@@ -1,9 +1,10 @@
 import {
+  consumeKmaEarthquakeQuota,
   type HazardEventInput,
   type HazardEventType,
   type HazardEventUpdateResult,
   recordApiLog,
-  replaceHazardEvents,
+  upsertHazardEvents,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
 
@@ -26,6 +27,10 @@ type KmaResponse = {
 
 const KMA_EQK_BASE_URL = "http://apis.data.go.kr/1360000/EqkInfoService";
 const HAZARD_NUM_OF_ROWS = 100;
+
+const hazardUpdateGlobal = globalThis as typeof globalThis & {
+  __plateletsHazardUpdatePromise?: Promise<HazardEventUpdateResult>;
+};
 
 function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -117,6 +122,8 @@ async function fetchKmaRecords(
   url.searchParams.set("dataType", "JSON");
   url.searchParams.set("fromTmFc", dateRange.fromTmFc);
   url.searchParams.set("toTmFc", dateRange.toTmFc);
+
+  await consumeKmaEarthquakeQuota();
 
   const response = await fetch(url, {
     cache: "no-store",
@@ -222,7 +229,9 @@ function mapTsunamiRecord(record: KmaRecord): HazardEventInput | null {
   };
 }
 
-export async function updateHazardEvents(): Promise<HazardEventUpdateResult> {
+async function updateHazardEventsUnlocked(
+  trigger: "background" | "manual" = "manual",
+): Promise<HazardEventUpdateResult> {
   const fetchedAt = new Date().toISOString();
 
   try {
@@ -231,13 +240,12 @@ export async function updateHazardEvents(): Promise<HazardEventUpdateResult> {
       category: "hazard",
       level: "info",
       message: "Hazard event update started.",
+      metadata: { trigger },
       status: "success",
     });
 
-    const [earthquakeRecords, tsunamiRecords] = await Promise.all([
-      fetchKmaRecords("earthquake", "getEqkMsg"),
-      fetchKmaRecords("tsunami", "getTsunamiMsg"),
-    ]);
+    const earthquakeRecords = await fetchKmaRecords("earthquake", "getEqkMsg");
+    const tsunamiRecords = await fetchKmaRecords("tsunami", "getTsunamiMsg");
     const events = [
       ...earthquakeRecords
         .map(mapEarthquakeRecord)
@@ -247,7 +255,7 @@ export async function updateHazardEvents(): Promise<HazardEventUpdateResult> {
         .filter((event): event is HazardEventInput => event !== null),
     ];
 
-    await replaceHazardEvents({
+    await upsertHazardEvents({
       events,
       fetchedAt,
     });
@@ -261,6 +269,7 @@ export async function updateHazardEvents(): Promise<HazardEventUpdateResult> {
         earthquakeCount: earthquakeRecords.length,
         importedCount: events.length,
         tsunamiCount: tsunamiRecords.length,
+        trigger,
       },
       requestCount: 2,
       status: "success",
@@ -286,8 +295,28 @@ export async function updateHazardEvents(): Promise<HazardEventUpdateResult> {
       category: "hazard",
       level: "error",
       message: error instanceof Error ? error.message : String(error),
+      metadata: { trigger },
       status: "failure",
     });
     throw error;
+  }
+}
+
+export async function updateHazardEvents(
+  trigger: "background" | "manual" = "manual",
+) {
+  if (hazardUpdateGlobal.__plateletsHazardUpdatePromise) {
+    return hazardUpdateGlobal.__plateletsHazardUpdatePromise;
+  }
+
+  const promise = updateHazardEventsUnlocked(trigger);
+  hazardUpdateGlobal.__plateletsHazardUpdatePromise = promise;
+
+  try {
+    return await promise;
+  } finally {
+    if (hazardUpdateGlobal.__plateletsHazardUpdatePromise === promise) {
+      hazardUpdateGlobal.__plateletsHazardUpdatePromise = undefined;
+    }
   }
 }

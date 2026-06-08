@@ -63,7 +63,7 @@ export type ApiLogEntry = Required<
 
 export type ApiUsageWindow = {
   monthlyLimit: number;
-  provider: "naver-geocoding";
+  provider: "kma-earthquake" | "naver-geocoding";
   registeredAt: string | null;
   updatedAt: string | null;
   usedCount: number;
@@ -150,7 +150,7 @@ type ApiLogRow = {
 
 type ApiUsageWindowRow = {
   monthly_limit: number;
-  provider: "naver-geocoding";
+  provider: ApiUsageWindow["provider"];
   registered_at: string | null;
   updated_at: string | null;
   used_count: number;
@@ -179,6 +179,7 @@ type HazardEventRow = {
 
 const dataDirectory = path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
+const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
 const NAVER_GEOCODING_MONTHLY_LIMIT = 300_000;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
@@ -426,6 +427,18 @@ function emptyNaverUsageWindow(): ApiUsageWindow {
   };
 }
 
+function emptyKmaEarthquakeUsageWindow(): ApiUsageWindow {
+  return {
+    monthlyLimit: KMA_EARTHQUAKE_DAILY_LIMIT,
+    provider: "kma-earthquake",
+    registeredAt: null,
+    updatedAt: null,
+    usedCount: 0,
+    windowEndsAt: null,
+    windowStartedAt: null,
+  };
+}
+
 function mapUsageWindowRow(row: ApiUsageWindowRow): ApiUsageWindow {
   return {
     monthlyLimit: row.monthly_limit,
@@ -465,11 +478,36 @@ function addOneMonth(value: Date) {
   return next;
 }
 
+function nextKstMidnight(value: Date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+  });
+  const parts = new Map(
+    formatter.formatToParts(value).map((part) => [part.type, part.value]),
+  );
+  const year = Number(parts.get("year"));
+  const month = Number(parts.get("month"));
+  const day = Number(parts.get("day"));
+
+  return new Date(Date.UTC(year, month - 1, day + 1, -9, 0, 0));
+}
+
 async function getNaverUsageWindowRow(db: SqliteDatabase) {
   return get<ApiUsageWindowRow>(
     db,
     "SELECT * FROM api_usage_windows WHERE provider = ?",
     ["naver-geocoding"],
+  );
+}
+
+async function getKmaEarthquakeUsageWindowRow(db: SqliteDatabase) {
+  return get<ApiUsageWindowRow>(
+    db,
+    "SELECT * FROM api_usage_windows WHERE provider = ?",
+    ["kma-earthquake"],
   );
 }
 
@@ -581,7 +619,7 @@ export async function recordApiLog(input: ApiLogInput) {
   );
 }
 
-export async function replaceHazardEvents(params: {
+export async function upsertHazardEvents(params: {
   events: HazardEventInput[];
   fetchedAt: string;
 }) {
@@ -590,8 +628,6 @@ export async function replaceHazardEvents(params: {
   await run(db, "BEGIN IMMEDIATE");
 
   try {
-    await run(db, "DELETE FROM hazard_events");
-
     for (const event of params.events) {
       await run(
         db,
@@ -611,7 +647,23 @@ export async function replaceHazardEvents(params: {
           image_url,
           raw_json,
           fetched_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(event_id) DO UPDATE SET
+          event_type = excluded.event_type,
+          title = excluded.title,
+          issued_at = excluded.issued_at,
+          occurred_at = excluded.occurred_at,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          location = excluded.location,
+          magnitude = excluded.magnitude,
+          intensity = excluded.intensity,
+          depth = excluded.depth,
+          description = excluded.description,
+          image_url = excluded.image_url,
+          raw_json = excluded.raw_json,
+          fetched_at = excluded.fetched_at,
+          updated_at = CURRENT_TIMESTAMP`,
         [
           event.eventId,
           event.eventType,
@@ -644,6 +696,13 @@ export async function getNaverGeocodingUsage() {
   const row = await getNaverUsageWindowRow(db);
 
   return row ? mapUsageWindowRow(row) : emptyNaverUsageWindow();
+}
+
+export async function getKmaEarthquakeUsage() {
+  const db = await getDatabase();
+  const row = await getKmaEarthquakeUsageWindowRow(db);
+
+  return row ? mapUsageWindowRow(row) : emptyKmaEarthquakeUsageWindow();
 }
 
 export async function consumeNaverGeocodingQuota() {
@@ -705,6 +764,67 @@ export async function consumeNaverGeocodingQuota() {
   }
 
   return getNaverGeocodingUsage();
+}
+
+export async function consumeKmaEarthquakeQuota(requestCount = 1) {
+  const db = await getDatabase();
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  await run(db, "BEGIN IMMEDIATE");
+
+  try {
+    const existing = await getKmaEarthquakeUsageWindowRow(db);
+    const shouldReset =
+      existing?.window_ends_at && now >= new Date(existing.window_ends_at);
+    const windowStartedAt =
+      existing && !shouldReset ? existing.window_started_at : nowIso;
+    const registeredAt = existing?.registered_at ?? nowIso;
+    const windowEndsAt =
+      existing && !shouldReset && existing.window_ends_at
+        ? existing.window_ends_at
+        : nextKstMidnight(now).toISOString();
+    const currentUsedCount = existing && !shouldReset ? existing.used_count : 0;
+
+    if (currentUsedCount + requestCount > KMA_EARTHQUAKE_DAILY_LIMIT) {
+      throw new Error("KMA earthquake daily request quota exceeded");
+    }
+
+    await run(
+      db,
+      `INSERT INTO api_usage_windows (
+        provider,
+        registered_at,
+        window_started_at,
+        window_ends_at,
+        used_count,
+        monthly_limit,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(provider) DO UPDATE SET
+        registered_at = excluded.registered_at,
+        window_started_at = excluded.window_started_at,
+        window_ends_at = excluded.window_ends_at,
+        used_count = excluded.used_count,
+        monthly_limit = excluded.monthly_limit,
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        "kma-earthquake",
+        registeredAt,
+        windowStartedAt,
+        windowEndsAt,
+        currentUsedCount + requestCount,
+        KMA_EARTHQUAKE_DAILY_LIMIT,
+      ],
+    );
+
+    await run(db, "COMMIT");
+  } catch (error) {
+    await run(db, "ROLLBACK");
+    throw error;
+  }
+
+  return getKmaEarthquakeUsage();
 }
 
 export async function listDatasetStatuses() {
