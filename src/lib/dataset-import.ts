@@ -10,6 +10,7 @@ import {
   recordDatasetError,
   replaceDataset,
 } from "@/lib/points-db";
+import { getPublicDataApiKey } from "@/lib/public-data";
 
 type CsvRecord = Record<string, unknown>;
 type AedRecord = Record<string, unknown>;
@@ -112,32 +113,19 @@ async function downloadCsv(source: DatasetSourceId) {
 
 function getNaverCredentials() {
   const keyId =
-    process.env.NAVER_MAPS_API_KEY_ID ?? process.env.NCP_APIGW_API_KEY_ID;
-  const key = process.env.NAVER_MAPS_API_KEY ?? process.env.NCP_APIGW_API_KEY;
+    process.env.NAVER_MAPS_CLIENT_ID ??
+    process.env.NAVER_MAPS_API_KEY_ID ??
+    process.env.NCP_APIGW_API_KEY_ID;
+  const key =
+    process.env.NAVER_MAPS_CLIENT_SECRET ??
+    process.env.NAVER_MAPS_API_KEY ??
+    process.env.NCP_APIGW_API_KEY;
 
   if (!keyId || !key) {
     return null;
   }
 
   return { key, keyId };
-}
-
-function getPublicDataApiKey() {
-  const key =
-    process.env.PUBLIC_DATA_API_KEY ??
-    process.env.DATA_GO_KR_API_KEY ??
-    process.env.DATA_GO_KR_SERVICE_KEY ??
-    null;
-
-  if (!key) {
-    return null;
-  }
-
-  try {
-    return key.includes("%") ? decodeURIComponent(key) : key;
-  } catch {
-    return key;
-  }
 }
 
 function parseCsv(csv: string) {

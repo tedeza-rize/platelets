@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "biome check",
+    "lint": "biome check && node scripts/check-encoding.mjs",
     "format": "biome format --write"
   },
   "dependencies": {
