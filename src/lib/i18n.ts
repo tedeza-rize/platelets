@@ -15,6 +15,8 @@ export type MapDictionary = {
     refreshAll: string;
     refreshFire: string;
     refreshPolice: string;
+    showFire: string;
+    showPolice: string;
     updateFailed: string;
     updating: string;
   };
@@ -29,7 +31,7 @@ export type MapDictionary = {
   };
   popup: {
     address: string;
-    kakaoDirections: string;
+    kakaoMap: string;
     naverMap: string;
     phone: string;
     sourceUpdatedAt: string;
@@ -63,12 +65,14 @@ const dictionaries: Record<Locale, AppDictionary> = {
         lastUpdated: "갱신",
         loading: "불러오는 중",
         neverUpdated: "미갱신",
-        panelLabel: "데이터셋 업데이트",
+        panelLabel: "표시 항목",
         points: "표시 지점",
         police: "경찰",
         refreshAll: "전체 업데이트",
         refreshFire: "소방 업데이트",
         refreshPolice: "경찰 업데이트",
+        showFire: "소방 표시",
+        showPolice: "경찰 표시",
         updateFailed: "업데이트 실패",
         updating: "업데이트 중",
       },
@@ -84,7 +88,7 @@ const dictionaries: Record<Locale, AppDictionary> = {
       },
       popup: {
         address: "주소",
-        kakaoDirections: "카카오맵 길찾기",
+        kakaoMap: "카카오맵",
         naverMap: "네이버 지도",
         phone: "전화",
         sourceUpdatedAt: "자료 기준일",
@@ -114,12 +118,14 @@ const dictionaries: Record<Locale, AppDictionary> = {
         lastUpdated: "Updated",
         loading: "Loading",
         neverUpdated: "Not updated",
-        panelLabel: "Dataset updates",
+        panelLabel: "Visible categories",
         points: "Visible points",
         police: "Police",
         refreshAll: "Update all",
         refreshFire: "Update fire",
         refreshPolice: "Update police",
+        showFire: "Show fire",
+        showPolice: "Show police",
         updateFailed: "Update failed",
         updating: "Updating",
       },
@@ -135,7 +141,7 @@ const dictionaries: Record<Locale, AppDictionary> = {
       },
       popup: {
         address: "Address",
-        kakaoDirections: "Kakao directions",
+        kakaoMap: "Kakao Map",
         naverMap: "Naver Map",
         phone: "Phone",
         sourceUpdatedAt: "Source date",

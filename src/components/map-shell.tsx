@@ -9,7 +9,6 @@ import {
   Home,
   Layers,
   MapPin,
-  RefreshCw,
   Shield,
 } from "lucide-react";
 import type {
@@ -231,14 +230,14 @@ function formatDateTime(value: string | null) {
   }).format(date);
 }
 
-function buildKakaoDirectionsUrl(point: PointFeatureProperties) {
-  const destination = encodeURIComponent(point.name);
-  return `https://map.kakao.com/link/to/${destination},${point.latitude},${point.longitude}`;
+function buildKakaoMapUrl(point: PointFeatureProperties) {
+  return `https://map.kakao.com/link/search/${encodeURIComponent(
+    point.address,
+  )}`;
 }
 
 function buildNaverMapUrl(point: PointFeatureProperties) {
-  const query = encodeURIComponent(`${point.name} ${point.address}`);
-  return `https://map.naver.com/p/search/${query}`;
+  return `https://map.naver.com/p/search/${encodeURIComponent(point.address)}`;
 }
 
 function buildPopupHtml(
@@ -266,11 +265,11 @@ function buildPopupHtml(
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
-      <a href="${buildKakaoDirectionsUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
-        dictionary.map.popup.kakaoDirections,
-      )}</a>
       <a href="${buildNaverMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
         dictionary.map.popup.naverMap,
+      )}</a>
+      <a href="${buildKakaoMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.kakaoMap,
       )}</a>
     </div>
   </article>`;
@@ -337,29 +336,6 @@ function syncPointLayerWhenReady(map: MapLibreMap, points: EmergencyPoint[]) {
   });
 }
 
-function fitToPoints(map: MapLibreMap, points: EmergencyPoint[]) {
-  const mappedPoints = points.filter(isMappedPoint);
-
-  if (mappedPoints.length === 0) {
-    return;
-  }
-
-  const lngValues = mappedPoints.map((point) => point.longitude);
-  const latValues = mappedPoints.map((point) => point.latitude);
-
-  map.fitBounds(
-    [
-      [Math.min(...lngValues), Math.min(...latValues)],
-      [Math.max(...lngValues), Math.max(...latValues)],
-    ],
-    {
-      duration: 800,
-      maxZoom: 9,
-      padding: 64,
-    },
-  );
-}
-
 export function MapShell({
   dictionary,
   initialProvider,
@@ -370,7 +346,6 @@ export function MapShell({
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const pointsRef = useRef<EmergencyPoint[]>([]);
-  const hasFitPointsRef = useRef(false);
   const initialStyleRef = useRef<StyleSpecification | string>(
     initialProvider === "vworld" && vworldApiKey.trim().length > 0
       ? createVworldStyle(vworldApiKey)
@@ -381,10 +356,13 @@ export function MapShell({
   const [points, setPoints] = useState<EmergencyPoint[]>([]);
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [updatingSource, setUpdatingSource] = useState<
-    DatasetSourceId | "all"
-  >();
   const [dataError, setDataError] = useState<string | null>(null);
+  const [visibleSources, setVisibleSources] = useState<
+    Record<DatasetSourceId, boolean>
+  >({
+    "fire-stations": true,
+    "police-stations": true,
+  });
 
   const isVworldReady = vworldApiKey.trim().length > 0;
   const activeProvider =
@@ -393,7 +371,11 @@ export function MapShell({
   const SelectedProviderIcon = selectedProviderConfig.icon;
   const selectedProviderLabel =
     dictionary.map.providers[selectedProviderConfig.labelKey];
-  const mappedPointCount = points.filter(isMappedPoint).length;
+  const visiblePoints = useMemo(
+    () => points.filter((point) => visibleSources[point.source]),
+    [points, visibleSources],
+  );
+  const mappedPointCount = visiblePoints.filter(isMappedPoint).length;
   const latestFetchedAt = useMemo(() => {
     const fetchedDates = datasets
       .map((dataset) => dataset.fetchedAt)
@@ -420,31 +402,6 @@ export function MapShell({
     setDatasets(datasetsPayload.datasets);
   }, []);
 
-  async function updateDataset(source: DatasetSourceId | "all") {
-    setUpdatingSource(source);
-    setDataError(null);
-
-    try {
-      const response = await fetch(
-        source === "all" ? "/api/datasets" : `/api/datasets/${source}/update`,
-        {
-          method: "POST",
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(dictionary.map.datasets.updateFailed);
-      }
-
-      await refreshData();
-      hasFitPointsRef.current = false;
-    } catch (error) {
-      setDataError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setUpdatingSource(undefined);
-    }
-  }
-
   useEffect(() => {
     let isDisposed = false;
 
@@ -466,19 +423,14 @@ export function MapShell({
   }, [refreshData]);
 
   useEffect(() => {
-    pointsRef.current = points;
+    pointsRef.current = visiblePoints;
 
     if (!mapRef.current) {
       return;
     }
 
-    syncPointLayerWhenReady(mapRef.current, points);
-
-    if (!hasFitPointsRef.current && points.some(isMappedPoint)) {
-      fitToPoints(mapRef.current, points);
-      hasFitPointsRef.current = true;
-    }
-  }, [points]);
+    syncPointLayerWhenReady(mapRef.current, visiblePoints);
+  }, [visiblePoints]);
 
   useEffect(() => {
     let isDisposed = false;
@@ -546,11 +498,6 @@ export function MapShell({
 
       map.once("load", () => {
         syncPointLayerWhenReady(map, pointsRef.current);
-
-        if (!hasFitPointsRef.current && pointsRef.current.some(isMappedPoint)) {
-          fitToPoints(map, pointsRef.current);
-          hasFitPointsRef.current = true;
-        }
       });
     }
 
@@ -731,37 +678,30 @@ export function MapShell({
 
           <div className={styles.updateActions}>
             <button
+              aria-pressed={visibleSources["fire-stations"]}
               className={styles.updateButton}
-              disabled={Boolean(updatingSource)}
-              onClick={() => updateDataset("all")}
-              title={dictionary.map.datasets.refreshAll}
-              type="button"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={
-                  updatingSource === "all" ? styles.spinningIcon : undefined
-                }
-                size={16}
-                strokeWidth={2.4}
-              />
-              <span>{dictionary.map.datasets.all}</span>
-            </button>
-            <button
-              className={styles.updateButton}
-              disabled={Boolean(updatingSource)}
-              onClick={() => updateDataset("fire-stations")}
-              title={dictionary.map.datasets.refreshFire}
+              onClick={() =>
+                setVisibleSources((current) => ({
+                  ...current,
+                  "fire-stations": !current["fire-stations"],
+                }))
+              }
+              title={dictionary.map.datasets.showFire}
               type="button"
             >
               <Flame aria-hidden="true" size={16} strokeWidth={2.4} />
               <span>{dictionary.map.datasets.fire}</span>
             </button>
             <button
+              aria-pressed={visibleSources["police-stations"]}
               className={styles.updateButton}
-              disabled={Boolean(updatingSource)}
-              onClick={() => updateDataset("police-stations")}
-              title={dictionary.map.datasets.refreshPolice}
+              onClick={() =>
+                setVisibleSources((current) => ({
+                  ...current,
+                  "police-stations": !current["police-stations"],
+                }))
+              }
+              title={dictionary.map.datasets.showPolice}
               type="button"
             >
               <Shield aria-hidden="true" size={16} strokeWidth={2.4} />
@@ -769,12 +709,9 @@ export function MapShell({
             </button>
           </div>
 
-          {isLoadingData || updatingSource || dataError ? (
+          {isLoadingData || dataError ? (
             <output className={styles.dataNotice}>
-              {dataError ??
-                (updatingSource
-                  ? dictionary.map.datasets.updating
-                  : dictionary.map.datasets.loading)}
+              {dataError ?? dictionary.map.datasets.loading}
             </output>
           ) : null}
         </section>
