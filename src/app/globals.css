@@ -9,6 +9,10 @@
   --control-selected: #ffffff;
   --control-shadow: 0 2px 8px rgb(24 32 28 / 12%);
   --control-surface: #edf3ef;
+  --dropdown-border: #cfdad2;
+  --dropdown-hover: #edf3ef;
+  --dropdown-shadow: 0 12px 28px rgb(24 32 28 / 18%);
+  --dropdown-surface: #ffffff;
   --focus-ring: #2a7ee4;
   --map-fallback: #dce7df;
   --nav-action-active: rgb(255 255 255 / 18%);
@@ -37,6 +41,10 @@
     --control-selected: #223027;
     --control-shadow: 0 2px 8px rgb(0 0 0 / 32%);
     --control-surface: #171e1a;
+    --dropdown-border: #38453d;
+    --dropdown-hover: #223027;
+    --dropdown-shadow: 0 12px 28px rgb(0 0 0 / 42%);
+    --dropdown-surface: #161d18;
     --focus-ring: #7db7ff;
     --map-fallback: #202820;
     --nav-action-active: rgb(255 255 255 / 16%);

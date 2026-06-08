@@ -7,6 +7,7 @@ export type MapDictionary = {
   missingKeyTitle: string;
   providerButtonLabel: string;
   providerLegend: string;
+  providerMenuLabel: string;
   providers: {
     osm: string;
     vworld: string;
@@ -39,6 +40,7 @@ const dictionaries: Record<Locale, AppDictionary> = {
       missingKeyTitle: "브이월드 API 키가 필요합니다",
       providerButtonLabel: "{provider} 지도로 전환",
       providerLegend: "지도 제공자",
+      providerMenuLabel: "지도 서비스 선택: 현재 {provider}",
       providers: {
         osm: "OSM",
         vworld: "브이월드",
@@ -66,6 +68,7 @@ const dictionaries: Record<Locale, AppDictionary> = {
       missingKeyTitle: "VWorld API key required",
       providerButtonLabel: "Switch to {provider} map",
       providerLegend: "Map provider",
+      providerMenuLabel: "Choose map service: currently {provider}",
       providers: {
         osm: "OSM",
         vworld: "VWorld",
