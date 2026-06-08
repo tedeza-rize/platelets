@@ -4,15 +4,15 @@ import {
   ClipboardList,
   Database,
   Flame,
+  HeartPulse,
   RefreshCw,
   Shield,
   TerminalSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DatasetSourceId } from "@/lib/dataset-sources";
 import styles from "./management-console.module.css";
-
-type DatasetSourceId = "fire-stations" | "police-stations";
 
 type DatasetStatus = {
   error: string | null;
@@ -80,6 +80,18 @@ function statusClassName(status: ApiLogEntry["status"]) {
   }
 
   return styles.statusSkipped;
+}
+
+function datasetIcon(source: DatasetSourceId) {
+  if (source === "fire-stations") {
+    return <Flame aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
+  if (source === "police-stations") {
+    return <Shield aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
+  return <HeartPulse aria-hidden="true" size={16} strokeWidth={2.4} />;
 }
 
 export function ManagementConsole({ mode }: ManagementConsoleProps) {
@@ -232,24 +244,27 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
               />
               전체
             </button>
-            <button
-              className={styles.actionButton}
-              disabled={Boolean(activeUpdate)}
-              onClick={() => updateDataset("fire-stations")}
-              type="button"
-            >
-              <Flame aria-hidden="true" size={16} strokeWidth={2.4} />
-              소방
-            </button>
-            <button
-              className={styles.actionButton}
-              disabled={Boolean(activeUpdate)}
-              onClick={() => updateDataset("police-stations")}
-              type="button"
-            >
-              <Shield aria-hidden="true" size={16} strokeWidth={2.4} />
-              경찰
-            </button>
+            {datasets.map((dataset) => (
+              <button
+                className={styles.actionButton}
+                disabled={Boolean(activeUpdate)}
+                key={dataset.id}
+                onClick={() => updateDataset(dataset.id)}
+                type="button"
+              >
+                {activeUpdate === dataset.id ? (
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={styles.spinning}
+                    size={16}
+                    strokeWidth={2.4}
+                  />
+                ) : (
+                  datasetIcon(dataset.id)
+                )}
+                {dataset.label}
+              </button>
+            ))}
           </div>
           <output className={styles.notice}>{notice}</output>
         </section>

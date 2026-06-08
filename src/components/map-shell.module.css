@@ -135,6 +135,105 @@
   height: 100%;
 }
 
+.sourceMenu {
+  position: absolute;
+  top: 78px;
+  right: 10px;
+  z-index: 950;
+  display: grid;
+  justify-items: end;
+}
+
+.sourceMenuButton {
+  display: inline-flex;
+  min-width: 70px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 0 8px;
+  box-shadow: var(--control-shadow);
+}
+
+.sourceMenuButton:hover,
+.sourceMenuButton:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.sourceDropdown {
+  display: grid;
+  width: min(260px, calc(100vw - 24px));
+  max-height: min(420px, calc(100dvh - 126px));
+  gap: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid var(--dropdown-border);
+  border-radius: 8px;
+  background: var(--dropdown-surface);
+  box-shadow: var(--dropdown-shadow);
+  color: var(--text-strong);
+  padding: 10px;
+}
+
+.sourceDropdown legend {
+  padding: 0;
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.sourceList {
+  display: grid;
+  gap: 2px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.sourceItem {
+  display: grid;
+  min-height: 34px;
+  align-items: center;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  line-height: 1.25;
+  padding: 0 6px;
+}
+
+.sourceItem:hover {
+  background: var(--dropdown-hover);
+}
+
+.sourceItem input {
+  width: 15px;
+  height: 15px;
+  accent-color: #225ea8;
+}
+
+.sourceItem span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceItem small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .datasetPanel {
   position: absolute;
   left: 16px;
@@ -171,55 +270,6 @@
 .datasetMetric span:nth-child(2) {
   color: var(--text-strong);
   font-weight: 700;
-}
-
-.updateActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.updateButton {
-  display: inline-flex;
-  min-width: 0;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  background: var(--control-selected);
-  color: var(--text-strong);
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  padding: 0 10px;
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
-}
-
-.updateButton:hover:not(:disabled),
-.updateButton:focus-visible {
-  border-color: var(--focus-ring);
-  outline: 0;
-}
-
-.updateButton[aria-pressed="true"] {
-  border-color: var(--focus-ring);
-  background: #225ea8;
-  color: #ffffff;
-}
-
-.updateButton[aria-pressed="false"] {
-  color: var(--text-muted);
-}
-
-.updateButton:disabled {
-  cursor: wait;
-  opacity: 0.65;
 }
 
 .dataNotice {
@@ -364,14 +414,9 @@
     gap: 6px;
   }
 
-  .updateActions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .updateButton {
-    min-height: 32px;
-    font-size: 0.78rem;
-    padding: 0 6px;
+  .sourceMenu {
+    top: 76px;
+    right: 10px;
   }
 
   .notice {

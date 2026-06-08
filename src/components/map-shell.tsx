@@ -4,12 +4,11 @@ import {
   Check,
   ChevronDown,
   Database,
-  Flame,
   Globe2,
   Home,
   Layers,
+  ListFilter,
   MapPin,
-  Shield,
 } from "lucide-react";
 import type {
   GeoJSONSource,
@@ -19,11 +18,11 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DatasetSourceId } from "@/lib/dataset-sources";
 import type { AppDictionary } from "@/lib/i18n";
 import styles from "./map-shell.module.css";
 
 type MapProvider = "vworld" | "osm";
-type DatasetSourceId = "fire-stations" | "police-stations";
 
 type MapShellProps = {
   dictionary: AppDictionary;
@@ -82,6 +81,16 @@ const VWORLD_MAX_ZOOM = 19;
 const POINTS_SOURCE_ID = "emergency-points";
 const POINTS_HALO_LAYER_ID = "emergency-points-halo";
 const POINTS_LAYER_ID = "emergency-points-circle";
+const SOURCE_COLORS: Record<DatasetSourceId, string> = {
+  aeds: "#059669",
+  "fire-stations": "#dc2626",
+  "police-stations": "#1d4ed8",
+};
+const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
+  aeds: "#10b981",
+  "fire-stations": "#f97316",
+  "police-stations": "#2563eb",
+};
 
 type PointFeatureProperties = {
   address: string;
@@ -296,10 +305,15 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPoint[]) {
     id: POINTS_HALO_LAYER_ID,
     paint: {
       "circle-color": [
-        "case",
-        ["==", ["get", "source"], "fire-stations"],
-        "#f97316",
-        "#2563eb",
+        "match",
+        ["get", "source"],
+        "fire-stations",
+        SOURCE_HALO_COLORS["fire-stations"],
+        "police-stations",
+        SOURCE_HALO_COLORS["police-stations"],
+        "aeds",
+        SOURCE_HALO_COLORS.aeds,
+        "#6b7280",
       ],
       "circle-opacity": 0.2,
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 20],
@@ -311,10 +325,15 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPoint[]) {
     id: POINTS_LAYER_ID,
     paint: {
       "circle-color": [
-        "case",
-        ["==", ["get", "source"], "fire-stations"],
-        "#dc2626",
-        "#1d4ed8",
+        "match",
+        ["get", "source"],
+        "fire-stations",
+        SOURCE_COLORS["fire-stations"],
+        "police-stations",
+        SOURCE_COLORS["police-stations"],
+        "aeds",
+        SOURCE_COLORS.aeds,
+        "#374151",
       ],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 9],
       "circle-stroke-color": "#ffffff",
@@ -343,6 +362,7 @@ export function MapShell({
 }: MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const providerMenuRef = useRef<HTMLDivElement>(null);
+  const sourceMenuRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const pointsRef = useRef<EmergencyPoint[]>([]);
@@ -353,16 +373,14 @@ export function MapShell({
   );
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
   const [points, setPoints] = useState<EmergencyPoint[]>([]);
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [visibleSources, setVisibleSources] = useState<
-    Record<DatasetSourceId, boolean>
-  >({
-    "fire-stations": true,
-    "police-stations": true,
-  });
+    Partial<Record<DatasetSourceId, boolean>>
+  >({});
 
   const isVworldReady = vworldApiKey.trim().length > 0;
   const activeProvider =
@@ -372,7 +390,7 @@ export function MapShell({
   const selectedProviderLabel =
     dictionary.map.providers[selectedProviderConfig.labelKey];
   const visiblePoints = useMemo(
-    () => points.filter((point) => visibleSources[point.source]),
+    () => points.filter((point) => visibleSources[point.source] ?? true),
     [points, visibleSources],
   );
   const mappedPointCount = visiblePoints.filter(isMappedPoint).length;
@@ -384,6 +402,18 @@ export function MapShell({
 
     return fetchedDates.at(-1) ?? null;
   }, [datasets]);
+  const sourcePointCounts = useMemo(() => {
+    const counts = new Map<DatasetSourceId, number>();
+
+    for (const point of points) {
+      counts.set(point.source, (counts.get(point.source) ?? 0) + 1);
+    }
+
+    return counts;
+  }, [points]);
+  const selectedDatasetCount = datasets.filter(
+    (dataset) => visibleSources[dataset.id] ?? true,
+  ).length;
 
   const refreshData = useCallback(async () => {
     const [pointsResponse, datasetsResponse] = await Promise.all([
@@ -421,6 +451,22 @@ export function MapShell({
       isDisposed = true;
     };
   }, [refreshData]);
+
+  useEffect(() => {
+    if (datasets.length === 0) {
+      return;
+    }
+
+    setVisibleSources((current) => {
+      const next: Partial<Record<DatasetSourceId, boolean>> = {};
+
+      for (const dataset of datasets) {
+        next[dataset.id] = current[dataset.id] ?? true;
+      }
+
+      return next;
+    });
+  }, [datasets]);
 
   useEffect(() => {
     pointsRef.current = visiblePoints;
@@ -582,6 +628,29 @@ export function MapShell({
     };
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    if (!isSourceMenuOpen) {
+      return;
+    }
+
+    function closeMenu(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        sourceMenuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+
+      setIsSourceMenuOpen(false);
+    }
+
+    window.addEventListener("pointerdown", closeMenu);
+
+    return () => {
+      window.removeEventListener("pointerdown", closeMenu);
+    };
+  }, [isSourceMenuOpen]);
+
   return (
     <div className={styles.page}>
       <nav className={styles.navbar} aria-label={dictionary.navigation.label}>
@@ -656,6 +725,53 @@ export function MapShell({
           ref={mapContainerRef}
           role="application"
         />
+        <div className={styles.sourceMenu} ref={sourceMenuRef}>
+          <button
+            aria-expanded={isSourceMenuOpen}
+            aria-haspopup="true"
+            aria-label={dictionary.map.datasets.sourceMenuLabel}
+            className={styles.sourceMenuButton}
+            onClick={() => setIsSourceMenuOpen((current) => !current)}
+            title={dictionary.map.datasets.sourceMenuLabel}
+            type="button"
+          >
+            <ListFilter aria-hidden="true" size={18} strokeWidth={2.5} />
+            <span>
+              {selectedDatasetCount.toLocaleString("ko-KR")}/
+              {datasets.length.toLocaleString("ko-KR")}
+            </span>
+          </button>
+          {isSourceMenuOpen ? (
+            <fieldset
+              aria-label={dictionary.map.datasets.sourceMenuTitle}
+              className={styles.sourceDropdown}
+            >
+              <legend>{dictionary.map.datasets.sourceMenuTitle}</legend>
+              <div className={styles.sourceList}>
+                {datasets.map((dataset) => (
+                  <label className={styles.sourceItem} key={dataset.id}>
+                    <input
+                      checked={visibleSources[dataset.id] ?? true}
+                      onChange={() =>
+                        setVisibleSources((current) => ({
+                          ...current,
+                          [dataset.id]: !(current[dataset.id] ?? true),
+                        }))
+                      }
+                      type="checkbox"
+                    />
+                    <span>{dataset.label}</span>
+                    <small>
+                      {(sourcePointCounts.get(dataset.id) ?? 0).toLocaleString(
+                        "ko-KR",
+                      )}
+                    </small>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
+        </div>
         <section
           aria-label={dictionary.map.datasets.panelLabel}
           className={styles.datasetPanel}
@@ -674,39 +790,6 @@ export function MapShell({
                   dictionary.map.datasets.neverUpdated}
               </span>
             </span>
-          </div>
-
-          <div className={styles.updateActions}>
-            <button
-              aria-pressed={visibleSources["fire-stations"]}
-              className={styles.updateButton}
-              onClick={() =>
-                setVisibleSources((current) => ({
-                  ...current,
-                  "fire-stations": !current["fire-stations"],
-                }))
-              }
-              title={dictionary.map.datasets.showFire}
-              type="button"
-            >
-              <Flame aria-hidden="true" size={16} strokeWidth={2.4} />
-              <span>{dictionary.map.datasets.fire}</span>
-            </button>
-            <button
-              aria-pressed={visibleSources["police-stations"]}
-              className={styles.updateButton}
-              onClick={() =>
-                setVisibleSources((current) => ({
-                  ...current,
-                  "police-stations": !current["police-stations"],
-                }))
-              }
-              title={dictionary.map.datasets.showPolice}
-              type="button"
-            >
-              <Shield aria-hidden="true" size={16} strokeWidth={2.4} />
-              <span>{dictionary.map.datasets.police}</span>
-            </button>
           </div>
 
           {isLoadingData || dataError ? (

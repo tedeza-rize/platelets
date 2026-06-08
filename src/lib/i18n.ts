@@ -4,6 +4,7 @@ export type MapDictionary = {
   activeProvider: string;
   ariaLabel: string;
   datasets: {
+    aed: string;
     all: string;
     fire: string;
     lastUpdated: string;
@@ -17,6 +18,8 @@ export type MapDictionary = {
     refreshPolice: string;
     showFire: string;
     showPolice: string;
+    sourceMenuLabel: string;
+    sourceMenuTitle: string;
     updateFailed: string;
     updating: string;
   };
@@ -60,12 +63,13 @@ const dictionaries: Record<Locale, AppDictionary> = {
       activeProvider: "선택한 지도: {provider}",
       ariaLabel: "전국 비상 대응 거점 지도",
       datasets: {
+        aed: "AED",
         all: "전체",
         fire: "소방",
         lastUpdated: "갱신",
         loading: "불러오는 중",
         neverUpdated: "미갱신",
-        panelLabel: "표시 항목",
+        panelLabel: "표시 항목 상태",
         points: "표시 지점",
         police: "경찰",
         refreshAll: "전체 업데이트",
@@ -73,6 +77,8 @@ const dictionaries: Record<Locale, AppDictionary> = {
         refreshPolice: "경찰 업데이트",
         showFire: "소방 표시",
         showPolice: "경찰 표시",
+        sourceMenuLabel: "표시 항목 선택",
+        sourceMenuTitle: "표시 항목",
         updateFailed: "업데이트 실패",
         updating: "업데이트 중",
       },
@@ -113,12 +119,13 @@ const dictionaries: Record<Locale, AppDictionary> = {
       activeProvider: "Selected map: {provider}",
       ariaLabel: "Nationwide emergency response point map",
       datasets: {
+        aed: "AED",
         all: "All",
         fire: "Fire",
         lastUpdated: "Updated",
         loading: "Loading",
         neverUpdated: "Not updated",
-        panelLabel: "Visible categories",
+        panelLabel: "Visible category status",
         points: "Visible points",
         police: "Police",
         refreshAll: "Update all",
@@ -126,6 +133,8 @@ const dictionaries: Record<Locale, AppDictionary> = {
         refreshPolice: "Update police",
         showFire: "Show fire",
         showPolice: "Show police",
+        sourceMenuLabel: "Choose visible categories",
+        sourceMenuTitle: "Visible categories",
         updateFailed: "Update failed",
         updating: "Updating",
       },
