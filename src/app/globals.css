@@ -1,4 +1,5 @@
 :root {
+  --navbar-height: 38px;
   --background: #ffffff;
   --foreground: #18201c;
   --border: #d8e0d9;
@@ -10,7 +11,13 @@
   --control-surface: #edf3ef;
   --focus-ring: #2a7ee4;
   --map-fallback: #dce7df;
+  --nav-action-active: rgb(255 255 255 / 18%);
+  --nav-border: rgb(255 255 255 / 24%);
+  --nav-focus-ring: rgb(255 255 255 / 78%);
+  --nav-gradient: linear-gradient(90deg, #4f86d7 0%, #5a88d2 48%, #6740c7 100%);
   --nav-surface: rgb(255 255 255 / 82%);
+  --nav-text: rgb(255 255 255 / 86%);
+  --nav-text-strong: #ffffff;
   --notice-border: #cad7ce;
   --notice-shadow: 0 12px 32px rgb(24 32 28 / 16%);
   --notice-surface: rgb(255 255 255 / 94%);
@@ -32,7 +39,18 @@
     --control-surface: #171e1a;
     --focus-ring: #7db7ff;
     --map-fallback: #202820;
+    --nav-action-active: rgb(255 255 255 / 16%);
+    --nav-border: rgb(255 255 255 / 18%);
+    --nav-focus-ring: rgb(255 255 255 / 76%);
+    --nav-gradient: linear-gradient(
+      90deg,
+      #285899 0%,
+      #365d9b 48%,
+      #4a2d92 100%
+    );
     --nav-surface: rgb(17 21 18 / 84%);
+    --nav-text: rgb(255 255 255 / 86%);
+    --nav-text-strong: #ffffff;
     --notice-border: #3a463f;
     --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
     --notice-surface: rgb(22 29 24 / 94%);

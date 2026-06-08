@@ -1,19 +1,22 @@
 "use client";
 
-import L, { type Map as LeafletMap, type TileLayer } from "leaflet";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { MapDictionary } from "@/lib/i18n";
+import type { Map as LeafletMap, TileLayer } from "leaflet";
+import { Globe2, Home, Layers } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { AppDictionary } from "@/lib/i18n";
 import styles from "./map-shell.module.css";
 
 type MapProvider = "vworld" | "osm";
 
 type MapShellProps = {
-  dictionary: MapDictionary;
+  dictionary: AppDictionary;
   initialProvider: MapProvider;
   vworldApiKey: string;
 };
 
-const SEOUL_CENTER: L.LatLngExpression = [37.5665, 126.978];
+type LeafletModule = typeof import("leaflet");
+
+const SEOUL_CENTER: [number, number] = [37.5665, 126.978];
 const DEFAULT_ZOOM = 12;
 const TILE_SIZE = 256;
 const MAX_ZOOM = 19;
@@ -22,12 +25,14 @@ const PROVIDERS: Record<
   MapProvider,
   {
     attribution: string;
-    labelKey: keyof MapDictionary["providers"];
+    icon: typeof Layers;
+    labelKey: keyof AppDictionary["map"]["providers"];
     url: (vworldApiKey: string) => string;
   }
 > = {
   vworld: {
     attribution: "VWorld",
+    icon: Layers,
     labelKey: "vworld",
     url: (vworldApiKey) =>
       `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(
@@ -36,6 +41,7 @@ const PROVIDERS: Record<
   },
   osm: {
     attribution: "&copy; OpenStreetMap contributors",
+    icon: Globe2,
     labelKey: "osm",
     url: () => "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   },
@@ -46,45 +52,50 @@ export function MapShell({
   initialProvider,
   vworldApiKey,
 }: MapShellProps) {
-  const mapId = useId();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const tileLayerRef = useRef<TileLayer | null>(null);
+  const [leaflet, setLeaflet] = useState<LeafletModule | null>(null);
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
 
   const isVworldReady = vworldApiKey.trim().length > 0;
   const activeProvider =
     provider === "vworld" && !isVworldReady ? "osm" : provider;
-  const selectedProvider = PROVIDERS[provider];
   const activeProviderConfig = PROVIDERS[activeProvider];
 
-  const providerOptions = useMemo(
-    () =>
-      (Object.keys(PROVIDERS) as MapProvider[]).map((providerKey) => ({
-        label: dictionary.providers[PROVIDERS[providerKey].labelKey],
-        value: providerKey,
-      })),
-    [dictionary.providers],
-  );
-
   useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) {
-      return;
+    let isDisposed = false;
+
+    async function initializeMap() {
+      if (!mapContainerRef.current || mapRef.current) {
+        return;
+      }
+
+      const leafletModule = await import("leaflet");
+
+      if (isDisposed || !mapContainerRef.current || mapRef.current) {
+        return;
+      }
+
+      mapRef.current = leafletModule.map(mapContainerRef.current, {
+        center: SEOUL_CENTER,
+        zoom: DEFAULT_ZOOM,
+        zoomControl: false,
+      });
+
+      leafletModule.control
+        .zoom({
+          position: "topright",
+        })
+        .addTo(mapRef.current);
+
+      setLeaflet(leafletModule);
     }
 
-    mapRef.current = L.map(mapContainerRef.current, {
-      center: SEOUL_CENTER,
-      zoom: DEFAULT_ZOOM,
-      zoomControl: false,
-    });
-
-    L.control
-      .zoom({
-        position: "bottomright",
-      })
-      .addTo(mapRef.current);
+    initializeMap();
 
     return () => {
+      isDisposed = true;
       mapRef.current?.remove();
       mapRef.current = null;
       tileLayerRef.current = null;
@@ -92,66 +103,80 @@ export function MapShell({
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) {
+    if (!leaflet || !mapRef.current) {
       return;
     }
 
     tileLayerRef.current?.remove();
-    tileLayerRef.current = L.tileLayer(activeProviderConfig.url(vworldApiKey), {
-      attribution: activeProviderConfig.attribution,
-      maxZoom: MAX_ZOOM,
-      tileSize: TILE_SIZE,
-    }).addTo(mapRef.current);
-  }, [activeProviderConfig, vworldApiKey]);
+    tileLayerRef.current = leaflet
+      .tileLayer(activeProviderConfig.url(vworldApiKey), {
+        attribution: activeProviderConfig.attribution,
+        maxZoom: MAX_ZOOM,
+        tileSize: TILE_SIZE,
+      })
+      .addTo(mapRef.current);
+    mapRef.current.invalidateSize();
+  }, [activeProviderConfig, leaflet, vworldApiKey]);
 
   return (
-    <section className={styles.shell} aria-labelledby={`${mapId}-title`}>
-      <div className={styles.toolbar}>
-        <div>
-          <h1 id={`${mapId}-title`} className={styles.title}>
-            {dictionary.title}
-          </h1>
-          <p className={styles.status}>
-            {dictionary.activeProvider.replace(
-              "{provider}",
-              dictionary.providers[selectedProvider.labelKey],
-            )}
-          </p>
-        </div>
+    <div className={styles.page}>
+      <nav className={styles.navbar} aria-label={dictionary.navigation.label}>
+        <a
+          aria-label={dictionary.navigation.homeLabel}
+          className={styles.homeLink}
+          href="/"
+          title={dictionary.navigation.homeLabel}
+        >
+          <Home aria-hidden="true" size={22} strokeWidth={2.6} />
+        </a>
 
-        <fieldset className={styles.providerGroup}>
+        <h1 className={styles.navTitle}>{dictionary.navigation.title}</h1>
+
+        <fieldset className={styles.providerActions}>
           <legend className={styles.providerLegend}>
-            {dictionary.providerLegend}
+            {dictionary.map.providerLegend}
           </legend>
-          {providerOptions.map((option) => (
-            <label className={styles.providerOption} key={option.value}>
-              <input
-                checked={provider === option.value}
-                name="map-provider"
-                onChange={() => setProvider(option.value)}
-                type="radio"
-                value={option.value}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </fieldset>
-      </div>
+          {(Object.keys(PROVIDERS) as MapProvider[]).map((providerKey) => {
+            const providerConfig = PROVIDERS[providerKey];
+            const Icon = providerConfig.icon;
+            const providerLabel =
+              dictionary.map.providers[providerConfig.labelKey];
 
-      <div className={styles.mapFrame}>
+            return (
+              <button
+                aria-label={dictionary.map.providerButtonLabel.replace(
+                  "{provider}",
+                  providerLabel,
+                )}
+                aria-pressed={provider === providerKey}
+                className={styles.providerButton}
+                data-active={provider === providerKey}
+                key={providerKey}
+                onClick={() => setProvider(providerKey)}
+                title={providerLabel}
+                type="button"
+              >
+                <Icon aria-hidden="true" size={18} strokeWidth={2.5} />
+              </button>
+            );
+          })}
+        </fieldset>
+      </nav>
+
+      <main className={styles.main}>
         <div
-          aria-label={dictionary.ariaLabel}
+          aria-label={dictionary.map.ariaLabel}
           className={styles.map}
           ref={mapContainerRef}
           role="application"
         />
         {provider === "vworld" && !isVworldReady ? (
           <output className={styles.notice}>
-            <strong>{dictionary.missingKeyTitle}</strong>
-            <span>{dictionary.missingKeyBody}</span>
+            <strong>{dictionary.map.missingKeyTitle}</strong>
+            <span>{dictionary.map.missingKeyBody}</span>
           </output>
         ) : null}
-      </div>
-    </section>
+      </main>
+    </div>
   );
 }
