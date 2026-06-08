@@ -6,11 +6,12 @@ import { listApiLogs } from "@/lib/points-db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type LogCategory = "dataset" | "geocoding" | "system" | "ui";
+type LogCategory = "dataset" | "geocoding" | "hazard" | "system" | "ui";
 
 const LOG_CATEGORIES = new Set<LogCategory>([
   "dataset",
   "geocoding",
+  "hazard",
   "system",
   "ui",
 ]);

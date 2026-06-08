@@ -105,6 +105,7 @@ export function LogConsole() {
               <option value="">전체 분류</option>
               <option value="dataset">dataset</option>
               <option value="geocoding">geocoding</option>
+              <option value="hazard">hazard</option>
               <option value="system">system</option>
               <option value="ui">ui</option>
             </select>

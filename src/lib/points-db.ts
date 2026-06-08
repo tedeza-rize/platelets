@@ -42,7 +42,7 @@ export type DatasetUpdateResult = DatasetStatus & {
 
 export type ApiLogInput = {
   action: string;
-  category: "dataset" | "geocoding" | "system" | "ui";
+  category: "dataset" | "geocoding" | "hazard" | "system" | "ui";
   level: "debug" | "error" | "info" | "warn";
   message: string;
   metadata?: Record<string, unknown>;
@@ -69,6 +69,39 @@ export type ApiUsageWindow = {
   usedCount: number;
   windowEndsAt: string | null;
   windowStartedAt: string | null;
+};
+
+export type HazardEventType = "earthquake" | "tsunami";
+
+export type HazardEventInput = {
+  eventId: string;
+  eventType: HazardEventType;
+  title: string;
+  issuedAt: string | null;
+  occurredAt: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location: string;
+  magnitude: string | null;
+  intensity: string | null;
+  depth: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  raw: Record<string, string>;
+};
+
+export type HazardEvent = HazardEventInput & {
+  fetchedAt: string | null;
+  id: number;
+};
+
+export type HazardEventUpdateResult = {
+  fetchedAt: string;
+  importedCount: number;
+  sources: Array<{
+    count: number;
+    eventType: HazardEventType;
+  }>;
 };
 
 type SqliteDatabase = sqlite3.Database;
@@ -123,6 +156,25 @@ type ApiUsageWindowRow = {
   used_count: number;
   window_ends_at: string | null;
   window_started_at: string | null;
+};
+
+type HazardEventRow = {
+  depth: string | null;
+  description: string | null;
+  event_id: string;
+  event_type: HazardEventType;
+  fetched_at: string | null;
+  id: number;
+  image_url: string | null;
+  intensity: string | null;
+  issued_at: string | null;
+  latitude: number | null;
+  location: string;
+  longitude: number | null;
+  magnitude: string | null;
+  occurred_at: string | null;
+  raw_json: string;
+  title: string;
 };
 
 const dataDirectory = path.join(process.cwd(), "data");
@@ -233,6 +285,29 @@ async function initializeDatabase(db: SqliteDatabase) {
   );
   await run(
     db,
+    `CREATE TABLE IF NOT EXISTS hazard_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT NOT NULL UNIQUE,
+      event_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      issued_at TEXT,
+      occurred_at TEXT,
+      latitude REAL,
+      longitude REAL,
+      location TEXT NOT NULL,
+      magnitude TEXT,
+      intensity TEXT,
+      depth TEXT,
+      description TEXT,
+      image_url TEXT,
+      raw_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+  await run(
+    db,
     "CREATE INDEX IF NOT EXISTS points_source_idx ON points(source)",
   );
   await run(
@@ -246,6 +321,14 @@ async function initializeDatabase(db: SqliteDatabase) {
   await run(
     db,
     "CREATE INDEX IF NOT EXISTS api_logs_category_idx ON api_logs(category, event_at DESC)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS hazard_events_event_idx ON hazard_events(event_type, issued_at DESC)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS hazard_events_coordinates_idx ON hazard_events(latitude, longitude)",
   );
 }
 
@@ -355,6 +438,27 @@ function mapUsageWindowRow(row: ApiUsageWindowRow): ApiUsageWindow {
   };
 }
 
+function mapHazardEventRow(row: HazardEventRow): HazardEvent {
+  return {
+    depth: row.depth,
+    description: row.description,
+    eventId: row.event_id,
+    eventType: row.event_type,
+    fetchedAt: row.fetched_at,
+    id: row.id,
+    imageUrl: row.image_url,
+    intensity: row.intensity,
+    issuedAt: row.issued_at,
+    latitude: row.latitude,
+    location: row.location,
+    longitude: row.longitude,
+    magnitude: row.magnitude,
+    occurredAt: row.occurred_at,
+    raw: JSON.parse(row.raw_json) as Record<string, string>,
+    title: row.title,
+  };
+}
+
 function addOneMonth(value: Date) {
   const next = new Date(value);
   next.setMonth(next.getMonth() + 1);
@@ -434,6 +538,21 @@ export async function listApiLogs(
   return rows.map(mapApiLogRow);
 }
 
+export async function listHazardEvents(options: { limit?: number } = {}) {
+  const db = await getDatabase();
+  const limit = Math.min(Math.max(options.limit ?? 100, 1), 300);
+  const rows = await all<HazardEventRow>(
+    db,
+    `SELECT *
+      FROM hazard_events
+      ORDER BY COALESCE(issued_at, occurred_at, fetched_at) DESC, id DESC
+      LIMIT ?`,
+    [limit],
+  );
+
+  return rows.map(mapHazardEventRow);
+}
+
 export async function recordApiLog(input: ApiLogInput) {
   const db = await getDatabase();
 
@@ -460,6 +579,64 @@ export async function recordApiLog(input: ApiLogInput) {
       JSON.stringify(input.metadata ?? {}),
     ],
   );
+}
+
+export async function replaceHazardEvents(params: {
+  events: HazardEventInput[];
+  fetchedAt: string;
+}) {
+  const db = await getDatabase();
+
+  await run(db, "BEGIN IMMEDIATE");
+
+  try {
+    await run(db, "DELETE FROM hazard_events");
+
+    for (const event of params.events) {
+      await run(
+        db,
+        `INSERT INTO hazard_events (
+          event_id,
+          event_type,
+          title,
+          issued_at,
+          occurred_at,
+          latitude,
+          longitude,
+          location,
+          magnitude,
+          intensity,
+          depth,
+          description,
+          image_url,
+          raw_json,
+          fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          event.eventId,
+          event.eventType,
+          event.title,
+          event.issuedAt,
+          event.occurredAt,
+          event.latitude,
+          event.longitude,
+          event.location,
+          event.magnitude,
+          event.intensity,
+          event.depth,
+          event.description,
+          event.imageUrl,
+          JSON.stringify(event.raw),
+          params.fetchedAt,
+        ],
+      );
+    }
+
+    await run(db, "COMMIT");
+  } catch (error) {
+    await run(db, "ROLLBACK");
+    throw error;
+  }
 }
 
 export async function getNaverGeocodingUsage() {
