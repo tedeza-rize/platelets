@@ -23,8 +23,6 @@ export type MapDictionary = {
     updateFailed: string;
     updating: string;
   };
-  missingKeyBody: string;
-  missingKeyTitle: string;
   providerButtonLabel: string;
   providerLegend: string;
   providerMenuLabel: string;
@@ -82,9 +80,6 @@ const dictionaries: Record<Locale, AppDictionary> = {
         updateFailed: "업데이트 실패",
         updating: "업데이트 중",
       },
-      missingKeyBody:
-        ".env.local에 NEXT_PUBLIC_VWORLD_API_KEY를 설정하면 브이월드 타일이 표시됩니다. 지금은 OSM 타일로 지도를 유지합니다.",
-      missingKeyTitle: "브이월드 API 키가 필요합니다",
       providerButtonLabel: "{provider} 지도로 전환",
       providerLegend: "지도 제공자",
       providerMenuLabel: "지도 서비스 선택: 현재 {provider}",
@@ -138,9 +133,6 @@ const dictionaries: Record<Locale, AppDictionary> = {
         updateFailed: "Update failed",
         updating: "Updating",
       },
-      missingKeyBody:
-        "Set NEXT_PUBLIC_VWORLD_API_KEY in .env.local to show VWorld tiles. The map stays available with OSM tiles for now.",
-      missingKeyTitle: "VWorld API key required",
       providerButtonLabel: "Switch to {provider} map",
       providerLegend: "Map provider",
       providerMenuLabel: "Choose map service: currently {provider}",

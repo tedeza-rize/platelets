@@ -6,13 +6,6 @@ export default async function Home() {
   const headerList = await headers();
   const locale = resolveLocale(headerList.get("accept-language"));
   const dictionary = getDictionary(locale);
-  const vworldApiKey = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? "";
 
-  return (
-    <MapShell
-      dictionary={dictionary}
-      initialProvider="vworld"
-      vworldApiKey={vworldApiKey}
-    />
-  );
+  return <MapShell dictionary={dictionary} initialProvider="vworld" />;
 }

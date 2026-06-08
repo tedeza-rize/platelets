@@ -29,7 +29,6 @@ type MapProvider = "vworld" | "osm";
 type MapShellProps = {
   dictionary: AppDictionary;
   initialProvider: MapProvider;
-  vworldApiKey: string;
 };
 
 type EmergencyPoint = {
@@ -76,10 +75,6 @@ const SEOUL_CENTER: [number, number] = [37.5665, 126.978];
 const MAP_CENTER: [number, number] = [SEOUL_CENTER[1], SEOUL_CENTER[0]];
 const DEFAULT_ZOOM = 16;
 const STYLE_LOAD_TIMEOUT_MS = 8000;
-const OSM_TILE_SIZE = 256;
-const OSM_MAX_ZOOM = 19;
-const VWORLD_TILE_SIZE = 256;
-const VWORLD_MAX_ZOOM = 19;
 const POINTS_SOURCE_ID = "emergency-points";
 const POINTS_HALO_LAYER_ID = "emergency-points-halo";
 const POINTS_LAYER_ID = "emergency-points-circle";
@@ -175,54 +170,254 @@ const PROVIDERS: Record<
   },
 };
 
-function createVworldStyle(vworldApiKey: string): StyleSpecification {
-  return {
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    layers: [
-      {
-        id: "vworld-base",
-        source: "vworld-base",
-        type: "raster",
-      },
-    ],
-    sources: {
-      "vworld-base": {
-        attribution: "VWorld",
-        maxzoom: VWORLD_MAX_ZOOM,
-        tileSize: VWORLD_TILE_SIZE,
-        tiles: [
-          `https://api.vworld.kr/req/wmts/1.0.0/${encodeURIComponent(
-            vworldApiKey,
-          )}/Base/{z}/{y}/{x}.png`,
-        ],
-        type: "raster",
-      },
-    },
-    version: 8,
-  };
+type VectorPalette = {
+  background: string;
+  boundary: string;
+  building: string;
+  land: string;
+  landuse: string;
+  park: string;
+  road: string;
+  roadCasing: string;
+  roadMajor: string;
+  text: string;
+  textHalo: string;
+  water: string;
+  waterLine: string;
+};
+
+const VECTOR_PALETTES: Record<MapProvider, VectorPalette> = {
+  osm: {
+    background: "#f7f8f5",
+    boundary: "#9ba3af",
+    building: "#d8d2c6",
+    land: "#eef0e7",
+    landuse: "#e9edd8",
+    park: "#cfe8bf",
+    road: "#ffffff",
+    roadCasing: "#c6cbd2",
+    roadMajor: "#f4d06f",
+    text: "#334155",
+    textHalo: "#ffffff",
+    water: "#a8d7f0",
+    waterLine: "#74b7df",
+  },
+  vworld: {
+    background: "#f4f7fb",
+    boundary: "#7d8798",
+    building: "#d7dce4",
+    land: "#edf2f1",
+    landuse: "#e5efd9",
+    park: "#bddfb6",
+    road: "#ffffff",
+    roadCasing: "#aeb8c7",
+    roadMajor: "#ffd27a",
+    text: "#27364a",
+    textHalo: "#f8fbff",
+    water: "#93c9e8",
+    waterLine: "#4f9fce",
+  },
+};
+
+function localizedNameExpression() {
+  return ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name_en"]];
 }
 
-function createOsmStyle(): StyleSpecification {
+function createMapStyle(provider: MapProvider): StyleSpecification {
+  const palette = VECTOR_PALETTES[provider];
+
   return {
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
     layers: [
       {
-        id: "osm-base",
-        source: "osm-base",
-        type: "raster",
+        id: "background",
+        paint: { "background-color": palette.background },
+        type: "background",
+      },
+      {
+        id: "landcover",
+        paint: {
+          "fill-color": [
+            "match",
+            ["get", "class"],
+            "wood",
+            palette.park,
+            "grass",
+            palette.park,
+            "wetland",
+            palette.landuse,
+            "ice",
+            "#eef6ff",
+            palette.land,
+          ],
+          "fill-opacity": 0.85,
+        },
+        source: "openmaptiles",
+        "source-layer": "landcover",
+        type: "fill",
+      },
+      {
+        id: "landuse",
+        minzoom: 7,
+        paint: {
+          "fill-color": [
+            "match",
+            ["get", "class"],
+            "park",
+            palette.park,
+            "hospital",
+            "#f7d9dd",
+            "school",
+            "#efe4bd",
+            "residential",
+            palette.landuse,
+            palette.landuse,
+          ],
+          "fill-opacity": 0.72,
+        },
+        source: "openmaptiles",
+        "source-layer": "landuse",
+        type: "fill",
+      },
+      {
+        id: "park",
+        minzoom: 8,
+        paint: {
+          "fill-color": palette.park,
+          "fill-opacity": 0.78,
+        },
+        source: "openmaptiles",
+        "source-layer": "park",
+        type: "fill",
+      },
+      {
+        id: "water",
+        paint: { "fill-color": palette.water },
+        source: "openmaptiles",
+        "source-layer": "water",
+        type: "fill",
+      },
+      {
+        id: "waterway",
+        minzoom: 9,
+        paint: {
+          "line-color": palette.waterLine,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 15, 2.5],
+        },
+        source: "openmaptiles",
+        "source-layer": "waterway",
+        type: "line",
+      },
+      {
+        id: "building",
+        minzoom: 14,
+        paint: {
+          "fill-color": palette.building,
+          "fill-opacity": 0.72,
+        },
+        source: "openmaptiles",
+        "source-layer": "building",
+        type: "fill",
+      },
+      {
+        id: "road-casing",
+        minzoom: 7,
+        paint: {
+          "line-color": palette.roadCasing,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 16, 9],
+        },
+        source: "openmaptiles",
+        "source-layer": "transportation",
+        type: "line",
+      },
+      {
+        id: "road",
+        minzoom: 7,
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "class"],
+            "motorway",
+            palette.roadMajor,
+            "trunk",
+            palette.roadMajor,
+            "primary",
+            palette.roadMajor,
+            palette.road,
+          ],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 16, 6],
+        },
+        source: "openmaptiles",
+        "source-layer": "transportation",
+        type: "line",
+      },
+      {
+        id: "boundary",
+        paint: {
+          "line-color": palette.boundary,
+          "line-dasharray": [2, 2],
+          "line-opacity": 0.62,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 12, 1.4],
+        },
+        source: "openmaptiles",
+        "source-layer": "boundary",
+        type: "line",
+      },
+      {
+        id: "road-label",
+        layout: {
+          "symbol-placement": "line",
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 12],
+        },
+        minzoom: 12,
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.2,
+        },
+        source: "openmaptiles",
+        "source-layer": "transportation_name",
+        type: "symbol",
+      },
+      {
+        id: "place-label",
+        layout: {
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            5,
+            11,
+            12,
+            15,
+            16,
+            18,
+          ],
+        },
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.5,
+        },
+        source: "openmaptiles",
+        "source-layer": "place",
+        type: "symbol",
       },
     ],
     sources: {
-      "osm-base": {
-        attribution: "OpenStreetMap contributors",
-        maxzoom: OSM_MAX_ZOOM,
-        tileSize: OSM_TILE_SIZE,
-        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        type: "raster",
+      openmaptiles: {
+        attribution:
+          '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+        type: "vector",
+        url: "https://tiles.openfreemap.org/planet",
       },
     },
     version: 8,
-  };
+  } as StyleSpecification;
 }
 
 function isMappedPoint(point: EmergencyPoint): point is MappedEmergencyPoint {
@@ -509,11 +704,7 @@ function syncHazardLayerWhenReady(map: MapLibreMap, events: HazardEvent[]) {
   });
 }
 
-export function MapShell({
-  dictionary,
-  initialProvider,
-  vworldApiKey,
-}: MapShellProps) {
+export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const providerMenuRef = useRef<HTMLDivElement>(null);
   const sourceMenuRef = useRef<HTMLDivElement>(null);
@@ -522,10 +713,8 @@ export function MapShell({
   const pointsRef = useRef<EmergencyPoint[]>([]);
   const hazardsRef = useRef<HazardEvent[]>([]);
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
-  const initialStyleRef = useRef<StyleSpecification | string>(
-    initialProvider === "vworld" && vworldApiKey.trim().length > 0
-      ? createVworldStyle(vworldApiKey)
-      : createOsmStyle(),
+  const initialStyleRef = useRef<StyleSpecification>(
+    createMapStyle(initialProvider),
   );
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -541,9 +730,7 @@ export function MapShell({
     Partial<Record<DatasetSourceId, boolean>>
   >({});
 
-  const isVworldReady = vworldApiKey.trim().length > 0;
-  const activeProvider =
-    provider === "vworld" && !isVworldReady ? "osm" : provider;
+  const activeProvider = provider;
   const selectedProviderConfig = PROVIDERS[provider];
   const SelectedProviderIcon = selectedProviderConfig.icon;
   const selectedProviderLabel =
@@ -838,13 +1025,7 @@ export function MapShell({
     let timeoutId: number | undefined;
 
     async function updateStyle() {
-      let style: StyleSpecification;
-
-      if (activeProvider === "vworld") {
-        style = createVworldStyle(vworldApiKey);
-      } else {
-        style = createOsmStyle();
-      }
+      const style = createMapStyle(activeProvider);
 
       if (isDisposed) {
         return;
@@ -876,7 +1057,7 @@ export function MapShell({
         window.clearTimeout(timeoutId);
       }
     };
-  }, [activeProvider, vworldApiKey]);
+  }, [activeProvider]);
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -1087,12 +1268,6 @@ export function MapShell({
             </output>
           ) : null}
         </section>
-        {provider === "vworld" && !isVworldReady ? (
-          <output className={styles.notice}>
-            <strong>{dictionary.map.missingKeyTitle}</strong>
-            <span>{dictionary.map.missingKeyBody}</span>
-          </output>
-        ) : null}
         {activeHazard ? (
           <div className={styles.modalBackdrop} role="presentation">
             <section
