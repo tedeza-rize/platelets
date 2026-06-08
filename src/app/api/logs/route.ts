@@ -1,8 +1,10 @@
 import type { NextRequest } from "next/server";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
+import { noStoreJson } from "@/lib/http";
 import { listApiLogs } from "@/lib/points-db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 type LogCategory = "dataset" | "geocoding" | "system" | "ui";
 
@@ -23,11 +25,11 @@ export async function GET(request: NextRequest) {
   const limitValue = Number(request.nextUrl.searchParams.get("limit") ?? 200);
 
   if (category && !isLogCategory(category)) {
-    return Response.json({ error: "Unknown log category" }, { status: 400 });
+    return noStoreJson({ error: "Unknown log category" }, { status: 400 });
   }
 
   if (source && !isDatasetSourceId(source)) {
-    return Response.json({ error: "Unknown source" }, { status: 400 });
+    return noStoreJson({ error: "Unknown source" }, { status: 400 });
   }
 
   const selectedCategory =
@@ -39,5 +41,5 @@ export async function GET(request: NextRequest) {
     source: selectedSource,
   });
 
-  return Response.json({ logs });
+  return noStoreJson({ logs });
 }

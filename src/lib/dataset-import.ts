@@ -1,5 +1,6 @@
 import https from "node:https";
 import { parse } from "csv-parse/sync";
+import { XMLParser } from "fast-xml-parser";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
   consumeNaverGeocodingQuota,
@@ -10,7 +11,8 @@ import {
   replaceDataset,
 } from "@/lib/points-db";
 
-type CsvRecord = Record<string, string | undefined>;
+type CsvRecord = Record<string, unknown>;
+type AedRecord = Record<string, unknown>;
 
 type ImportResult = {
   failedCount: number;
@@ -37,19 +39,20 @@ type NaverGeocodingResponse = {
 };
 
 const CSV_ENCODING = "euc-kr";
+const AED_NUM_OF_ROWS = 10_000;
 const GEOCODE_CONCURRENCY = 4;
 const DOWNLOAD_RETRY_COUNT = 3;
 
-function text(value: string | undefined) {
-  return value?.trim() ?? "";
+function text(value: unknown) {
+  return value === null || value === undefined ? "" : String(value).trim();
 }
 
-function nullableText(value: string | undefined) {
+function nullableText(value: unknown) {
   const trimmed = text(value);
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function toNumber(value: string | undefined) {
+function toNumber(value: unknown) {
   const number = Number(text(value));
   return Number.isFinite(number) ? number : null;
 }
@@ -119,6 +122,24 @@ function getNaverCredentials() {
   return { key, keyId };
 }
 
+function getPublicDataApiKey() {
+  const key =
+    process.env.PUBLIC_DATA_API_KEY ??
+    process.env.DATA_GO_KR_API_KEY ??
+    process.env.DATA_GO_KR_SERVICE_KEY ??
+    null;
+
+  if (!key) {
+    return null;
+  }
+
+  try {
+    return key.includes("%") ? decodeURIComponent(key) : key;
+  } catch {
+    return key;
+  }
+}
+
 function parseCsv(csv: string) {
   return parse(csv, {
     bom: true,
@@ -126,6 +147,85 @@ function parseCsv(csv: string) {
     skip_empty_lines: true,
     trim: true,
   }) as CsvRecord[];
+}
+
+async function fetchAedPage(pageNo: number) {
+  const serviceKey = getPublicDataApiKey();
+
+  if (!serviceKey) {
+    throw new Error(
+      "PUBLIC_DATA_API_KEY, DATA_GO_KR_API_KEY, or DATA_GO_KR_SERVICE_KEY is required to update AED data.",
+    );
+  }
+
+  const url = new URL(DATASET_SOURCES.aeds.url);
+  url.searchParams.set("serviceKey", serviceKey);
+  url.searchParams.set("pageNo", String(pageNo));
+  url.searchParams.set("numOfRows", String(AED_NUM_OF_ROWS));
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/xml,text/xml,*/*",
+      "User-Agent": "platelets/0.1",
+    },
+  });
+
+  await recordApiLog({
+    action: "dataset-download",
+    category: "dataset",
+    level: response.ok ? "info" : "error",
+    message: response.ok
+      ? `AED page downloaded: ${pageNo}`
+      : `AED page download failed with HTTP ${response.status}.`,
+    metadata: {
+      pageNo,
+      statusCode: response.status,
+    },
+    requestCount: 1,
+    source: "aeds",
+    status: response.ok ? "success" : "failure",
+  });
+
+  if (!response.ok) {
+    throw new Error(`AED API request failed (${response.status})`);
+  }
+
+  const xml = await response.text();
+  const payload = new XMLParser({
+    ignoreAttributes: false,
+    trimValues: true,
+  }).parse(xml) as {
+    response?: {
+      body?: {
+        items?: {
+          item?: AedRecord | AedRecord[];
+        };
+        pageNo?: number | string;
+        totalCount?: number | string;
+      };
+      header?: {
+        resultCode?: string;
+        resultMsg?: string;
+      };
+    };
+  };
+  const header = payload.response?.header;
+
+  if (header?.resultCode && header.resultCode !== "00") {
+    throw new Error(
+      `AED API returned ${header.resultCode}: ${header.resultMsg ?? "unknown error"}`,
+    );
+  }
+
+  const body = payload.response?.body;
+  const rawItems = body?.items?.item;
+  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+
+  return {
+    items,
+    totalCount: Number(body?.totalCount ?? items.length),
+  };
 }
 
 function mapFireRecord(record: CsvRecord): EmergencyPointInput | null {
@@ -176,6 +276,40 @@ function mapPoliceRecord(
     phone: null,
     raw: compactRecord(record),
     source: "police-stations",
+    sourceRecordId,
+    sourceUpdatedAt: null,
+  };
+}
+
+function mapAedRecord(record: AedRecord): EmergencyPointInput | null {
+  const sourceRecordId = text(record.serialSeq);
+  const latitude = toNumber(record.wgs84Lat);
+  const longitude = toNumber(record.wgs84Lon);
+  const buildAddress = text(record.buildAddress);
+  const addressParts = [
+    text(record.sido),
+    text(record.gugun),
+    buildAddress,
+  ].filter(Boolean);
+  const address = Array.from(new Set(addressParts)).join(" ");
+  const org = text(record.org);
+  const buildPlace = text(record.buildPlace);
+  const name = org || buildPlace || "AED";
+
+  if (!sourceRecordId || !name) {
+    return null;
+  }
+
+  return {
+    address,
+    category: "AED",
+    latitude,
+    longitude,
+    name,
+    parentName: nullableText(buildPlace),
+    phone: nullableText(record.clerkTel) ?? nullableText(record.managerTel),
+    raw: compactRecord(record),
+    source: "aeds",
     sourceRecordId,
     sourceUpdatedAt: null,
   };
@@ -371,6 +505,38 @@ async function importPoliceStations(): Promise<ImportResult> {
   };
 }
 
+async function importAeds(): Promise<ImportResult> {
+  const firstPage = await fetchAedPage(1);
+  const totalCount = Number.isFinite(firstPage.totalCount)
+    ? firstPage.totalCount
+    : firstPage.items.length;
+  const pageCount = Math.max(1, Math.ceil(totalCount / AED_NUM_OF_ROWS));
+  const pages = [firstPage];
+
+  for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
+    pages.push(await fetchAedPage(pageNo));
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const rows = pages.flatMap((page) => page.items);
+  const points = rows
+    .map(mapAedRecord)
+    .filter((point): point is EmergencyPointInput => point !== null);
+  const skippedCount = rows.length - points.length;
+
+  return {
+    failedCount: points.filter(
+      (point) => point.latitude === null || point.longitude === null,
+    ).length,
+    fetchedAt,
+    geocodedCount: points.filter(
+      (point) => point.latitude !== null && point.longitude !== null,
+    ).length,
+    points,
+    skippedCount,
+  };
+}
+
 export async function updateDataset(source: DatasetSourceId) {
   try {
     await recordApiLog({
@@ -385,7 +551,9 @@ export async function updateDataset(source: DatasetSourceId) {
     const result =
       source === "fire-stations"
         ? await importFireStations()
-        : await importPoliceStations();
+        : source === "police-stations"
+          ? await importPoliceStations()
+          : await importAeds();
 
     const dataset = await replaceDataset({
       ...result,

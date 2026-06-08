@@ -1,9 +1,9 @@
-export type DatasetSourceId = "fire-stations" | "police-stations";
+export type DatasetSourceId = "fire-stations" | "police-stations" | "aeds";
 
 export type DatasetSource = {
   id: DatasetSourceId;
   label: string;
-  type: "fire" | "police";
+  type: "aed" | "fire" | "police";
   url: string;
 };
 
@@ -19,6 +19,12 @@ export const DATASET_SOURCES = {
     label: "경찰서/지구대/파출소",
     type: "police",
     url: "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003600631&fileDetailSn=1&dataNm=%EA%B2%BD%EC%B0%B0%EC%B2%AD_%EC%A0%84%EA%B5%AD%20%EC%A7%80%EA%B5%AC%EB%8C%80%20%ED%8C%8C%EC%B6%9C%EC%86%8C%20%EC%A3%BC%EC%86%8C%20%ED%98%84%ED%99%A9_20251231",
+  },
+  aeds: {
+    id: "aeds",
+    label: "AED",
+    type: "aed",
+    url: "https://apis.data.go.kr/B552657/AEDInfoInqireService/getAedFullDown",
   },
 } satisfies Record<DatasetSourceId, DatasetSource>;
 

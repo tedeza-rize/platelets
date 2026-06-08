@@ -1,7 +1,9 @@
 import { updateDataset } from "@/lib/dataset-import";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
+import { noStoreJson } from "@/lib/http";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(
   _request: Request,
@@ -10,10 +12,10 @@ export async function POST(
   const { source } = await context.params;
 
   if (!isDatasetSourceId(source)) {
-    return Response.json({ error: "Unknown source" }, { status: 404 });
+    return noStoreJson({ error: "Unknown source" }, { status: 404 });
   }
 
   const dataset = await updateDataset(source);
 
-  return Response.json({ dataset });
+  return noStoreJson({ dataset });
 }

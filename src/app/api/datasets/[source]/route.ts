@@ -1,7 +1,9 @@
 import { isDatasetSourceId } from "@/lib/dataset-sources";
+import { noStoreJson } from "@/lib/http";
 import { getDatasetStatus } from "@/lib/points-db";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -10,10 +12,10 @@ export async function GET(
   const { source } = await context.params;
 
   if (!isDatasetSourceId(source)) {
-    return Response.json({ error: "Unknown source" }, { status: 404 });
+    return noStoreJson({ error: "Unknown source" }, { status: 404 });
   }
 
   const dataset = await getDatasetStatus(source);
 
-  return Response.json({ dataset });
+  return noStoreJson({ dataset });
 }
