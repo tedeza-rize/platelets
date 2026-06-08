@@ -3,10 +3,12 @@
 import {
   AlertTriangle,
   ClipboardList,
+  Clock3,
   Database,
   Flame,
   HeartPulse,
   RefreshCw,
+  Save,
   Shield,
   TerminalSquare,
 } from "lucide-react";
@@ -50,6 +52,29 @@ type ApiLogEntry = {
   status: "failure" | "skipped" | "success";
 };
 
+type UpdateCooldown = {
+  action: string;
+  available: boolean;
+  cooldownMs: number;
+  lastUsedAt: string | null;
+  nextAvailableAt: string | null;
+  remainingMs: number;
+};
+
+type TimeStatus = {
+  ntp: {
+    error: string | null;
+    selected: {
+      host: string;
+      offsetMs: number | null;
+      roundTripDelayMs: number | null;
+    } | null;
+  };
+  ntpServers: string[];
+  serverTime: string;
+  thresholdMs: number;
+};
+
 type ManagementConsoleProps = {
   mode: "admin" | "sudo";
 };
@@ -75,6 +100,27 @@ function formatDateTime(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function formatDuration(value: number) {
+  const totalSeconds = Math.max(0, Math.ceil(value / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatSignedSeconds(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  const sign = value > 0 ? "+" : "";
+
+  return `${sign}${(value / 1000).toLocaleString("ko-KR", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  })}s`;
 }
 
 function statusClassName(status: ApiLogEntry["status"]) {
@@ -106,9 +152,14 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [quota, setQuota] = useState<ApiUsageWindow | null>(null);
   const [kmaQuota, setKmaQuota] = useState<ApiUsageWindow | null>(null);
   const [logs, setLogs] = useState<ApiLogEntry[]>([]);
+  const [cooldowns, setCooldowns] = useState<UpdateCooldown[]>([]);
+  const [timeStatus, setTimeStatus] = useState<TimeStatus | null>(null);
+  const [ntpServersDraft, setNtpServersDraft] = useState("");
   const [activeUpdate, setActiveUpdate] = useState<DatasetSourceId | "all">();
   const [notice, setNotice] = useState<string>("");
   const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [savingNtpServers, setSavingNtpServers] = useState(false);
+  const [clockTick, setClockTick] = useState(0);
 
   const title = mode === "sudo" ? "개발자 총 권한 페이지" : "관리자 페이지";
   const quotaPercent = useMemo(() => {
@@ -125,21 +176,83 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     return Math.round((kmaQuota.usedCount / kmaQuota.monthlyLimit) * 1000) / 10;
   }, [kmaQuota]);
+  const cooldownByAction = useMemo(
+    () => new Map(cooldowns.map((cooldown) => [cooldown.action, cooldown])),
+    [cooldowns],
+  );
+  const isUpdating = Boolean(activeUpdate) || Boolean(progress);
+
+  function getCooldown(action: string) {
+    const cooldown = cooldownByAction.get(action);
+    void clockTick;
+
+    if (!cooldown?.nextAvailableAt) {
+      return cooldown ?? null;
+    }
+
+    const remainingMs = Math.max(
+      0,
+      new Date(cooldown.nextAvailableAt).getTime() - Date.now(),
+    );
+
+    return {
+      ...cooldown,
+      available: remainingMs === 0,
+      remainingMs,
+    };
+  }
+
+  function datasetCooldown(source: DatasetSourceId) {
+    return getCooldown(`dataset:${source}`);
+  }
+
+  function actionUnavailableLabel(cooldown: UpdateCooldown | null) {
+    if (!cooldown || cooldown.available) {
+      return "";
+    }
+
+    return `다시 가능: ${formatDuration(cooldown.remainingMs)}`;
+  }
+
+  async function parseUpdateError(response: Response, fallback: string) {
+    const payload = (await response.json().catch(() => null)) as {
+      cooldown?: UpdateCooldown;
+      error?: string;
+    } | null;
+
+    if (response.status === 429 && payload?.cooldown) {
+      return `5분 갱신 간격 적용 중입니다. ${formatDuration(
+        payload.cooldown.remainingMs,
+      )} 뒤 다시 시도할 수 있습니다.`;
+    }
+
+    return payload?.error ?? fallback;
+  }
 
   const refresh = useCallback(async () => {
-    const [datasetsResponse, quotaResponse, kmaQuotaResponse, logsResponse] =
-      await Promise.all([
-        fetch("/api/datasets", { cache: "no-store" }),
-        fetch("/api/geocoding/quota", { cache: "no-store" }),
-        fetch("/api/hazards/quota", { cache: "no-store" }),
-        fetch("/api/logs?limit=12", { cache: "no-store" }),
-      ]);
+    const [
+      datasetsResponse,
+      quotaResponse,
+      kmaQuotaResponse,
+      logsResponse,
+      cooldownsResponse,
+      timeResponse,
+    ] = await Promise.all([
+      fetch("/api/datasets", { cache: "no-store" }),
+      fetch("/api/geocoding/quota", { cache: "no-store" }),
+      fetch("/api/hazards/quota", { cache: "no-store" }),
+      fetch(`/api/logs?limit=12&ts=${Date.now()}`, { cache: "no-store" }),
+      fetch("/api/admin/update-cooldowns", { cache: "no-store" }),
+      fetch("/api/server-time", { cache: "no-store" }),
+    ]);
 
     if (
       !datasetsResponse.ok ||
       !quotaResponse.ok ||
       !kmaQuotaResponse.ok ||
-      !logsResponse.ok
+      !logsResponse.ok ||
+      !cooldownsResponse.ok ||
+      !timeResponse.ok
     ) {
       throw new Error("관리 데이터를 불러오지 못했습니다.");
     }
@@ -148,9 +261,29 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     setQuota((await quotaResponse.json()).quota);
     setKmaQuota((await kmaQuotaResponse.json()).quota);
     setLogs((await logsResponse.json()).logs);
+    setCooldowns((await cooldownsResponse.json()).cooldowns);
+    const nextTimeStatus = (await timeResponse.json()) as TimeStatus;
+    setTimeStatus(nextTimeStatus);
+    setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
   }, []);
 
   async function updateDataset(source: DatasetSourceId | "all") {
+    const blockedCooldown =
+      source === "all"
+        ? datasets
+            .map((dataset) => datasetCooldown(dataset.id))
+            .find((cooldown) => cooldown && !cooldown.available)
+        : datasetCooldown(source);
+
+    if (blockedCooldown && !blockedCooldown.available) {
+      setNotice(
+        `5분 갱신 간격 적용 중입니다. ${formatDuration(
+          blockedCooldown.remainingMs,
+        )} 뒤 다시 시도할 수 있습니다.`,
+      );
+      return;
+    }
+
     setActiveUpdate(source);
     setNotice("업데이트 중");
     setProgress({
@@ -174,7 +307,12 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           });
 
           if (!response.ok) {
-            throw new Error(`${dataset.label} 업데이트 실패`);
+            throw new Error(
+              await parseUpdateError(
+                response,
+                `${dataset.label} 업데이트 실패`,
+              ),
+            );
           }
         }
       } else {
@@ -190,7 +328,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         });
 
         if (!response.ok) {
-          throw new Error("업데이트 실패");
+          throw new Error(await parseUpdateError(response, "업데이트 실패"));
         }
       }
 
@@ -215,6 +353,17 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   async function updateHazards() {
+    const blockedCooldown = getCooldown("hazards");
+
+    if (blockedCooldown && !blockedCooldown.available) {
+      setNotice(
+        `5분 갱신 간격 적용 중입니다. ${formatDuration(
+          blockedCooldown.remainingMs,
+        )} 뒤 다시 시도할 수 있습니다.`,
+      );
+      return;
+    }
+
     setNotice("지진/지진해일 업데이트 중");
     setProgress({
       currentStep: "기상청 지진/지진해일 정보 요청 중",
@@ -228,7 +377,9 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       });
 
       if (!response.ok) {
-        throw new Error("지진/지진해일 업데이트 실패");
+        throw new Error(
+          await parseUpdateError(response, "지진/지진해일 업데이트 실패"),
+        );
       }
 
       setProgress({
@@ -250,11 +401,56 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     }
   }
 
+  async function saveNtpServers() {
+    setSavingNtpServers(true);
+    setNotice("NTP 서버 목록 저장 중");
+
+    try {
+      const servers = ntpServersDraft
+        .split(/\r?\n/)
+        .map((server) => server.trim())
+        .filter(Boolean);
+      const response = await fetch("/api/ntp/servers", {
+        body: JSON.stringify({ servers }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "NTP 서버 목록 저장 실패");
+      }
+
+      await refresh();
+      setNotice("NTP 서버 목록 저장 완료");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingNtpServers(false);
+    }
+  }
+
   useEffect(() => {
     refresh().catch((error) => {
       setNotice(error instanceof Error ? error.message : String(error));
     });
   }, [refresh]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setClockTick((value) => value + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const allDatasetCooldown =
+    datasets
+      .map((dataset) => datasetCooldown(dataset.id))
+      .find((cooldown) => cooldown && !cooldown.available) ?? null;
+  const hazardsCooldown = getCooldown("hazards");
 
   return (
     <div className={styles.page}>
@@ -350,8 +546,9 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           <div className={styles.actions}>
             <button
               className={styles.actionButton}
-              disabled={Boolean(activeUpdate) || Boolean(progress)}
+              disabled={isUpdating || Boolean(allDatasetCooldown)}
               onClick={() => updateDataset("all")}
+              title={actionUnavailableLabel(allDatasetCooldown)}
               type="button"
             >
               <RefreshCw
@@ -361,40 +558,130 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                 strokeWidth={2.4}
               />
               전체
+              {allDatasetCooldown ? (
+                <span className={styles.buttonMeta}>
+                  {formatDuration(allDatasetCooldown.remainingMs)}
+                </span>
+              ) : null}
             </button>
-            {datasets.map((dataset) => (
-              <button
-                className={styles.actionButton}
-                disabled={Boolean(activeUpdate) || Boolean(progress)}
-                key={dataset.id}
-                onClick={() => updateDataset(dataset.id)}
-                type="button"
-              >
-                {activeUpdate === dataset.id ? (
-                  <RefreshCw
-                    aria-hidden="true"
-                    className={styles.spinning}
-                    size={16}
-                    strokeWidth={2.4}
-                  />
-                ) : (
-                  datasetIcon(dataset.id)
-                )}
-                {dataset.label}
-              </button>
-            ))}
+            {datasets.map((dataset) => {
+              const cooldown = datasetCooldown(dataset.id);
+
+              return (
+                <button
+                  className={styles.actionButton}
+                  disabled={
+                    isUpdating || Boolean(cooldown && !cooldown.available)
+                  }
+                  key={dataset.id}
+                  onClick={() => updateDataset(dataset.id)}
+                  title={actionUnavailableLabel(cooldown)}
+                  type="button"
+                >
+                  {activeUpdate === dataset.id ? (
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={styles.spinning}
+                      size={16}
+                      strokeWidth={2.4}
+                    />
+                  ) : (
+                    datasetIcon(dataset.id)
+                  )}
+                  {dataset.label}
+                  {cooldown && !cooldown.available ? (
+                    <span className={styles.buttonMeta}>
+                      {formatDuration(cooldown.remainingMs)}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
             <button
               className={styles.actionButton}
-              disabled={Boolean(activeUpdate) || Boolean(progress)}
+              disabled={
+                isUpdating ||
+                Boolean(hazardsCooldown && !hazardsCooldown.available)
+              }
               onClick={updateHazards}
+              title={actionUnavailableLabel(hazardsCooldown)}
               type="button"
             >
               <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
               지진/지진해일
+              {hazardsCooldown && !hazardsCooldown.available ? (
+                <span className={styles.buttonMeta}>
+                  {formatDuration(hazardsCooldown.remainingMs)}
+                </span>
+              ) : null}
             </button>
           </div>
           <output className={styles.notice}>{notice}</output>
         </section>
+
+        {mode === "sudo" ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>
+                <Clock3 aria-hidden="true" size={18} strokeWidth={2.4} />
+                NTP 시간 기준
+              </span>
+            </div>
+            <div className={styles.settingsGrid}>
+              <label className={styles.fieldLabel}>
+                서버 목록
+                <textarea
+                  className={styles.textarea}
+                  onChange={(event) => setNtpServersDraft(event.target.value)}
+                  spellCheck={false}
+                  value={ntpServersDraft}
+                />
+              </label>
+              <div className={styles.statusPanel}>
+                <dl className={styles.compactDetails}>
+                  <div>
+                    <dt>선택 서버</dt>
+                    <dd>{timeStatus?.ntp.selected?.host ?? "-"}</dd>
+                  </div>
+                  <div>
+                    <dt>서버-NTP 오차</dt>
+                    <dd>
+                      {formatSignedSeconds(
+                        timeStatus?.ntp.selected?.offsetMs ?? null,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>왕복 지연</dt>
+                    <dd>
+                      {timeStatus?.ntp.selected?.roundTripDelayMs === null ||
+                      timeStatus?.ntp.selected?.roundTripDelayMs === undefined
+                        ? "-"
+                        : `${Math.round(
+                            timeStatus.ntp.selected.roundTripDelayMs,
+                          )}ms`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>경고 기준</dt>
+                    <dd>
+                      {formatSignedSeconds(timeStatus?.thresholdMs ?? 3000)}
+                    </dd>
+                  </div>
+                </dl>
+                <button
+                  className={styles.actionButton}
+                  disabled={savingNtpServers}
+                  onClick={saveNtpServers}
+                  type="button"
+                >
+                  <Save aria-hidden="true" size={16} strokeWidth={2.4} />
+                  저장
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <section className={styles.card}>
           <div className={styles.cardHeader}>

@@ -139,6 +139,72 @@
   opacity: 0.62;
 }
 
+.buttonMeta {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+  gap: 14px;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.textarea {
+  min-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  font-family: var(--font-geist-mono);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  padding: 10px;
+}
+
+.textarea:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.statusPanel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.compactDetails {
+  display: grid;
+  gap: 8px;
+}
+
+.compactDetails div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.compactDetails dt {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.compactDetails dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .tableWrap {
   overflow: auto;
 }
@@ -292,7 +358,8 @@
   }
 
   .summaryGrid,
-  .actions {
+  .actions,
+  .settingsGrid {
     grid-template-columns: 1fr;
   }
 }

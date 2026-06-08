@@ -1,6 +1,11 @@
 import { updateDataset } from "@/lib/dataset-import";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
+import {
+  AdminUpdateCooldownError,
+  assertAdminUpdateAvailable,
+  recordAdminUpdateUsed,
+} from "@/lib/points-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +20,25 @@ export async function POST(
     return noStoreJson({ error: "Unknown source" }, { status: 404 });
   }
 
-  const dataset = await updateDataset(source);
+  const action = `dataset:${source}`;
 
-  return noStoreJson({ dataset });
+  try {
+    await assertAdminUpdateAvailable(action);
+    const dataset = await updateDataset(source);
+    await recordAdminUpdateUsed(action);
+
+    return noStoreJson({ dataset });
+  } catch (error) {
+    if (error instanceof AdminUpdateCooldownError) {
+      return noStoreJson(
+        {
+          cooldown: error.cooldown,
+          error: "Update cooldown is active.",
+        },
+        { status: 429 },
+      );
+    }
+
+    throw error;
+  }
 }

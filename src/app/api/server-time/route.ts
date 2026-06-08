@@ -1,10 +1,11 @@
 import { noStoreJson } from "@/lib/http";
+import { getServerTimeStatus } from "@/lib/time-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return noStoreJson({
-    serverTime: new Date().toISOString(),
-  });
+  const status = await getServerTimeStatus();
+
+  return noStoreJson(status);
 }

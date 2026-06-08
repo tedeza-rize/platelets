@@ -71,6 +71,15 @@ export type ApiUsageWindow = {
   windowStartedAt: string | null;
 };
 
+export type AdminUpdateCooldown = {
+  action: string;
+  available: boolean;
+  cooldownMs: number;
+  lastUsedAt: string | null;
+  nextAvailableAt: string | null;
+  remainingMs: number;
+};
+
 export type HazardEventType = "earthquake" | "tsunami";
 
 export type HazardEventInput = {
@@ -158,6 +167,18 @@ type ApiUsageWindowRow = {
   window_started_at: string | null;
 };
 
+type AdminUpdateCooldownRow = {
+  action: string;
+  last_used_at: string;
+  updated_at: string;
+};
+
+type AppSettingRow = {
+  key: string;
+  updated_at: string;
+  value_json: string;
+};
+
 type HazardEventRow = {
   depth: string | null;
   description: string | null;
@@ -179,6 +200,7 @@ type HazardEventRow = {
 
 const dataDirectory = path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
+export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
 const NAVER_GEOCODING_MONTHLY_LIMIT = 300_000;
 
@@ -282,6 +304,22 @@ async function initializeDatabase(db: SqliteDatabase) {
       message TEXT NOT NULL,
       request_count INTEGER NOT NULL DEFAULT 0,
       metadata_json TEXT NOT NULL DEFAULT '{}'
+    )`,
+  );
+  await run(
+    db,
+    `CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+  await run(
+    db,
+    `CREATE TABLE IF NOT EXISTS admin_update_cooldowns (
+      action TEXT PRIMARY KEY,
+      last_used_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   );
   await run(
@@ -616,6 +654,132 @@ export async function recordApiLog(input: ApiLogInput) {
       input.requestCount ?? 0,
       JSON.stringify(input.metadata ?? {}),
     ],
+  );
+}
+
+function mapAdminUpdateCooldownRow(
+  action: string,
+  row: AdminUpdateCooldownRow | undefined,
+  cooldownMs: number,
+): AdminUpdateCooldown {
+  const lastUsedAt = row?.last_used_at ?? null;
+  const nextAvailableAt = lastUsedAt
+    ? new Date(new Date(lastUsedAt).getTime() + cooldownMs).toISOString()
+    : null;
+  const remainingMs = nextAvailableAt
+    ? Math.max(0, new Date(nextAvailableAt).getTime() - Date.now())
+    : 0;
+
+  return {
+    action,
+    available: remainingMs === 0,
+    cooldownMs,
+    lastUsedAt,
+    nextAvailableAt,
+    remainingMs,
+  };
+}
+
+export class AdminUpdateCooldownError extends Error {
+  cooldown: AdminUpdateCooldown;
+
+  constructor(cooldown: AdminUpdateCooldown) {
+    super("Admin update cooldown is active");
+    this.cooldown = cooldown;
+  }
+}
+
+export async function getAdminUpdateCooldowns(
+  actions: string[],
+  cooldownMs = ADMIN_UPDATE_COOLDOWN_MS,
+) {
+  const db = await getDatabase();
+
+  if (actions.length === 0) {
+    const rows = await all<AdminUpdateCooldownRow>(
+      db,
+      "SELECT * FROM admin_update_cooldowns ORDER BY action",
+    );
+
+    return rows.map((row) =>
+      mapAdminUpdateCooldownRow(row.action, row, cooldownMs),
+    );
+  }
+
+  const rows = await all<AdminUpdateCooldownRow>(
+    db,
+    `SELECT * FROM admin_update_cooldowns
+      WHERE action IN (${actions.map(() => "?").join(",")})`,
+    actions,
+  );
+  const byAction = new Map(rows.map((row) => [row.action, row]));
+
+  return actions.map((action) =>
+    mapAdminUpdateCooldownRow(action, byAction.get(action), cooldownMs),
+  );
+}
+
+export async function assertAdminUpdateAvailable(action: string) {
+  const [cooldown] = await getAdminUpdateCooldowns([action]);
+
+  if (cooldown && !cooldown.available) {
+    throw new AdminUpdateCooldownError(cooldown);
+  }
+}
+
+export async function recordAdminUpdateUsed(action: string) {
+  const db = await getDatabase();
+
+  await run(
+    db,
+    `INSERT INTO admin_update_cooldowns (
+      action,
+      last_used_at,
+      updated_at
+    ) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(action) DO UPDATE SET
+      last_used_at = excluded.last_used_at,
+      updated_at = CURRENT_TIMESTAMP`,
+    [action, new Date().toISOString()],
+  );
+}
+
+export async function getAppSetting<TValue>(
+  key: string,
+  fallback: TValue,
+): Promise<TValue> {
+  const db = await getDatabase();
+  const row = await get<AppSettingRow>(
+    db,
+    "SELECT * FROM app_settings WHERE key = ?",
+    [key],
+  );
+
+  if (!row) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(row.value_json) as TValue;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function setAppSetting(key: string, value: unknown) {
+  const db = await getDatabase();
+
+  await run(
+    db,
+    `INSERT INTO app_settings (
+      key,
+      value_json,
+      updated_at
+    ) VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET
+      value_json = excluded.value_json,
+      updated_at = CURRENT_TIMESTAMP`,
+    [key, JSON.stringify(value)],
   );
 }
 
