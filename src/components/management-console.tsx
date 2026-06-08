@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   ClipboardList,
   Database,
   Flame,
@@ -53,6 +54,12 @@ type ManagementConsoleProps = {
   mode: "admin" | "sudo";
 };
 
+type ProgressState = {
+  currentStep: string;
+  percent: number;
+  title: string;
+};
+
 function formatDateTime(value: string | null) {
   if (!value) {
     return "-";
@@ -100,6 +107,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [logs, setLogs] = useState<ApiLogEntry[]>([]);
   const [activeUpdate, setActiveUpdate] = useState<DatasetSourceId | "all">();
   const [notice, setNotice] = useState<string>("");
+  const [progress, setProgress] = useState<ProgressState | null>(null);
 
   const title = mode === "sudo" ? "개발자 총 권한 페이지" : "관리자 페이지";
   const quotaPercent = useMemo(() => {
@@ -129,23 +137,100 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   async function updateDataset(source: DatasetSourceId | "all") {
     setActiveUpdate(source);
     setNotice("업데이트 중");
+    setProgress({
+      currentStep: "업데이트 준비 중",
+      percent: 5,
+      title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
+    });
 
     try {
-      const response = await fetch(
-        source === "all" ? "/api/datasets" : `/api/datasets/${source}/update`,
-        { method: "POST" },
-      );
+      if (source === "all") {
+        for (const [index, dataset] of datasets.entries()) {
+          setProgress({
+            currentStep: `${dataset.label} 갱신 중`,
+            percent:
+              Math.round((index / Math.max(datasets.length, 1)) * 85) + 5,
+            title: "전체 데이터 갱신",
+          });
 
-      if (!response.ok) {
-        throw new Error("업데이트 실패");
+          const response = await fetch(`/api/datasets/${dataset.id}/update`, {
+            method: "POST",
+          });
+
+          if (!response.ok) {
+            throw new Error(`${dataset.label} 업데이트 실패`);
+          }
+        }
+      } else {
+        const dataset = datasets.find((current) => current.id === source);
+        setProgress({
+          currentStep: `${dataset?.label ?? source} 갱신 중`,
+          percent: 40,
+          title: "데이터셋 갱신",
+        });
+
+        const response = await fetch(`/api/datasets/${source}/update`, {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          throw new Error("업데이트 실패");
+        }
       }
 
+      setProgress({
+        currentStep: "갱신 결과 불러오는 중",
+        percent: 94,
+        title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
+      });
       await refresh();
       setNotice("업데이트 완료");
+      setProgress({
+        currentStep: "완료",
+        percent: 100,
+        title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
+      });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
       setActiveUpdate(undefined);
+      window.setTimeout(() => setProgress(null), 500);
+    }
+  }
+
+  async function updateHazards() {
+    setNotice("지진/지진해일 업데이트 중");
+    setProgress({
+      currentStep: "기상청 지진/지진해일 정보 요청 중",
+      percent: 35,
+      title: "재난 이벤트 갱신",
+    });
+
+    try {
+      const response = await fetch("/api/hazards/update", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("지진/지진해일 업데이트 실패");
+      }
+
+      setProgress({
+        currentStep: "갱신 결과 불러오는 중",
+        percent: 90,
+        title: "재난 이벤트 갱신",
+      });
+      await refresh();
+      setNotice("지진/지진해일 업데이트 완료");
+      setProgress({
+        currentStep: "완료",
+        percent: 100,
+        title: "재난 이벤트 갱신",
+      });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      window.setTimeout(() => setProgress(null), 500);
     }
   }
 
@@ -232,7 +317,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           <div className={styles.actions}>
             <button
               className={styles.actionButton}
-              disabled={Boolean(activeUpdate)}
+              disabled={Boolean(activeUpdate) || Boolean(progress)}
               onClick={() => updateDataset("all")}
               type="button"
             >
@@ -247,7 +332,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             {datasets.map((dataset) => (
               <button
                 className={styles.actionButton}
-                disabled={Boolean(activeUpdate)}
+                disabled={Boolean(activeUpdate) || Boolean(progress)}
                 key={dataset.id}
                 onClick={() => updateDataset(dataset.id)}
                 type="button"
@@ -265,6 +350,15 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                 {dataset.label}
               </button>
             ))}
+            <button
+              className={styles.actionButton}
+              disabled={Boolean(activeUpdate) || Boolean(progress)}
+              onClick={updateHazards}
+              type="button"
+            >
+              <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
+              지진/지진해일
+            </button>
           </div>
           <output className={styles.notice}>{notice}</output>
         </section>
@@ -344,6 +438,32 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           </div>
         </section>
       </main>
+      {progress ? (
+        <div className={styles.progressBackdrop} role="presentation">
+          <section
+            aria-labelledby="progress-title"
+            aria-modal="true"
+            className={styles.progressModal}
+            role="dialog"
+          >
+            <div className={styles.progressHeader}>
+              <h2 id="progress-title">{progress.title}</h2>
+              <span>{progress.percent}%</span>
+            </div>
+            <div
+              aria-label="갱신 진행률"
+              aria-valuemax={100}
+              aria-valuemin={0}
+              aria-valuenow={progress.percent}
+              className={styles.progressTrack}
+              role="progressbar"
+            >
+              <span style={{ width: `${progress.percent}%` }} />
+            </div>
+            <p>{progress.currentStep}</p>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

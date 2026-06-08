@@ -1,0 +1,70 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 42%);
+  padding: 18px;
+}
+
+.modal {
+  display: grid;
+  width: min(440px, 100%);
+  gap: 14px;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  background: var(--dropdown-surface);
+  color: var(--text-strong);
+  box-shadow: var(--dropdown-shadow);
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header h2 {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.closeButton {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.modal p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.details {
+  display: grid;
+  gap: 8px;
+}
+
+.details div {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.details dt {
+  color: var(--text-muted);
+  font-weight: 700;
+}
