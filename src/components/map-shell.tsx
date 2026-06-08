@@ -83,6 +83,11 @@ const HAZARDS_HALO_LAYER_ID = "hazard-events-halo";
 const HAZARDS_LAYER_ID = "hazard-events-circle";
 const HAZARD_POLL_INTERVAL_MS = 60_000;
 const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
+const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
+const VWORLD_BASE_SOURCE_ID = "vworld-base";
+const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
+const VWORLD_POI_SOURCE_ID = "vworld-poi";
+const OPENFREEMAP_SOURCE_ID = "openmaptiles";
 const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
   "fire-stations": "#dc2626",
@@ -170,6 +175,27 @@ const PROVIDERS: Record<
   },
 };
 
+const VWORLD_TRAFFIC_LINE_LAYERS = [
+  ["vl_ex_hwrdcenl_l_0612", "#d4a93e", 1.8],
+  ["vl_ex_cityhwrdcenl_l_0712", "#d8b34f", 1.5],
+  ["vl_ex_mainrdcenl_l_0913", "#e0c16f", 1.3],
+  ["vl_ex_nardcenl_l_0713", "#d7bf87", 1.1],
+  ["vl_ex_localrdcenl_l_0713", "#d6c59b", 1],
+  ["nsid_data.vl_ex_mainrdcenl_l_0913", "#e0c16f", 1.4],
+  ["nsid_data.vl_ex_nardcenl_l_0713", "#d7bf87", 1.2],
+  ["nsid_data.vl_ex_mainrd_a_1418", "#efe2bd", 1],
+  ["nsid_data.vl_ex_narda_a_1418", "#eadfbf", 1],
+  ["nsid_data.vl_rodway_ctln_1214", "#c7c2b7", 0.7],
+  ["nsid_data.vl_rodway_bndry_1518", "#c9c4ba", 0.7],
+] as const;
+
+const VWORLD_POI_SOURCE_LAYERS = [
+  ["twin_upoi.mv_vctl_poi_10", 10, 12],
+  ["twin_upoi.mv_vctl_poi_11", 12, 14],
+  ["twin_upoi.mv_vctl_poi_13", 14, 16],
+  ["twin_upoi.mv_vctl_poi_15", 16, 20],
+] as const;
+
 type VectorPalette = {
   background: string;
   boundary: string;
@@ -223,8 +249,114 @@ function localizedNameExpression() {
   return ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name_en"]];
 }
 
-function createMapStyle(provider: MapProvider): StyleSpecification {
-  const palette = VECTOR_PALETTES[provider];
+function createVworldTileUrl(path: string) {
+  return `https://api.vworld.kr/req/wmts/vector/${path.replace(
+    "{key}",
+    VWORLD_API_KEY,
+  )}`;
+}
+
+function createVworldVectorTileUrl(layer: "poi" | "traffic") {
+  return `https://api.vworld.kr/req/wmts/vector/getTile/${VWORLD_API_KEY}/${layer}/{z}/{x}/{y}.pbf`;
+}
+
+function createVworldStyle(): StyleSpecification {
+  if (!vworldApiKeyExists()) {
+    return {
+      layers: [
+        {
+          id: "background",
+          paint: { "background-color": VECTOR_PALETTES.vworld.background },
+          type: "background",
+        },
+      ],
+      sources: {},
+      version: 8,
+    } as StyleSpecification;
+  }
+
+  return {
+    layers: [
+      {
+        id: "background",
+        paint: { "background-color": VECTOR_PALETTES.vworld.background },
+        type: "background",
+      },
+      {
+        id: "vworld-base-raster",
+        source: VWORLD_BASE_SOURCE_ID,
+        type: "raster",
+      },
+      ...VWORLD_TRAFFIC_LINE_LAYERS.map(
+        ([sourceLayer, color, width], index) => ({
+          id: `vworld-traffic-${index}`,
+          paint: {
+            "line-color": color,
+            "line-opacity": 0.72,
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              7,
+              width,
+              16,
+              width * 3,
+            ],
+          },
+          source: VWORLD_TRAFFIC_SOURCE_ID,
+          "source-layer": sourceLayer,
+          type: "line",
+        }),
+      ),
+      ...VWORLD_POI_SOURCE_LAYERS.map(([sourceLayer, minzoom, maxzoom]) => ({
+        id: `vworld-poi-${sourceLayer.slice(-2)}`,
+        maxzoom,
+        minzoom,
+        paint: {
+          "circle-color": "#315f8f",
+          "circle-opacity": 0.48,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2, 16, 5],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1,
+        },
+        source: VWORLD_POI_SOURCE_ID,
+        "source-layer": sourceLayer,
+        type: "circle",
+      })),
+    ],
+    sources: {
+      [VWORLD_BASE_SOURCE_ID]: {
+        attribution:
+          '<a href="https://www.vworld.kr" target="_blank">&copy; VWorld</a>',
+        maxzoom: 19,
+        minzoom: 6,
+        tileSize: 256,
+        tiles: [createVworldTileUrl("{key}/Base/{z}/{x}/{y}.png")],
+        type: "raster",
+      },
+      [VWORLD_POI_SOURCE_ID]: {
+        maxzoom: 19,
+        minzoom: 6,
+        tiles: [createVworldVectorTileUrl("poi")],
+        type: "vector",
+      },
+      [VWORLD_TRAFFIC_SOURCE_ID]: {
+        maxzoom: 19,
+        minzoom: 6,
+        tiles: [createVworldVectorTileUrl("traffic")],
+        type: "vector",
+      },
+    },
+    version: 8,
+  } as StyleSpecification;
+}
+
+function vworldApiKeyExists() {
+  return VWORLD_API_KEY.length > 0;
+}
+
+function createOsmStyle(): StyleSpecification {
+  const palette = VECTOR_PALETTES.osm;
 
   return {
     glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
@@ -252,7 +384,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           ],
           "fill-opacity": 0.85,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "landcover",
         type: "fill",
       },
@@ -275,7 +407,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           ],
           "fill-opacity": 0.72,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "landuse",
         type: "fill",
       },
@@ -286,14 +418,14 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "fill-color": palette.park,
           "fill-opacity": 0.78,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "park",
         type: "fill",
       },
       {
         id: "water",
         paint: { "fill-color": palette.water },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "water",
         type: "fill",
       },
@@ -304,7 +436,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "line-color": palette.waterLine,
           "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 15, 2.5],
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "waterway",
         type: "line",
       },
@@ -315,7 +447,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "fill-color": palette.building,
           "fill-opacity": 0.72,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "building",
         type: "fill",
       },
@@ -326,7 +458,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "line-color": palette.roadCasing,
           "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 16, 9],
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "transportation",
         type: "line",
       },
@@ -347,7 +479,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           ],
           "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 16, 6],
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "transportation",
         type: "line",
       },
@@ -359,7 +491,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "line-opacity": 0.62,
           "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 12, 1.4],
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "boundary",
         type: "line",
       },
@@ -377,7 +509,7 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "text-halo-color": palette.textHalo,
           "text-halo-width": 1.2,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "transportation_name",
         type: "symbol",
       },
@@ -403,13 +535,13 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
           "text-halo-color": palette.textHalo,
           "text-halo-width": 1.5,
         },
-        source: "openmaptiles",
+        source: OPENFREEMAP_SOURCE_ID,
         "source-layer": "place",
         type: "symbol",
       },
     ],
     sources: {
-      openmaptiles: {
+      [OPENFREEMAP_SOURCE_ID]: {
         attribution:
           '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
         type: "vector",
@@ -418,6 +550,10 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
     },
     version: 8,
   } as StyleSpecification;
+}
+
+function createMapStyle(provider: MapProvider): StyleSpecification {
+  return provider === "vworld" ? createVworldStyle() : createOsmStyle();
 }
 
 function isMappedPoint(point: EmergencyPoint): point is MappedEmergencyPoint {
