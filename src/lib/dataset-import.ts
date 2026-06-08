@@ -2,8 +2,10 @@ import https from "node:https";
 import { parse } from "csv-parse/sync";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
+  consumeNaverGeocodingQuota,
   type DatasetUpdateResult,
   type EmergencyPointInput,
+  recordApiLog,
   recordDatasetError,
   replaceDataset,
 } from "@/lib/points-db";
@@ -18,16 +20,20 @@ type ImportResult = {
   skippedCount: number;
 };
 
-type VworldAddressResponse = {
-  response?: {
-    result?: {
-      point?: {
-        x?: string;
-        y?: string;
-      };
-    };
-    status?: string;
+type NaverGeocodingResponse = {
+  addresses?: Array<{
+    jibunAddress?: string;
+    roadAddress?: string;
+    x?: string;
+    y?: string;
+  }>;
+  errorMessage?: string;
+  meta?: {
+    count?: number;
+    page?: number;
+    totalCount?: number;
   };
+  status?: string;
 };
 
 const CSV_ENCODING = "euc-kr";
@@ -101,6 +107,18 @@ async function downloadCsv(source: DatasetSourceId) {
   throw lastError;
 }
 
+function getNaverCredentials() {
+  const keyId =
+    process.env.NAVER_MAPS_API_KEY_ID ?? process.env.NCP_APIGW_API_KEY_ID;
+  const key = process.env.NAVER_MAPS_API_KEY ?? process.env.NCP_APIGW_API_KEY;
+
+  if (!keyId || !key) {
+    return null;
+  }
+
+  return { key, keyId };
+}
+
 function parseCsv(csv: string) {
   return parse(csv, {
     bom: true,
@@ -170,40 +188,107 @@ function compactRecord(record: CsvRecord) {
 }
 
 async function geocodeAddress(address: string) {
-  const key =
-    process.env.VWORLD_API_KEY ?? process.env.NEXT_PUBLIC_VWORLD_API_KEY;
+  const credentials = getNaverCredentials();
 
-  if (!key || !address) {
+  if (!address) {
     return null;
   }
 
-  for (const type of ["road", "parcel"]) {
-    const url = new URL("https://api.vworld.kr/req/address");
-    url.searchParams.set("service", "address");
-    url.searchParams.set("request", "getcoord");
-    url.searchParams.set("format", "json");
-    url.searchParams.set("crs", "epsg:4326");
-    url.searchParams.set("type", type);
-    url.searchParams.set("address", address);
-    url.searchParams.set("key", key);
-
-    const response = await fetch(url, { cache: "no-store" });
-
-    if (!response.ok) {
-      continue;
-    }
-
-    const payload = (await response.json()) as VworldAddressResponse;
-    const point = payload.response?.result?.point;
-    const longitude = Number(point?.x);
-    const latitude = Number(point?.y);
-
-    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-      return { latitude, longitude };
-    }
+  if (!credentials) {
+    await recordApiLog({
+      action: "geocode",
+      category: "geocoding",
+      level: "warn",
+      message: "Naver geocoding skipped because API credentials are missing.",
+      metadata: { address },
+      status: "skipped",
+    });
+    return null;
   }
 
-  return null;
+  await consumeNaverGeocodingQuota();
+
+  const url = new URL(
+    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode",
+  );
+  url.searchParams.set("query", address);
+  url.searchParams.set("count", "1");
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "x-ncp-apigw-api-key": credentials.key,
+        "x-ncp-apigw-api-key-id": credentials.keyId,
+      },
+    });
+
+    if (!response.ok) {
+      await recordApiLog({
+        action: "geocode",
+        category: "geocoding",
+        level: "error",
+        message: `Naver geocoding failed with HTTP ${response.status}.`,
+        metadata: { address, statusCode: response.status },
+        requestCount: 1,
+        status: "failure",
+      });
+      return null;
+    }
+
+    const payload = (await response.json()) as NaverGeocodingResponse;
+    const firstAddress = payload.addresses?.[0];
+    const longitude = Number(firstAddress?.x);
+    const latitude = Number(firstAddress?.y);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      await recordApiLog({
+        action: "geocode",
+        category: "geocoding",
+        level: "warn",
+        message: "Naver geocoding returned no coordinate result.",
+        metadata: {
+          address,
+          count: payload.meta?.count,
+          errorMessage: payload.errorMessage,
+          status: payload.status,
+          totalCount: payload.meta?.totalCount,
+        },
+        requestCount: 1,
+        status: "skipped",
+      });
+      return null;
+    }
+
+    await recordApiLog({
+      action: "geocode",
+      category: "geocoding",
+      level: "info",
+      message: "Naver geocoding returned a coordinate result.",
+      metadata: {
+        address,
+        latitude,
+        longitude,
+        matchedAddress: firstAddress?.roadAddress || firstAddress?.jibunAddress,
+      },
+      requestCount: 1,
+      status: "success",
+    });
+
+    return { latitude, longitude };
+  } catch (error) {
+    await recordApiLog({
+      action: "geocode",
+      category: "geocoding",
+      level: "error",
+      message: error instanceof Error ? error.message : String(error),
+      metadata: { address },
+      requestCount: 1,
+      status: "failure",
+    });
+    throw error;
+  }
 }
 
 async function mapWithConcurrency<T, R>(
@@ -288,17 +373,51 @@ async function importPoliceStations(): Promise<ImportResult> {
 
 export async function updateDataset(source: DatasetSourceId) {
   try {
+    await recordApiLog({
+      action: "dataset-update",
+      category: "dataset",
+      level: "info",
+      message: `Dataset update started: ${source}`,
+      source,
+      status: "success",
+    });
+
     const result =
       source === "fire-stations"
         ? await importFireStations()
         : await importPoliceStations();
 
-    return replaceDataset({
+    const dataset = await replaceDataset({
       ...result,
       source,
     });
+
+    await recordApiLog({
+      action: "dataset-update",
+      category: "dataset",
+      level: "info",
+      message: `Dataset update completed: ${source}`,
+      metadata: {
+        failedCount: dataset.failedCount,
+        geocodedCount: dataset.geocodedCount,
+        importedCount: dataset.importedCount,
+        skippedCount: dataset.skippedCount,
+      },
+      source,
+      status: "success",
+    });
+
+    return dataset;
   } catch (error) {
     await recordDatasetError(source, error);
+    await recordApiLog({
+      action: "dataset-update",
+      category: "dataset",
+      level: "error",
+      message: error instanceof Error ? error.message : String(error),
+      source,
+      status: "failure",
+    });
     throw error;
   }
 }

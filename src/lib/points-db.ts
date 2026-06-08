@@ -40,6 +40,37 @@ export type DatasetUpdateResult = DatasetStatus & {
   importedCount: number;
 };
 
+export type ApiLogInput = {
+  action: string;
+  category: "dataset" | "geocoding" | "system" | "ui";
+  level: "debug" | "error" | "info" | "warn";
+  message: string;
+  metadata?: Record<string, unknown>;
+  requestCount?: number;
+  source?: DatasetSourceId | null;
+  status: "failure" | "skipped" | "success";
+};
+
+export type ApiLogEntry = Required<
+  Omit<ApiLogInput, "metadata" | "requestCount" | "source">
+> & {
+  eventAt: string;
+  id: number;
+  metadata: Record<string, unknown>;
+  requestCount: number;
+  source: DatasetSourceId | null;
+};
+
+export type ApiUsageWindow = {
+  monthlyLimit: number;
+  provider: "naver-geocoding";
+  registeredAt: string | null;
+  updatedAt: string | null;
+  usedCount: number;
+  windowEndsAt: string | null;
+  windowStartedAt: string | null;
+};
+
 type SqliteDatabase = sqlite3.Database;
 
 type PointRow = {
@@ -71,8 +102,32 @@ type StatusRow = {
   updated_at: string | null;
 };
 
+type ApiLogRow = {
+  action: string;
+  category: ApiLogInput["category"];
+  event_at: string;
+  id: number;
+  level: ApiLogInput["level"];
+  message: string;
+  metadata_json: string;
+  request_count: number;
+  source: DatasetSourceId | null;
+  status: ApiLogInput["status"];
+};
+
+type ApiUsageWindowRow = {
+  monthly_limit: number;
+  provider: "naver-geocoding";
+  registered_at: string | null;
+  updated_at: string | null;
+  used_count: number;
+  window_ends_at: string | null;
+  window_started_at: string | null;
+};
+
 const dataDirectory = path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
+const NAVER_GEOCODING_MONTHLY_LIMIT = 300_000;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 
@@ -151,11 +206,46 @@ async function initializeDatabase(db: SqliteDatabase) {
   );
   await run(
     db,
+    `CREATE TABLE IF NOT EXISTS api_usage_windows (
+      provider TEXT PRIMARY KEY,
+      registered_at TEXT,
+      window_started_at TEXT,
+      window_ends_at TEXT,
+      used_count INTEGER NOT NULL DEFAULT 0,
+      monthly_limit INTEGER NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+  await run(
+    db,
+    `CREATE TABLE IF NOT EXISTS api_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      level TEXT NOT NULL,
+      category TEXT NOT NULL,
+      source TEXT,
+      action TEXT NOT NULL,
+      status TEXT NOT NULL,
+      message TEXT NOT NULL,
+      request_count INTEGER NOT NULL DEFAULT 0,
+      metadata_json TEXT NOT NULL DEFAULT '{}'
+    )`,
+  );
+  await run(
+    db,
     "CREATE INDEX IF NOT EXISTS points_source_idx ON points(source)",
   );
   await run(
     db,
     "CREATE INDEX IF NOT EXISTS points_coordinates_idx ON points(latitude, longitude)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS api_logs_event_idx ON api_logs(event_at DESC)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS api_logs_category_idx ON api_logs(category, event_at DESC)",
   );
 }
 
@@ -226,6 +316,59 @@ function mapStatusRow(row: StatusRow): DatasetStatus {
   };
 }
 
+function mapApiLogRow(row: ApiLogRow): ApiLogEntry {
+  return {
+    action: row.action,
+    category: row.category,
+    eventAt: row.event_at,
+    id: row.id,
+    level: row.level,
+    message: row.message,
+    metadata: JSON.parse(row.metadata_json) as Record<string, unknown>,
+    requestCount: row.request_count,
+    source: row.source,
+    status: row.status,
+  };
+}
+
+function emptyNaverUsageWindow(): ApiUsageWindow {
+  return {
+    monthlyLimit: NAVER_GEOCODING_MONTHLY_LIMIT,
+    provider: "naver-geocoding",
+    registeredAt: null,
+    updatedAt: null,
+    usedCount: 0,
+    windowEndsAt: null,
+    windowStartedAt: null,
+  };
+}
+
+function mapUsageWindowRow(row: ApiUsageWindowRow): ApiUsageWindow {
+  return {
+    monthlyLimit: row.monthly_limit,
+    provider: row.provider,
+    registeredAt: row.registered_at,
+    updatedAt: row.updated_at,
+    usedCount: row.used_count,
+    windowEndsAt: row.window_ends_at,
+    windowStartedAt: row.window_started_at,
+  };
+}
+
+function addOneMonth(value: Date) {
+  const next = new Date(value);
+  next.setMonth(next.getMonth() + 1);
+  return next;
+}
+
+async function getNaverUsageWindowRow(db: SqliteDatabase) {
+  return get<ApiUsageWindowRow>(
+    db,
+    "SELECT * FROM api_usage_windows WHERE provider = ?",
+    ["naver-geocoding"],
+  );
+}
+
 export async function listPoints(
   options: { includeUnmapped?: boolean; source?: DatasetSourceId | null } = {},
 ) {
@@ -256,6 +399,135 @@ export async function listPoints(
   );
 
   return rows.map(mapPointRow);
+}
+
+export async function listApiLogs(
+  options: {
+    category?: ApiLogInput["category"] | null;
+    limit?: number;
+    source?: DatasetSourceId | null;
+  } = {},
+) {
+  const db = await getDatabase();
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+
+  if (options.category) {
+    conditions.push("category = ?");
+    params.push(options.category);
+  }
+
+  if (options.source) {
+    conditions.push("source = ?");
+    params.push(options.source);
+  }
+
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = await all<ApiLogRow>(
+    db,
+    `SELECT * FROM api_logs ${where} ORDER BY event_at DESC, id DESC LIMIT ?`,
+    [...params, limit],
+  );
+
+  return rows.map(mapApiLogRow);
+}
+
+export async function recordApiLog(input: ApiLogInput) {
+  const db = await getDatabase();
+
+  await run(
+    db,
+    `INSERT INTO api_logs (
+      level,
+      category,
+      source,
+      action,
+      status,
+      message,
+      request_count,
+      metadata_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      input.level,
+      input.category,
+      input.source ?? null,
+      input.action,
+      input.status,
+      input.message,
+      input.requestCount ?? 0,
+      JSON.stringify(input.metadata ?? {}),
+    ],
+  );
+}
+
+export async function getNaverGeocodingUsage() {
+  const db = await getDatabase();
+  const row = await getNaverUsageWindowRow(db);
+
+  return row ? mapUsageWindowRow(row) : emptyNaverUsageWindow();
+}
+
+export async function consumeNaverGeocodingQuota() {
+  const db = await getDatabase();
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  await run(db, "BEGIN IMMEDIATE");
+
+  try {
+    const existing = await getNaverUsageWindowRow(db);
+    const shouldReset =
+      existing?.window_ends_at && now >= new Date(existing.window_ends_at);
+    const windowStartedAt =
+      existing && !shouldReset ? existing.window_started_at : nowIso;
+    const registeredAt = existing?.registered_at ?? nowIso;
+    const windowEndsAt =
+      existing && !shouldReset && existing.window_ends_at
+        ? existing.window_ends_at
+        : addOneMonth(now).toISOString();
+    const currentUsedCount = existing && !shouldReset ? existing.used_count : 0;
+
+    if (currentUsedCount >= NAVER_GEOCODING_MONTHLY_LIMIT) {
+      throw new Error("Naver geocoding monthly quota exceeded");
+    }
+
+    await run(
+      db,
+      `INSERT INTO api_usage_windows (
+        provider,
+        registered_at,
+        window_started_at,
+        window_ends_at,
+        used_count,
+        monthly_limit,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(provider) DO UPDATE SET
+        registered_at = excluded.registered_at,
+        window_started_at = excluded.window_started_at,
+        window_ends_at = excluded.window_ends_at,
+        used_count = excluded.used_count,
+        monthly_limit = excluded.monthly_limit,
+        updated_at = CURRENT_TIMESTAMP`,
+      [
+        "naver-geocoding",
+        registeredAt,
+        windowStartedAt,
+        windowEndsAt,
+        currentUsedCount + 1,
+        NAVER_GEOCODING_MONTHLY_LIMIT,
+      ],
+    );
+
+    await run(db, "COMMIT");
+  } catch (error) {
+    await run(db, "ROLLBACK");
+    throw error;
+  }
+
+  return getNaverGeocodingUsage();
 }
 
 export async function listDatasetStatuses() {
