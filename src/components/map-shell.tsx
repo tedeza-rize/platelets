@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   Database,
@@ -9,6 +10,7 @@ import {
   Layers,
   ListFilter,
   MapPin,
+  Settings,
 } from "lucide-react";
 import type {
   GeoJSONSource,
@@ -81,6 +83,11 @@ const VWORLD_MAX_ZOOM = 19;
 const POINTS_SOURCE_ID = "emergency-points";
 const POINTS_HALO_LAYER_ID = "emergency-points-halo";
 const POINTS_LAYER_ID = "emergency-points-circle";
+const HAZARDS_SOURCE_ID = "hazard-events";
+const HAZARDS_HALO_LAYER_ID = "hazard-events-halo";
+const HAZARDS_LAYER_ID = "hazard-events-circle";
+const HAZARD_POLL_INTERVAL_MS = 60_000;
+const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
 const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
   "fire-stations": "#dc2626",
@@ -105,6 +112,50 @@ type PointFeatureProperties = {
   source: DatasetSourceId;
   sourceRecordId: string;
   sourceUpdatedAt: string;
+};
+
+type HazardEvent = {
+  depth: string | null;
+  description: string | null;
+  eventId: string;
+  eventType: "earthquake" | "tsunami";
+  fetchedAt: string | null;
+  id: number;
+  imageUrl: string | null;
+  intensity: string | null;
+  issuedAt: string | null;
+  latitude: number | null;
+  location: string;
+  longitude: number | null;
+  magnitude: string | null;
+  occurredAt: string | null;
+  title: string;
+};
+
+type MappedHazardEvent = HazardEvent & {
+  latitude: number;
+  longitude: number;
+};
+
+type HazardFeatureProperties = {
+  depth: string;
+  description: string;
+  eventId: string;
+  eventType: "earthquake" | "tsunami";
+  imageUrl: string;
+  intensity: string;
+  issuedAt: string;
+  latitude: number;
+  location: string;
+  longitude: number;
+  magnitude: string;
+  occurredAt: string;
+  title: string;
+};
+
+type HazardsResponse = {
+  events: HazardEvent[];
+  serverTime: string;
 };
 
 const PROVIDERS: Record<
@@ -178,6 +229,10 @@ function isMappedPoint(point: EmergencyPoint): point is MappedEmergencyPoint {
   return point.latitude !== null && point.longitude !== null;
 }
 
+function isMappedHazardEvent(event: HazardEvent): event is MappedHazardEvent {
+  return event.latitude !== null && event.longitude !== null;
+}
+
 function createPointData(points: EmergencyPoint[]) {
   return {
     features: points.filter(isMappedPoint).map((point) => ({
@@ -199,6 +254,34 @@ function createPointData(points: EmergencyPoint[]) {
         sourceRecordId: point.sourceRecordId,
         sourceUpdatedAt: point.sourceUpdatedAt ?? "",
       } satisfies PointFeatureProperties,
+      type: "Feature" as const,
+    })),
+    type: "FeatureCollection" as const,
+  };
+}
+
+function createHazardData(events: HazardEvent[]) {
+  return {
+    features: events.filter(isMappedHazardEvent).map((event) => ({
+      geometry: {
+        coordinates: [event.longitude, event.latitude],
+        type: "Point" as const,
+      },
+      properties: {
+        depth: event.depth ?? "",
+        description: event.description ?? "",
+        eventId: event.eventId,
+        eventType: event.eventType,
+        imageUrl: event.imageUrl ?? "",
+        intensity: event.intensity ?? "",
+        issuedAt: event.issuedAt ?? "",
+        latitude: event.latitude,
+        location: event.location,
+        longitude: event.longitude,
+        magnitude: event.magnitude ?? "",
+        occurredAt: event.occurredAt ?? "",
+        title: event.title,
+      } satisfies HazardFeatureProperties,
       type: "Feature" as const,
     })),
     type: "FeatureCollection" as const,
@@ -237,6 +320,10 @@ function formatDateTime(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
+  return eventType === "earthquake" ? "지진" : "지진해일";
 }
 
 function buildKakaoMapUrl(point: PointFeatureProperties) {
@@ -355,6 +442,73 @@ function syncPointLayerWhenReady(map: MapLibreMap, points: EmergencyPoint[]) {
   });
 }
 
+function syncHazardLayer(map: MapLibreMap, events: HazardEvent[]) {
+  if (!map.isStyleLoaded()) {
+    return;
+  }
+
+  const eventData = createHazardData(events);
+  const source = map.getSource(HAZARDS_SOURCE_ID) as GeoJSONSource | undefined;
+
+  if (source) {
+    source.setData(eventData);
+    return;
+  }
+
+  map.addSource(HAZARDS_SOURCE_ID, {
+    data: eventData,
+    type: "geojson",
+  });
+  map.addLayer({
+    id: HAZARDS_HALO_LAYER_ID,
+    paint: {
+      "circle-color": [
+        "match",
+        ["get", "eventType"],
+        "earthquake",
+        "#f59e0b",
+        "tsunami",
+        "#06b6d4",
+        "#ef4444",
+      ],
+      "circle-opacity": 0.24,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 12, 12, 30],
+    },
+    source: HAZARDS_SOURCE_ID,
+    type: "circle",
+  });
+  map.addLayer({
+    id: HAZARDS_LAYER_ID,
+    paint: {
+      "circle-color": [
+        "match",
+        ["get", "eventType"],
+        "earthquake",
+        "#d97706",
+        "tsunami",
+        "#0891b2",
+        "#dc2626",
+      ],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 7, 12, 12],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2,
+    },
+    source: HAZARDS_SOURCE_ID,
+    type: "circle",
+  });
+}
+
+function syncHazardLayerWhenReady(map: MapLibreMap, events: HazardEvent[]) {
+  if (map.isStyleLoaded()) {
+    syncHazardLayer(map, events);
+    return;
+  }
+
+  map.once("idle", () => {
+    syncHazardLayer(map, events);
+  });
+}
+
 export function MapShell({
   dictionary,
   initialProvider,
@@ -366,6 +520,8 @@ export function MapShell({
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const pointsRef = useRef<EmergencyPoint[]>([]);
+  const hazardsRef = useRef<HazardEvent[]>([]);
+  const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification | string>(
     initialProvider === "vworld" && vworldApiKey.trim().length > 0
       ? createVworldStyle(vworldApiKey)
@@ -376,8 +532,11 @@ export function MapShell({
   const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
   const [points, setPoints] = useState<EmergencyPoint[]>([]);
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
+  const [hazards, setHazards] = useState<HazardEvent[]>([]);
+  const [activeHazard, setActiveHazard] = useState<HazardEvent | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [autoFocusHazards, setAutoFocusHazards] = useState(true);
   const [visibleSources, setVisibleSources] = useState<
     Partial<Record<DatasetSourceId, boolean>>
   >({});
@@ -416,21 +575,66 @@ export function MapShell({
   ).length;
 
   const refreshData = useCallback(async () => {
-    const [pointsResponse, datasetsResponse] = await Promise.all([
-      fetch("/api/points", { cache: "no-store" }),
-      fetch("/api/datasets", { cache: "no-store" }),
-    ]);
+    const [pointsResponse, datasetsResponse, hazardsResponse] =
+      await Promise.all([
+        fetch("/api/points", { cache: "no-store" }),
+        fetch("/api/datasets", { cache: "no-store" }),
+        fetch("/api/hazards", { cache: "no-store" }),
+      ]);
 
-    if (!pointsResponse.ok || !datasetsResponse.ok) {
+    if (!pointsResponse.ok || !datasetsResponse.ok || !hazardsResponse.ok) {
       throw new Error("Failed to load map data");
     }
 
     const pointsPayload = (await pointsResponse.json()) as PointsResponse;
     const datasetsPayload = (await datasetsResponse.json()) as DatasetsResponse;
+    const hazardsPayload = (await hazardsResponse.json()) as HazardsResponse;
 
     setPoints(pointsPayload.points);
     setDatasets(datasetsPayload.datasets);
+    setHazards(hazardsPayload.events);
   }, []);
+
+  const focusHazard = useCallback((event: HazardEvent) => {
+    setActiveHazard(event);
+
+    if (
+      event.latitude === null ||
+      event.longitude === null ||
+      !mapRef.current
+    ) {
+      return;
+    }
+
+    const map = mapRef.current;
+    map.flyTo({
+      center: [event.longitude, event.latitude],
+      essential: true,
+      zoom: Math.max(map.getZoom(), 8),
+    });
+  }, []);
+
+  const refreshHazards = useCallback(async () => {
+    const response = await fetch("/api/hazards", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error("Failed to load hazard events");
+    }
+
+    const payload = (await response.json()) as HazardsResponse;
+    const previousIds = knownHazardIdsRef.current;
+    const nextIds = new Set(payload.events.map((event) => event.eventId));
+    const newEvent = payload.events.find(
+      (event) => !previousIds.has(event.eventId),
+    );
+
+    setHazards(payload.events);
+    knownHazardIdsRef.current = nextIds;
+
+    if (newEvent && previousIds.size > 0 && autoFocusHazards) {
+      focusHazard(newEvent);
+    }
+  }, [autoFocusHazards, focusHazard]);
 
   useEffect(() => {
     let isDisposed = false;
@@ -453,6 +657,31 @@ export function MapShell({
   }, [refreshData]);
 
   useEffect(() => {
+    const storedValue = window.localStorage.getItem(HAZARD_AUTO_FOCUS_KEY);
+
+    if (storedValue !== null) {
+      setAutoFocusHazards(storedValue === "true");
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      HAZARD_AUTO_FOCUS_KEY,
+      String(autoFocusHazards),
+    );
+  }, [autoFocusHazards]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      refreshHazards().catch(() => {});
+    }, HAZARD_POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [refreshHazards]);
+
+  useEffect(() => {
     if (datasets.length === 0) {
       return;
     }
@@ -467,6 +696,22 @@ export function MapShell({
       return next;
     });
   }, [datasets]);
+
+  useEffect(() => {
+    hazardsRef.current = hazards;
+
+    if (knownHazardIdsRef.current.size === 0 && hazards.length > 0) {
+      knownHazardIdsRef.current = new Set(
+        hazards.map((event) => event.eventId),
+      );
+    }
+
+    if (!mapRef.current) {
+      return;
+    }
+
+    syncHazardLayerWhenReady(mapRef.current, hazards);
+  }, [hazards]);
 
   useEffect(() => {
     pointsRef.current = visiblePoints;
@@ -535,15 +780,41 @@ export function MapShell({
           .addTo(map);
       });
 
+      map.on("click", HAZARDS_LAYER_ID, (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
+
+        if (!feature?.properties) {
+          return;
+        }
+
+        const eventId = String(
+          (feature.properties as HazardFeatureProperties).eventId,
+        );
+        const hazard = hazardsRef.current.find(
+          (current) => current.eventId === eventId,
+        );
+
+        if (hazard) {
+          focusHazard(hazard);
+        }
+      });
+
       map.on("mouseenter", POINTS_LAYER_ID, () => {
         map.getCanvas().style.cursor = "pointer";
       });
       map.on("mouseleave", POINTS_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
+      map.on("mouseenter", HAZARDS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", HAZARDS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
 
       map.once("load", () => {
         syncPointLayerWhenReady(map, pointsRef.current);
+        syncHazardLayerWhenReady(map, hazardsRef.current);
       });
     }
 
@@ -555,7 +826,7 @@ export function MapShell({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [dictionary]);
+  }, [dictionary, focusHazard]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -584,6 +855,7 @@ export function MapShell({
       timeoutId = window.setTimeout(() => {
         map.resize();
         syncPointLayerWhenReady(map, pointsRef.current);
+        syncHazardLayerWhenReady(map, hazardsRef.current);
       }, STYLE_LOAD_TIMEOUT_MS);
 
       map.once("styledata", () => {
@@ -592,6 +864,7 @@ export function MapShell({
         }
         map.resize();
         syncPointLayerWhenReady(map, pointsRef.current);
+        syncHazardLayerWhenReady(map, hazardsRef.current);
       });
     }
 
@@ -769,6 +1042,17 @@ export function MapShell({
                   </label>
                 ))}
               </div>
+              <label className={styles.settingItem}>
+                <input
+                  checked={autoFocusHazards}
+                  onChange={(event) =>
+                    setAutoFocusHazards(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <Settings aria-hidden="true" size={15} strokeWidth={2.4} />
+                <span>이벤트 발생 시 지도 이동</span>
+              </label>
             </fieldset>
           ) : null}
         </div>
@@ -790,6 +1074,11 @@ export function MapShell({
                   dictionary.map.datasets.neverUpdated}
               </span>
             </span>
+            <span className={styles.datasetMetric}>
+              <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{hazards.length.toLocaleString("ko-KR")}</span>
+              <span>최근 이벤트</span>
+            </span>
           </div>
 
           {isLoadingData || dataError ? (
@@ -803,6 +1092,72 @@ export function MapShell({
             <strong>{dictionary.map.missingKeyTitle}</strong>
             <span>{dictionary.map.missingKeyBody}</span>
           </output>
+        ) : null}
+        {activeHazard ? (
+          <div className={styles.modalBackdrop} role="presentation">
+            <section
+              aria-labelledby="hazard-modal-title"
+              aria-modal="true"
+              className={styles.hazardModal}
+              role="dialog"
+            >
+              <div className={styles.hazardHeader}>
+                <div>
+                  <span>{hazardTypeLabel(activeHazard.eventType)}</span>
+                  <h2 id="hazard-modal-title">{activeHazard.title}</h2>
+                </div>
+                <button
+                  aria-label="이벤트 정보 닫기"
+                  className={styles.modalCloseButton}
+                  onClick={() => setActiveHazard(null)}
+                  type="button"
+                >
+                  ×
+                </button>
+              </div>
+              <dl className={styles.hazardDetails}>
+                <div>
+                  <dt>통보 시각</dt>
+                  <dd>{formatDateTime(activeHazard.issuedAt) ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>발생 시각</dt>
+                  <dd>{formatDateTime(activeHazard.occurredAt) ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>위치</dt>
+                  <dd>{activeHazard.location}</dd>
+                </div>
+                <div>
+                  <dt>규모</dt>
+                  <dd>{activeHazard.magnitude ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>진도/지역</dt>
+                  <dd>{activeHazard.intensity ?? "-"}</dd>
+                </div>
+                <div>
+                  <dt>깊이</dt>
+                  <dd>{activeHazard.depth ?? "-"}</dd>
+                </div>
+              </dl>
+              {activeHazard.description ? (
+                <p className={styles.hazardDescription}>
+                  {activeHazard.description}
+                </p>
+              ) : null}
+              {activeHazard.imageUrl ? (
+                <a
+                  className={styles.hazardLink}
+                  href={activeHazard.imageUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  기상청 이미지 보기
+                </a>
+              ) : null}
+            </section>
+          </div>
         ) : null}
       </main>
     </div>

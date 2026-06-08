@@ -234,6 +234,27 @@
   font-weight: 700;
 }
 
+.settingItem {
+  display: grid;
+  min-height: 36px;
+  align-items: center;
+  grid-template-columns: 18px 18px minmax(0, 1fr);
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+  padding-top: 8px;
+}
+
+.settingItem input {
+  width: 15px;
+  height: 15px;
+  accent-color: #225ea8;
+}
+
 .datasetPanel {
   position: absolute;
   left: 16px;
@@ -303,6 +324,108 @@
   color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.45;
+}
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 980;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 26%);
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.hazardModal {
+  display: grid;
+  width: min(440px, 100%);
+  max-height: min(620px, calc(100dvh - 72px));
+  gap: 12px;
+  overflow: auto;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  background: var(--dropdown-surface);
+  color: var(--text-strong);
+  box-shadow: var(--dropdown-shadow);
+  padding: 16px;
+}
+
+.hazardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hazardHeader div {
+  display: grid;
+  gap: 4px;
+}
+
+.hazardHeader span {
+  color: #b45309;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.hazardHeader h2 {
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.modalCloseButton {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.hazardDetails {
+  display: grid;
+  gap: 7px;
+}
+
+.hazardDetails div {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.hazardDetails dt {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.hazardDescription {
+  border-radius: 6px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  padding: 10px;
+}
+
+.hazardLink {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #225ea8;
+  color: #ffffff;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 0 12px;
 }
 
 .popup {
