@@ -113,19 +113,26 @@ async function downloadCsv(source: DatasetSourceId) {
 
 function getNaverCredentials() {
   const keyId =
-    process.env.NAVER_MAPS_CLIENT_ID ??
-    process.env.NAVER_MAPS_API_KEY_ID ??
-    process.env.NCP_APIGW_API_KEY_ID;
+    process.env.NAVER_MAPS_CLIENT_ID?.trim() ??
+    process.env.NAVER_MAPS_API_KEY_ID?.trim() ??
+    process.env.NCP_APIGW_API_KEY_ID?.trim();
   const key =
-    process.env.NAVER_MAPS_CLIENT_SECRET ??
-    process.env.NAVER_MAPS_API_KEY ??
-    process.env.NCP_APIGW_API_KEY;
+    process.env.NAVER_MAPS_CLIENT_SECRET?.trim() ??
+    process.env.NAVER_MAPS_API_KEY?.trim() ??
+    process.env.NCP_APIGW_API_KEY?.trim();
 
   if (!keyId || !key) {
     return null;
   }
 
-  return { key, keyId };
+  return {
+    key,
+    keyId,
+    source:
+      process.env.NAVER_MAPS_CLIENT_ID || process.env.NAVER_MAPS_CLIENT_SECRET
+        ? "NAVER_MAPS_CLIENT_ID/NAVER_MAPS_CLIENT_SECRET"
+        : "legacy NCP API gateway env",
+  };
 }
 
 function parseCsv(csv: string) {
@@ -352,7 +359,16 @@ async function geocodeAddress(address: string) {
         category: "geocoding",
         level: "error",
         message: `Naver geocoding failed with HTTP ${response.status}.`,
-        metadata: { address, statusCode: response.status },
+        metadata: {
+          address,
+          credentialSource: credentials.source,
+          naverHint:
+            response.status === 401
+              ? "Use Naver Cloud Platform Maps Geocoding API Key ID/API Key and confirm the service/restriction settings."
+              : null,
+          statusCode: response.status,
+          usedHeaders: ["x-ncp-apigw-api-key-id", "x-ncp-apigw-api-key"],
+        },
         requestCount: 1,
         status: "failure",
       });
