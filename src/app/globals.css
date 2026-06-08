@@ -1,12 +1,44 @@
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #18201c;
+  --border: #d8e0d9;
+  --brand-mark: #1f8f57;
+  --brand-mark-halo: #dff3e8;
+  --control-border: #ccd8cf;
+  --control-selected: #ffffff;
+  --control-shadow: 0 2px 8px rgb(24 32 28 / 12%);
+  --control-surface: #edf3ef;
+  --focus-ring: #2a7ee4;
+  --map-fallback: #dce7df;
+  --nav-surface: rgb(255 255 255 / 82%);
+  --notice-border: #cad7ce;
+  --notice-shadow: 0 12px 32px rgb(24 32 28 / 16%);
+  --notice-surface: rgb(255 255 255 / 94%);
+  --page-glow: #eef7f1;
+  --text-muted: #617067;
+  --text-strong: #18201c;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #111512;
+    --foreground: #edf4ef;
+    --border: #2b352f;
+    --brand-mark: #61d394;
+    --brand-mark-halo: #183624;
+    --control-border: #344139;
+    --control-selected: #223027;
+    --control-shadow: 0 2px 8px rgb(0 0 0 / 32%);
+    --control-surface: #171e1a;
+    --focus-ring: #7db7ff;
+    --map-fallback: #202820;
+    --nav-surface: rgb(17 21 18 / 84%);
+    --notice-border: #3a463f;
+    --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
+    --notice-surface: rgb(22 29 24 / 94%);
+    --page-glow: #16251c;
+    --text-muted: #a7b5ac;
+    --text-strong: #f3f8f4;
   }
 }
 
@@ -29,6 +61,13 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 * {

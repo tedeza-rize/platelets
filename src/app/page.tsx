@@ -1,65 +1,32 @@
-import Image from "next/image";
+import { headers } from "next/headers";
+import { MapShell } from "@/components/map-shell";
+import { getDictionary, resolveLocale } from "@/lib/i18n";
 import styles from "./page.module.css";
 
-export default function Home() {
+export default async function Home() {
+  const headerList = await headers();
+  const locale = resolveLocale(headerList.get("accept-language"));
+  const dictionary = getDictionary(locale);
+  const vworldApiKey = process.env.NEXT_PUBLIC_VWORLD_API_KEY ?? "";
+
   return (
     <div className={styles.page}>
+      <nav className={styles.navbar} aria-label={dictionary.navigation.label}>
+        <a className={styles.brand} href="/">
+          <span className={styles.brandMark} aria-hidden="true" />
+          <span>{dictionary.navigation.brand}</span>
+        </a>
+        <div className={styles.navMeta}>
+          <span>{dictionary.navigation.defaultProvider}</span>
+        </div>
+      </nav>
+
       <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+        <MapShell
+          dictionary={dictionary.map}
+          initialProvider="vworld"
+          vworldApiKey={vworldApiKey}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
       </main>
     </div>
   );
