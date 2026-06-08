@@ -107,6 +107,23 @@ a {
   text-decoration: none;
 }
 
+.maplibregl-popup {
+  z-index: 960;
+}
+
+.maplibregl-popup-content {
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 12px 28px rgb(24 32 28 / 24%);
+}
+
+.maplibregl-popup-close-button {
+  width: 28px;
+  height: 28px;
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;

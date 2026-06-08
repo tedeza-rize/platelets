@@ -3,6 +3,21 @@ export type Locale = "ko" | "en";
 export type MapDictionary = {
   activeProvider: string;
   ariaLabel: string;
+  datasets: {
+    all: string;
+    fire: string;
+    lastUpdated: string;
+    loading: string;
+    neverUpdated: string;
+    panelLabel: string;
+    points: string;
+    police: string;
+    refreshAll: string;
+    refreshFire: string;
+    refreshPolice: string;
+    updateFailed: string;
+    updating: string;
+  };
   missingKeyBody: string;
   missingKeyTitle: string;
   providerButtonLabel: string;
@@ -11,6 +26,13 @@ export type MapDictionary = {
   providers: {
     osm: string;
     vworld: string;
+  };
+  popup: {
+    address: string;
+    kakaoDirections: string;
+    naverMap: string;
+    phone: string;
+    sourceUpdatedAt: string;
   };
   title: string;
 };
@@ -34,7 +56,22 @@ const dictionaries: Record<Locale, AppDictionary> = {
   ko: {
     map: {
       activeProvider: "선택한 지도: {provider}",
-      ariaLabel: "서울 중심의 인터랙티브 지도",
+      ariaLabel: "전국 비상 대응 거점 지도",
+      datasets: {
+        all: "전체",
+        fire: "소방",
+        lastUpdated: "갱신",
+        loading: "불러오는 중",
+        neverUpdated: "미갱신",
+        panelLabel: "데이터셋 업데이트",
+        points: "표시 지점",
+        police: "경찰",
+        refreshAll: "전체 업데이트",
+        refreshFire: "소방 업데이트",
+        refreshPolice: "경찰 업데이트",
+        updateFailed: "업데이트 실패",
+        updating: "업데이트 중",
+      },
       missingKeyBody:
         ".env.local에 NEXT_PUBLIC_VWORLD_API_KEY를 설정하면 브이월드 타일이 표시됩니다. 지금은 OSM 타일로 지도를 유지합니다.",
       missingKeyTitle: "브이월드 API 키가 필요합니다",
@@ -45,10 +82,18 @@ const dictionaries: Record<Locale, AppDictionary> = {
         osm: "OSM",
         vworld: "브이월드",
       },
+      popup: {
+        address: "주소",
+        kakaoDirections: "카카오맵 길찾기",
+        naverMap: "네이버 지도",
+        phone: "전화",
+        sourceUpdatedAt: "자료 기준일",
+      },
       title: "지도",
     },
     metadata: {
-      description: "브이월드와 OSM을 선택할 수 있는 반응형 지도 화면",
+      description:
+        "브이월드와 OSM을 선택할 수 있는 전국 비상 대응 거점 지도 화면",
       title: "Platelets 지도",
     },
     navigation: {
@@ -62,7 +107,22 @@ const dictionaries: Record<Locale, AppDictionary> = {
   en: {
     map: {
       activeProvider: "Selected map: {provider}",
-      ariaLabel: "Interactive map centered on Seoul",
+      ariaLabel: "Nationwide emergency response point map",
+      datasets: {
+        all: "All",
+        fire: "Fire",
+        lastUpdated: "Updated",
+        loading: "Loading",
+        neverUpdated: "Not updated",
+        panelLabel: "Dataset updates",
+        points: "Visible points",
+        police: "Police",
+        refreshAll: "Update all",
+        refreshFire: "Update fire",
+        refreshPolice: "Update police",
+        updateFailed: "Update failed",
+        updating: "Updating",
+      },
       missingKeyBody:
         "Set NEXT_PUBLIC_VWORLD_API_KEY in .env.local to show VWorld tiles. The map stays available with OSM tiles for now.",
       missingKeyTitle: "VWorld API key required",
@@ -73,11 +133,18 @@ const dictionaries: Record<Locale, AppDictionary> = {
         osm: "OSM",
         vworld: "VWorld",
       },
+      popup: {
+        address: "Address",
+        kakaoDirections: "Kakao directions",
+        naverMap: "Naver Map",
+        phone: "Phone",
+        sourceUpdatedAt: "Source date",
+      },
       title: "Map",
     },
     metadata: {
       description:
-        "Responsive map view with selectable VWorld and OSM providers",
+        "Responsive emergency point map view with selectable VWorld and OSM providers",
       title: "Platelets Map",
     },
     navigation: {

@@ -135,6 +135,94 @@
   height: 100%;
 }
 
+.datasetPanel {
+  position: absolute;
+  left: 16px;
+  bottom: 20px;
+  z-index: 900;
+  display: grid;
+  width: min(460px, calc(100% - 32px));
+  gap: 10px;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  background: var(--notice-surface);
+  color: var(--text-strong);
+  padding: 12px;
+  box-shadow: var(--notice-shadow);
+}
+
+.datasetStats {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.datasetMetric {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.datasetMetric span:nth-child(2) {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.updateActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.updateButton {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 0 10px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.updateButton:hover:not(:disabled),
+.updateButton:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.updateButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.dataNotice {
+  min-height: 20px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.spinningIcon {
+  animation: spin 900ms linear infinite;
+}
+
 .notice {
   position: absolute;
   right: 16px;
@@ -157,6 +245,83 @@
   line-height: 1.45;
 }
 
+.popup {
+  display: grid;
+  min-width: 220px;
+  gap: 10px;
+  color: var(--text-strong);
+  font-family: var(--font-geist-sans);
+}
+
+.popupHeader {
+  display: grid;
+  gap: 3px;
+}
+
+.popupHeader strong {
+  font-size: 0.96rem;
+  line-height: 1.25;
+}
+
+.popupHeader span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.popupDetails {
+  display: grid;
+  gap: 6px;
+}
+
+.popupRow {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.popupRow dt {
+  color: var(--text-muted);
+}
+
+.popupRow dd {
+  min-width: 0;
+  color: var(--text-strong);
+}
+
+.popupActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.popupActions a {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #225ea8;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  padding: 0 8px;
+  text-align: center;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 720px) {
   .navbar {
     grid-template-columns: 44px minmax(0, 1fr) auto;
@@ -174,5 +339,35 @@
 
   .providerButton {
     width: 50px;
+  }
+
+  .datasetPanel {
+    right: 12px;
+    bottom: 16px;
+    left: 12px;
+    width: auto;
+    padding: 10px;
+  }
+
+  .datasetStats {
+    display: grid;
+    gap: 6px;
+  }
+
+  .updateActions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .updateButton {
+    min-height: 32px;
+    font-size: 0.78rem;
+    padding: 0 6px;
+  }
+
+  .notice {
+    top: 52px;
+    right: 12px;
+    bottom: auto;
+    max-width: min(320px, calc(100% - 24px));
   }
 }

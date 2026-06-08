@@ -32,6 +32,7 @@ type VworldAddressResponse = {
 
 const CSV_ENCODING = "euc-kr";
 const GEOCODE_CONCURRENCY = 4;
+const DOWNLOAD_RETRY_COUNT = 3;
 
 function text(value: string | undefined) {
   return value?.trim() ?? "";
@@ -47,8 +48,14 @@ function toNumber(value: string | undefined) {
   return Number.isFinite(number) ? number : null;
 }
 
-async function downloadCsv(source: DatasetSourceId) {
-  const buffer = await new Promise<Buffer>((resolve, reject) => {
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function downloadCsvOnce(source: DatasetSourceId) {
+  return new Promise<Buffer>((resolve, reject) => {
     const request = https.get(
       DATASET_SOURCES[source].url,
       {
@@ -76,8 +83,22 @@ async function downloadCsv(source: DatasetSourceId) {
 
     request.on("error", reject);
   });
+}
 
-  return new TextDecoder(CSV_ENCODING).decode(buffer);
+async function downloadCsv(source: DatasetSourceId) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DOWNLOAD_RETRY_COUNT; attempt += 1) {
+    try {
+      const buffer = await downloadCsvOnce(source);
+      return new TextDecoder(CSV_ENCODING).decode(buffer);
+    } catch (error) {
+      lastError = error;
+      await wait(200 * attempt);
+    }
+  }
+
+  throw lastError;
 }
 
 function parseCsv(csv: string) {

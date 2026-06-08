@@ -1,12 +1,30 @@
 "use client";
 
-import { Check, ChevronDown, Globe2, Home, Layers } from "lucide-react";
-import type { StyleSpecification } from "maplibre-gl";
-import { useEffect, useRef, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  Database,
+  Flame,
+  Globe2,
+  Home,
+  Layers,
+  MapPin,
+  RefreshCw,
+  Shield,
+} from "lucide-react";
+import type {
+  GeoJSONSource,
+  MapGeoJSONFeature,
+  MapLayerMouseEvent,
+  Map as MapLibreMap,
+  StyleSpecification,
+} from "maplibre-gl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppDictionary } from "@/lib/i18n";
 import styles from "./map-shell.module.css";
 
 type MapProvider = "vworld" | "osm";
+type DatasetSourceId = "fire-stations" | "police-stations";
 
 type MapShellProps = {
   dictionary: AppDictionary;
@@ -14,33 +32,72 @@ type MapShellProps = {
   vworldApiKey: string;
 };
 
+type EmergencyPoint = {
+  address: string;
+  category: string;
+  fetchedAt: string | null;
+  id: number;
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  parentName: string | null;
+  phone: string | null;
+  source: DatasetSourceId;
+  sourceRecordId: string;
+  sourceUpdatedAt: string | null;
+};
+
+type MappedEmergencyPoint = EmergencyPoint & {
+  latitude: number;
+  longitude: number;
+};
+
+type DatasetStatus = {
+  error: string | null;
+  failedCount: number;
+  fetchedAt: string | null;
+  geocodedCount: number;
+  id: DatasetSourceId;
+  label: string;
+  recordCount: number;
+  skippedCount: number;
+  updatedAt: string | null;
+};
+
+type PointsResponse = {
+  points: EmergencyPoint[];
+};
+
+type DatasetsResponse = {
+  datasets: DatasetStatus[];
+};
+
 const SEOUL_CENTER: [number, number] = [37.5665, 126.978];
 const MAP_CENTER: [number, number] = [SEOUL_CENTER[1], SEOUL_CENTER[0]];
 const DEFAULT_ZOOM = 16;
 const STYLE_LOAD_TIMEOUT_MS = 8000;
+const OSM_TILE_SIZE = 256;
+const OSM_MAX_ZOOM = 19;
 const VWORLD_TILE_SIZE = 256;
 const VWORLD_MAX_ZOOM = 19;
-const OSM_VECTOR_STYLE_URL =
-  "https://vector.openstreetmap.org/demo/shortbread/colorful.json";
-const OSM_VECTOR_ORIGIN = new URL(OSM_VECTOR_STYLE_URL).origin;
-const EMPTY_STYLE: StyleSpecification = {
-  layers: [],
-  sources: {},
-  version: 8,
+const POINTS_SOURCE_ID = "emergency-points";
+const POINTS_HALO_LAYER_ID = "emergency-points-halo";
+const POINTS_LAYER_ID = "emergency-points-circle";
+
+type PointFeatureProperties = {
+  address: string;
+  category: string;
+  fetchedAt: string;
+  id: number;
+  latitude: number;
+  longitude: number;
+  name: string;
+  parentName: string;
+  phone: string;
+  source: DatasetSourceId;
+  sourceRecordId: string;
+  sourceUpdatedAt: string;
 };
-
-type MutableStyleSource = {
-  tiles?: string[];
-  url?: string;
-};
-
-function toAbsoluteOsmUrl(url: string) {
-  if (url.startsWith("/")) {
-    return `${OSM_VECTOR_ORIGIN}${url}`;
-  }
-
-  return new URL(url, OSM_VECTOR_STYLE_URL).toString();
-}
 
 const PROVIDERS: Record<
   MapProvider,
@@ -86,46 +143,221 @@ function createVworldStyle(vworldApiKey: string): StyleSpecification {
   };
 }
 
-async function loadOsmVectorStyle(): Promise<StyleSpecification> {
-  const response = await fetch(OSM_VECTOR_STYLE_URL);
+function createOsmStyle(): StyleSpecification {
+  return {
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+    layers: [
+      {
+        id: "osm-base",
+        source: "osm-base",
+        type: "raster",
+      },
+    ],
+    sources: {
+      "osm-base": {
+        attribution: "OpenStreetMap contributors",
+        maxzoom: OSM_MAX_ZOOM,
+        tileSize: OSM_TILE_SIZE,
+        tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        type: "raster",
+      },
+    },
+    version: 8,
+  };
+}
 
-  if (!response.ok) {
-    throw new Error(`Failed to load OSM vector style: ${response.status}`);
-  }
+function isMappedPoint(point: EmergencyPoint): point is MappedEmergencyPoint {
+  return point.latitude !== null && point.longitude !== null;
+}
 
-  const style = (await response.json()) as StyleSpecification;
+function createPointData(points: EmergencyPoint[]) {
+  return {
+    features: points.filter(isMappedPoint).map((point) => ({
+      geometry: {
+        coordinates: [point.longitude, point.latitude],
+        type: "Point" as const,
+      },
+      properties: {
+        address: point.address,
+        category: point.category,
+        fetchedAt: point.fetchedAt ?? "",
+        id: point.id,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        name: point.name,
+        parentName: point.parentName ?? "",
+        phone: point.phone ?? "",
+        source: point.source,
+        sourceRecordId: point.sourceRecordId,
+        sourceUpdatedAt: point.sourceUpdatedAt ?? "",
+      } satisfies PointFeatureProperties,
+      type: "Feature" as const,
+    })),
+    type: "FeatureCollection" as const,
+  };
+}
 
-  if (typeof style.sprite === "string") {
-    style.sprite = toAbsoluteOsmUrl(style.sprite);
-  } else if (Array.isArray(style.sprite)) {
-    style.sprite = style.sprite.map((sprite) => ({
-      ...sprite,
-      url:
-        typeof sprite.url === "string"
-          ? toAbsoluteOsmUrl(sprite.url)
-          : sprite.url,
-    }));
-  }
-
-  if (style.glyphs) {
-    style.glyphs = toAbsoluteOsmUrl(style.glyphs);
-  }
-
-  for (const source of Object.values(style.sources)) {
-    const mutableSource = source as MutableStyleSource;
-
-    if (mutableSource.url) {
-      mutableSource.url = toAbsoluteOsmUrl(mutableSource.url);
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
     }
+  });
+}
 
-    if (mutableSource.tiles) {
-      mutableSource.tiles = mutableSource.tiles.map((tileUrl) =>
-        typeof tileUrl === "string" ? toAbsoluteOsmUrl(tileUrl) : tileUrl,
-      );
-    }
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return null;
   }
 
-  return style;
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function buildKakaoDirectionsUrl(point: PointFeatureProperties) {
+  const destination = encodeURIComponent(point.name);
+  return `https://map.kakao.com/link/to/${destination},${point.latitude},${point.longitude}`;
+}
+
+function buildNaverMapUrl(point: PointFeatureProperties) {
+  const query = encodeURIComponent(`${point.name} ${point.address}`);
+  return `https://map.naver.com/p/search/${query}`;
+}
+
+function buildPopupHtml(
+  point: PointFeatureProperties,
+  dictionary: AppDictionary,
+) {
+  const rows = [
+    [dictionary.map.popup.address, point.address],
+    [dictionary.map.popup.phone, point.phone],
+    [dictionary.map.popup.sourceUpdatedAt, point.sourceUpdatedAt],
+  ].filter(([, value]) => value);
+  const rowsHtml = rows
+    .map(
+      ([label, value]) =>
+        `<div class="${styles.popupRow}"><dt>${escapeHtml(
+          label,
+        )}</dt><dd>${escapeHtml(value)}</dd></div>`,
+    )
+    .join("");
+
+  return `<article class="${styles.popup}">
+    <div class="${styles.popupHeader}">
+      <strong>${escapeHtml(point.name)}</strong>
+      <span>${escapeHtml(point.category)}</span>
+    </div>
+    <dl class="${styles.popupDetails}">${rowsHtml}</dl>
+    <div class="${styles.popupActions}">
+      <a href="${buildKakaoDirectionsUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.kakaoDirections,
+      )}</a>
+      <a href="${buildNaverMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.naverMap,
+      )}</a>
+    </div>
+  </article>`;
+}
+
+function syncPointLayer(map: MapLibreMap, points: EmergencyPoint[]) {
+  if (!map.isStyleLoaded()) {
+    return;
+  }
+
+  const pointData = createPointData(points);
+  const source = map.getSource(POINTS_SOURCE_ID) as GeoJSONSource | undefined;
+
+  if (source) {
+    source.setData(pointData);
+    return;
+  }
+
+  map.addSource(POINTS_SOURCE_ID, {
+    data: pointData,
+    type: "geojson",
+  });
+  map.addLayer({
+    id: POINTS_HALO_LAYER_ID,
+    paint: {
+      "circle-color": [
+        "case",
+        ["==", ["get", "source"], "fire-stations"],
+        "#f97316",
+        "#2563eb",
+      ],
+      "circle-opacity": 0.2,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 20],
+    },
+    source: POINTS_SOURCE_ID,
+    type: "circle",
+  });
+  map.addLayer({
+    id: POINTS_LAYER_ID,
+    paint: {
+      "circle-color": [
+        "case",
+        ["==", ["get", "source"], "fire-stations"],
+        "#dc2626",
+        "#1d4ed8",
+      ],
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 9],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1.5,
+    },
+    source: POINTS_SOURCE_ID,
+    type: "circle",
+  });
+}
+
+function syncPointLayerWhenReady(map: MapLibreMap, points: EmergencyPoint[]) {
+  if (map.isStyleLoaded()) {
+    syncPointLayer(map, points);
+    return;
+  }
+
+  map.once("idle", () => {
+    syncPointLayer(map, points);
+  });
+}
+
+function fitToPoints(map: MapLibreMap, points: EmergencyPoint[]) {
+  const mappedPoints = points.filter(isMappedPoint);
+
+  if (mappedPoints.length === 0) {
+    return;
+  }
+
+  const lngValues = mappedPoints.map((point) => point.longitude);
+  const latValues = mappedPoints.map((point) => point.latitude);
+
+  map.fitBounds(
+    [
+      [Math.min(...lngValues), Math.min(...latValues)],
+      [Math.max(...lngValues), Math.max(...latValues)],
+    ],
+    {
+      duration: 800,
+      maxZoom: 9,
+      padding: 64,
+    },
+  );
 }
 
 export function MapShell({
@@ -135,15 +367,24 @@ export function MapShell({
 }: MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const providerMenuRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<import("maplibre-gl").Map | null>(null);
-  const osmStyleRef = useRef<StyleSpecification | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
+  const pointsRef = useRef<EmergencyPoint[]>([]);
+  const hasFitPointsRef = useRef(false);
   const initialStyleRef = useRef<StyleSpecification | string>(
     initialProvider === "vworld" && vworldApiKey.trim().length > 0
       ? createVworldStyle(vworldApiKey)
-      : EMPTY_STYLE,
+      : createOsmStyle(),
   );
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [points, setPoints] = useState<EmergencyPoint[]>([]);
+  const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [updatingSource, setUpdatingSource] = useState<
+    DatasetSourceId | "all"
+  >();
+  const [dataError, setDataError] = useState<string | null>(null);
 
   const isVworldReady = vworldApiKey.trim().length > 0;
   const activeProvider =
@@ -152,6 +393,92 @@ export function MapShell({
   const SelectedProviderIcon = selectedProviderConfig.icon;
   const selectedProviderLabel =
     dictionary.map.providers[selectedProviderConfig.labelKey];
+  const mappedPointCount = points.filter(isMappedPoint).length;
+  const latestFetchedAt = useMemo(() => {
+    const fetchedDates = datasets
+      .map((dataset) => dataset.fetchedAt)
+      .filter((value): value is string => Boolean(value))
+      .sort();
+
+    return fetchedDates.at(-1) ?? null;
+  }, [datasets]);
+
+  const refreshData = useCallback(async () => {
+    const [pointsResponse, datasetsResponse] = await Promise.all([
+      fetch("/api/points", { cache: "no-store" }),
+      fetch("/api/datasets", { cache: "no-store" }),
+    ]);
+
+    if (!pointsResponse.ok || !datasetsResponse.ok) {
+      throw new Error("Failed to load map data");
+    }
+
+    const pointsPayload = (await pointsResponse.json()) as PointsResponse;
+    const datasetsPayload = (await datasetsResponse.json()) as DatasetsResponse;
+
+    setPoints(pointsPayload.points);
+    setDatasets(datasetsPayload.datasets);
+  }, []);
+
+  async function updateDataset(source: DatasetSourceId | "all") {
+    setUpdatingSource(source);
+    setDataError(null);
+
+    try {
+      const response = await fetch(
+        source === "all" ? "/api/datasets" : `/api/datasets/${source}/update`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(dictionary.map.datasets.updateFailed);
+      }
+
+      await refreshData();
+      hasFitPointsRef.current = false;
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUpdatingSource(undefined);
+    }
+  }
+
+  useEffect(() => {
+    let isDisposed = false;
+
+    refreshData()
+      .catch((error) => {
+        if (!isDisposed) {
+          setDataError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!isDisposed) {
+          setIsLoadingData(false);
+        }
+      });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [refreshData]);
+
+  useEffect(() => {
+    pointsRef.current = points;
+
+    if (!mapRef.current) {
+      return;
+    }
+
+    syncPointLayerWhenReady(mapRef.current, points);
+
+    if (!hasFitPointsRef.current && points.some(isMappedPoint)) {
+      fitToPoints(mapRef.current, points);
+      hasFitPointsRef.current = true;
+    }
+  }, [points]);
 
   useEffect(() => {
     let isDisposed = false;
@@ -167,7 +494,7 @@ export function MapShell({
         return;
       }
 
-      mapRef.current = new maplibre.Map({
+      const map = new maplibre.Map({
         attributionControl: {
           compact: true,
         },
@@ -177,22 +504,65 @@ export function MapShell({
         zoom: DEFAULT_ZOOM,
       });
 
-      mapRef.current.addControl(
+      mapRef.current = map;
+
+      map.addControl(
         new maplibre.NavigationControl({
           showCompass: false,
         }),
         "top-right",
       );
+
+      map.on("click", POINTS_LAYER_ID, (event: MapLayerMouseEvent) => {
+        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
+        const coordinates = (
+          feature?.geometry.type === "Point"
+            ? feature.geometry.coordinates
+            : null
+        ) as [number, number] | null;
+
+        if (!feature?.properties || !coordinates) {
+          return;
+        }
+
+        const point = feature.properties as PointFeatureProperties;
+        popupRef.current?.remove();
+        popupRef.current = new maplibre.Popup({
+          closeButton: true,
+          maxWidth: "320px",
+          offset: 16,
+        })
+          .setLngLat(coordinates)
+          .setHTML(buildPopupHtml(point, dictionary))
+          .addTo(map);
+      });
+
+      map.on("mouseenter", POINTS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", POINTS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
+
+      map.once("load", () => {
+        syncPointLayerWhenReady(map, pointsRef.current);
+
+        if (!hasFitPointsRef.current && pointsRef.current.some(isMappedPoint)) {
+          fitToPoints(map, pointsRef.current);
+          hasFitPointsRef.current = true;
+        }
+      });
     }
 
     initializeMap();
 
     return () => {
       isDisposed = true;
+      popupRef.current?.remove();
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [dictionary]);
 
   useEffect(() => {
     if (!mapRef.current) {
@@ -209,10 +579,7 @@ export function MapShell({
       if (activeProvider === "vworld") {
         style = createVworldStyle(vworldApiKey);
       } else {
-        if (!osmStyleRef.current) {
-          osmStyleRef.current = await loadOsmVectorStyle();
-        }
-        style = osmStyleRef.current;
+        style = createOsmStyle();
       }
 
       if (isDisposed) {
@@ -223,6 +590,7 @@ export function MapShell({
 
       timeoutId = window.setTimeout(() => {
         map.resize();
+        syncPointLayerWhenReady(map, pointsRef.current);
       }, STYLE_LOAD_TIMEOUT_MS);
 
       map.once("styledata", () => {
@@ -230,6 +598,7 @@ export function MapShell({
           window.clearTimeout(timeoutId);
         }
         map.resize();
+        syncPointLayerWhenReady(map, pointsRef.current);
       });
     }
 
@@ -340,6 +709,75 @@ export function MapShell({
           ref={mapContainerRef}
           role="application"
         />
+        <section
+          aria-label={dictionary.map.datasets.panelLabel}
+          className={styles.datasetPanel}
+        >
+          <div className={styles.datasetStats}>
+            <span className={styles.datasetMetric}>
+              <MapPin aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{mappedPointCount.toLocaleString("ko-KR")}</span>
+              <span>{dictionary.map.datasets.points}</span>
+            </span>
+            <span className={styles.datasetMetric}>
+              <Database aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{dictionary.map.datasets.lastUpdated}</span>
+              <span>
+                {formatDateTime(latestFetchedAt) ??
+                  dictionary.map.datasets.neverUpdated}
+              </span>
+            </span>
+          </div>
+
+          <div className={styles.updateActions}>
+            <button
+              className={styles.updateButton}
+              disabled={Boolean(updatingSource)}
+              onClick={() => updateDataset("all")}
+              title={dictionary.map.datasets.refreshAll}
+              type="button"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={
+                  updatingSource === "all" ? styles.spinningIcon : undefined
+                }
+                size={16}
+                strokeWidth={2.4}
+              />
+              <span>{dictionary.map.datasets.all}</span>
+            </button>
+            <button
+              className={styles.updateButton}
+              disabled={Boolean(updatingSource)}
+              onClick={() => updateDataset("fire-stations")}
+              title={dictionary.map.datasets.refreshFire}
+              type="button"
+            >
+              <Flame aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{dictionary.map.datasets.fire}</span>
+            </button>
+            <button
+              className={styles.updateButton}
+              disabled={Boolean(updatingSource)}
+              onClick={() => updateDataset("police-stations")}
+              title={dictionary.map.datasets.refreshPolice}
+              type="button"
+            >
+              <Shield aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{dictionary.map.datasets.police}</span>
+            </button>
+          </div>
+
+          {isLoadingData || updatingSource || dataError ? (
+            <output className={styles.dataNotice}>
+              {dataError ??
+                (updatingSource
+                  ? dictionary.map.datasets.updating
+                  : dictionary.map.datasets.loading)}
+            </output>
+          ) : null}
+        </section>
         {provider === "vworld" && !isVworldReady ? (
           <output className={styles.notice}>
             <strong>{dictionary.map.missingKeyTitle}</strong>
