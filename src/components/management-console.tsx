@@ -29,7 +29,7 @@ type DatasetStatus = {
 
 type ApiUsageWindow = {
   monthlyLimit: number;
-  provider: "naver-geocoding";
+  provider: "kma-earthquake" | "naver-geocoding";
   registeredAt: string | null;
   updatedAt: string | null;
   usedCount: number;
@@ -104,6 +104,7 @@ function datasetIcon(source: DatasetSourceId) {
 export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [quota, setQuota] = useState<ApiUsageWindow | null>(null);
+  const [kmaQuota, setKmaQuota] = useState<ApiUsageWindow | null>(null);
   const [logs, setLogs] = useState<ApiLogEntry[]>([]);
   const [activeUpdate, setActiveUpdate] = useState<DatasetSourceId | "all">();
   const [notice, setNotice] = useState<string>("");
@@ -117,20 +118,35 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     return Math.round((quota.usedCount / quota.monthlyLimit) * 1000) / 10;
   }, [quota]);
+  const kmaQuotaPercent = useMemo(() => {
+    if (!kmaQuota || kmaQuota.monthlyLimit === 0) {
+      return 0;
+    }
+
+    return Math.round((kmaQuota.usedCount / kmaQuota.monthlyLimit) * 1000) / 10;
+  }, [kmaQuota]);
 
   const refresh = useCallback(async () => {
-    const [datasetsResponse, quotaResponse, logsResponse] = await Promise.all([
-      fetch("/api/datasets", { cache: "no-store" }),
-      fetch("/api/geocoding/quota", { cache: "no-store" }),
-      fetch("/api/logs?limit=12", { cache: "no-store" }),
-    ]);
+    const [datasetsResponse, quotaResponse, kmaQuotaResponse, logsResponse] =
+      await Promise.all([
+        fetch("/api/datasets", { cache: "no-store" }),
+        fetch("/api/geocoding/quota", { cache: "no-store" }),
+        fetch("/api/hazards/quota", { cache: "no-store" }),
+        fetch("/api/logs?limit=12", { cache: "no-store" }),
+      ]);
 
-    if (!datasetsResponse.ok || !quotaResponse.ok || !logsResponse.ok) {
+    if (
+      !datasetsResponse.ok ||
+      !quotaResponse.ok ||
+      !kmaQuotaResponse.ok ||
+      !logsResponse.ok
+    ) {
       throw new Error("관리 데이터를 불러오지 못했습니다.");
     }
 
     setDatasets((await datasetsResponse.json()).datasets);
     setQuota((await quotaResponse.json()).quota);
+    setKmaQuota((await kmaQuotaResponse.json()).quota);
     setLogs((await logsResponse.json()).logs);
   }, []);
 
@@ -295,6 +311,23 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             <span className={styles.muted}>
               {quotaPercent}% 사용, 만료{" "}
               {formatDateTime(quota?.windowEndsAt ?? null)}
+            </span>
+          </div>
+
+          <div className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>
+                <AlertTriangle aria-hidden="true" size={18} strokeWidth={2.4} />
+                기상청 지진 API
+              </span>
+            </div>
+            <strong className={styles.metric}>
+              {(kmaQuota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
+              {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString("ko-KR")}
+            </strong>
+            <span className={styles.muted}>
+              {kmaQuotaPercent}% 사용, 리셋{" "}
+              {formatDateTime(kmaQuota?.windowEndsAt ?? null)}
             </span>
           </div>
 
