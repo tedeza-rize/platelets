@@ -54,6 +54,7 @@ export type DatasetStatus = {
   fetchedAt: string | null;
   geocodedCount: number;
   id: DatasetSourceId;
+  importProgress: DatasetImportProgress | null;
   label: string;
   recordCount: number;
   skippedCount: number;
@@ -63,6 +64,30 @@ export type DatasetStatus = {
 
 export type DatasetUpdateResult = DatasetStatus & {
   importedCount: number;
+};
+
+export type DatasetImportMode = "restart" | "resume";
+
+export type DatasetImportProgressStatus = "paused" | "running";
+
+export type DatasetImportProgress = {
+  failedCount: number;
+  fetchedAt: string;
+  geocodedCount: number;
+  importedCount: number;
+  mode: DatasetImportMode;
+  nextIndex: number;
+  reason: string | null;
+  skippedCount: number;
+  source: DatasetSourceId;
+  startedAt: string;
+  status: DatasetImportProgressStatus;
+  totalCount: number;
+  updatedAt: string;
+};
+
+export type DatasetImportCheckpoint = DatasetImportProgress & {
+  points: EmergencyPointInput[];
 };
 
 export type ApiLogInput = {
@@ -167,6 +192,23 @@ type StatusRow = {
   source: DatasetSourceId;
   source_url: string;
   updated_at: string | null;
+};
+
+type DatasetImportProgressRow = {
+  failed_count: number;
+  fetched_at: string;
+  geocoded_count: number;
+  imported_count: number;
+  mode: DatasetImportMode;
+  next_index: number;
+  points_json: string;
+  reason: string | null;
+  skipped_count: number;
+  source: DatasetSourceId;
+  started_at: string;
+  status: DatasetImportProgressStatus;
+  total_count: number;
+  updated_at: string;
 };
 
 type ApiLogRow = {
@@ -334,6 +376,25 @@ async function initializeDatabase(db: SqliteDatabase) {
       skipped_count INTEGER NOT NULL DEFAULT 0,
       failed_count INTEGER NOT NULL DEFAULT 0,
       error TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  );
+  await run(
+    db,
+    `CREATE TABLE IF NOT EXISTS dataset_import_progress (
+      source TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      next_index INTEGER NOT NULL DEFAULT 0,
+      total_count INTEGER NOT NULL DEFAULT 0,
+      imported_count INTEGER NOT NULL DEFAULT 0,
+      geocoded_count INTEGER NOT NULL DEFAULT 0,
+      skipped_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      reason TEXT,
+      points_json TEXT NOT NULL DEFAULT '[]',
+      fetched_at TEXT NOT NULL,
+      started_at TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
   );
@@ -512,6 +573,7 @@ function emptyStatus(source: DatasetSourceId): DatasetStatus {
     fetchedAt: null,
     geocodedCount: 0,
     id: source,
+    importProgress: null,
     label: definition.label,
     recordCount: 0,
     skippedCount: 0,
@@ -527,11 +589,63 @@ function mapStatusRow(row: StatusRow): DatasetStatus {
     fetchedAt: row.fetched_at,
     geocodedCount: row.geocoded_count,
     id: row.source,
+    importProgress: null,
     label: row.label,
     recordCount: row.record_count,
     skippedCount: row.skipped_count,
     sourceUrl: row.source_url,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapImportProgressRow(
+  row: DatasetImportProgressRow,
+): DatasetImportCheckpoint {
+  return {
+    failedCount: row.failed_count,
+    fetchedAt: row.fetched_at,
+    geocodedCount: row.geocoded_count,
+    importedCount: row.imported_count,
+    mode: row.mode,
+    nextIndex: row.next_index,
+    points: JSON.parse(row.points_json) as EmergencyPointInput[],
+    reason: row.reason,
+    skippedCount: row.skipped_count,
+    source: row.source,
+    startedAt: row.started_at,
+    status: row.status,
+    totalCount: row.total_count,
+    updatedAt: row.updated_at,
+  };
+}
+
+function stripCheckpointPoints(
+  checkpoint: DatasetImportCheckpoint,
+): DatasetImportProgress {
+  return {
+    failedCount: checkpoint.failedCount,
+    fetchedAt: checkpoint.fetchedAt,
+    geocodedCount: checkpoint.geocodedCount,
+    importedCount: checkpoint.importedCount,
+    mode: checkpoint.mode,
+    nextIndex: checkpoint.nextIndex,
+    reason: checkpoint.reason,
+    skippedCount: checkpoint.skippedCount,
+    source: checkpoint.source,
+    startedAt: checkpoint.startedAt,
+    status: checkpoint.status,
+    totalCount: checkpoint.totalCount,
+    updatedAt: checkpoint.updatedAt,
+  };
+}
+
+function withImportProgress(
+  status: DatasetStatus,
+  progress: DatasetImportProgress | null,
+): DatasetStatus {
+  return {
+    ...status,
+    importProgress: progress,
   };
 }
 
@@ -1232,9 +1346,22 @@ export async function listDatasetStatuses() {
     "SELECT * FROM dataset_updates ORDER BY source",
   );
   const bySource = new Map(rows.map((row) => [row.source, mapStatusRow(row)]));
+  const progressRows = await all<DatasetImportProgressRow>(
+    db,
+    "SELECT * FROM dataset_import_progress ORDER BY source",
+  );
+  const progressBySource = new Map(
+    progressRows.map((row) => [
+      row.source,
+      stripCheckpointPoints(mapImportProgressRow(row)),
+    ]),
+  );
 
-  return (Object.keys(DATASET_SOURCES) as DatasetSourceId[]).map(
-    (source) => bySource.get(source) ?? emptyStatus(source),
+  return (Object.keys(DATASET_SOURCES) as DatasetSourceId[]).map((source) =>
+    withImportProgress(
+      bySource.get(source) ?? emptyStatus(source),
+      progressBySource.get(source) ?? null,
+    ),
   );
 }
 
@@ -1245,8 +1372,94 @@ export async function getDatasetStatus(source: DatasetSourceId) {
     "SELECT * FROM dataset_updates WHERE source = ?",
     [source],
   );
+  const progress = await getDatasetImportProgress(source);
 
-  return row ? mapStatusRow(row) : emptyStatus(source);
+  return withImportProgress(
+    row ? mapStatusRow(row) : emptyStatus(source),
+    progress,
+  );
+}
+
+export async function getDatasetImportCheckpoint(source: DatasetSourceId) {
+  const db = await getDatabase();
+  const row = await get<DatasetImportProgressRow>(
+    db,
+    "SELECT * FROM dataset_import_progress WHERE source = ?",
+    [source],
+  );
+
+  return row ? mapImportProgressRow(row) : null;
+}
+
+export async function getDatasetImportProgress(source: DatasetSourceId) {
+  const checkpoint = await getDatasetImportCheckpoint(source);
+
+  return checkpoint ? stripCheckpointPoints(checkpoint) : null;
+}
+
+export async function saveDatasetImportProgress(
+  checkpoint: DatasetImportCheckpoint,
+) {
+  const db = await getDatabase();
+
+  await run(
+    db,
+    `INSERT INTO dataset_import_progress (
+      source,
+      status,
+      mode,
+      next_index,
+      total_count,
+      imported_count,
+      geocoded_count,
+      skipped_count,
+      failed_count,
+      reason,
+      points_json,
+      fetched_at,
+      started_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(source) DO UPDATE SET
+      status = excluded.status,
+      mode = excluded.mode,
+      next_index = excluded.next_index,
+      total_count = excluded.total_count,
+      imported_count = excluded.imported_count,
+      geocoded_count = excluded.geocoded_count,
+      skipped_count = excluded.skipped_count,
+      failed_count = excluded.failed_count,
+      reason = excluded.reason,
+      points_json = excluded.points_json,
+      fetched_at = excluded.fetched_at,
+      started_at = excluded.started_at,
+      updated_at = CURRENT_TIMESTAMP`,
+    [
+      checkpoint.source,
+      checkpoint.status,
+      checkpoint.mode,
+      checkpoint.nextIndex,
+      checkpoint.totalCount,
+      checkpoint.importedCount,
+      checkpoint.geocodedCount,
+      checkpoint.skippedCount,
+      checkpoint.failedCount,
+      checkpoint.reason,
+      JSON.stringify(checkpoint.points),
+      checkpoint.fetchedAt,
+      checkpoint.startedAt,
+    ],
+  );
+
+  return getDatasetImportProgress(checkpoint.source);
+}
+
+export async function clearDatasetImportProgress(source: DatasetSourceId) {
+  const db = await getDatabase();
+
+  await run(db, "DELETE FROM dataset_import_progress WHERE source = ?", [
+    source,
+  ]);
 }
 
 export async function replaceDataset(params: {
@@ -1261,6 +1474,9 @@ export async function replaceDataset(params: {
 
   await withWriteTransaction(async (db) => {
     await run(db, "DELETE FROM points WHERE source = ?", [params.source]);
+    await run(db, "DELETE FROM dataset_import_progress WHERE source = ?", [
+      params.source,
+    ]);
 
     for (const point of params.points) {
       await run(

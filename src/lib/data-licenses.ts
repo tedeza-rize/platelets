@@ -60,4 +60,25 @@ export const DATA_LICENSE_ENTRIES = [
     sourceUrl: "https://www.data.go.kr/",
     usage: "최근 지진/지진해일 이벤트 표시",
   },
+  {
+    id: "schools",
+    license:
+      "공공데이터포털 표준데이터 이용조건 및 개별 제공기관 조건 확인 필요",
+    notes:
+      "전국 단위 병합 표준데이터이며 시점에 따라 일부 데이터 시차가 있을 수 있다. 납품 전 최신 제공기관/라이선스를 재확인한다.",
+    provider: "재단법인 한국지방교육행정연구재단 / 공공데이터포털",
+    sourceName: "전국초중등학교위치표준데이터",
+    sourceUrl: "https://www.data.go.kr/data/15021148/standard.do",
+    usage: "초등학교, 중학교, 고등학교 지도 포인트",
+  },
+  {
+    id: "universities",
+    license: "이용허락범위 제한 없음",
+    notes:
+      "원문 XLSX를 다운로드해 첫 워크시트의 도로명주소, 지번주소, 위도, 경도, 대표번호를 사용한다.",
+    provider: "교육부 / 공공데이터포털",
+    sourceName: "교육부_대학교 주소기반 좌표정보_20251126",
+    sourceUrl: "https://www.data.go.kr/data/15138981/fileData.do",
+    usage: "대학교 캠퍼스 지도 포인트",
+  },
 ] as const satisfies readonly DataLicenseEntry[];

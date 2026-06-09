@@ -3,17 +3,25 @@ import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
+  clearDatasetImportProgress,
   consumeKakaoLocalQuota,
+  type DatasetImportCheckpoint,
+  type DatasetImportMode,
   type DatasetUpdateResult,
   type EmergencyPointInput,
+  getDatasetImportCheckpoint,
   recordApiLog,
   recordDatasetError,
   replaceDataset,
+  saveDatasetImportProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
+import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
 
 type CsvRecord = Record<string, unknown>;
 type AedRecord = Record<string, unknown>;
+type SchoolRecord = Record<string, unknown>;
+type UniversityRecord = Record<string, unknown>;
 
 type ImportResult = {
   failedCount: number;
@@ -21,6 +29,10 @@ type ImportResult = {
   geocodedCount: number;
   points: EmergencyPointInput[];
   skippedCount: number;
+};
+
+type DatasetUpdateOptions = {
+  mode?: DatasetImportMode;
 };
 
 type KakaoAddressSearchResponse = {
@@ -46,8 +58,30 @@ type KakaoAddressSearchResponse = {
 
 const CSV_ENCODING = "euc-kr";
 const AED_NUM_OF_ROWS = 10_000;
-const GEOCODE_CONCURRENCY = 4;
 const DOWNLOAD_RETRY_COUNT = 3;
+const SCHOOL_NUM_OF_ROWS = 10_000;
+const SCHOOL_TOTAL_COUNT_HINT = 12_011;
+const UNIVERSITY_SOURCE_UPDATED_AT = "2025-11-26";
+const SCHOOL_COLUMN_NAMES = [
+  "SCHOOL_ID",
+  "SCHOOL_NM",
+  "SCHOOL_SE",
+  "FOND_DATE",
+  "FOND_TYPE",
+  "BNHH_SE",
+  "OPER_STTUS",
+  "LNMADR",
+  "RDNMADR",
+  "CDDC_CODE",
+  "CDDC_NM",
+  "EDC_SPORT",
+  "EDC_SPORT_NM",
+  "CREAT_DATE",
+  "CHANGE_DATE",
+  "LATITUDE",
+  "LONGITUDE",
+  "REFERENCE_DATE",
+] as const;
 
 function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -67,6 +101,72 @@ function wait(milliseconds: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+}
+
+export class DatasetImportPausedError extends Error {
+  source: DatasetSourceId;
+
+  constructor(source: DatasetSourceId, message: string) {
+    super(message);
+    this.name = "DatasetImportPausedError";
+    this.source = source;
+  }
+}
+
+function isQuotaExceededError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("quota exceeded")
+  );
+}
+
+async function fetchWithRetry(url: string, source: DatasetSourceId) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= DOWNLOAD_RETRY_COUNT; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: {
+          "User-Agent": "platelets/0.1",
+        },
+      });
+
+      await recordApiLog({
+        action: "dataset-download",
+        category: "dataset",
+        level: response.ok ? "info" : "error",
+        message: response.ok
+          ? `Dataset download completed: ${source}`
+          : `Dataset download failed with HTTP ${response.status}: ${source}`,
+        metadata: {
+          attempt,
+          statusCode: response.status,
+          url,
+        },
+        requestCount: 1,
+        source,
+        status: response.ok ? "success" : "failure",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Dataset download failed (${response.status})`);
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+      await wait(200 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
+async function downloadBufferFromUrl(url: string, source: DatasetSourceId) {
+  const response = await fetchWithRetry(url, source);
+
+  return Buffer.from(await response.arrayBuffer());
 }
 
 function downloadCsvOnce(source: DatasetSourceId) {
@@ -212,6 +312,50 @@ async function fetchAedPage(pageNo: number) {
   };
 }
 
+function buildSchoolPageUrl(page: number) {
+  const url = new URL(DATASET_SOURCES.schools.url);
+
+  for (const column of SCHOOL_COLUMN_NAMES) {
+    url.searchParams.append("colNmList", column);
+  }
+
+  url.searchParams.set("totalCount", String(SCHOOL_TOTAL_COUNT_HINT));
+  url.searchParams.set("perPage", String(SCHOOL_NUM_OF_ROWS));
+  url.searchParams.set("page", String(page));
+
+  return url.toString();
+}
+
+async function fetchSchoolPage(page: number) {
+  const response = await fetchWithRetry(buildSchoolPageUrl(page), "schools");
+  const payload = (await response.json()) as unknown;
+
+  if (!Array.isArray(payload)) {
+    throw new Error("School dataset returned an unexpected JSON payload.");
+  }
+
+  return payload as SchoolRecord[];
+}
+
+function worksheetRowsToRecords(rows: string[][]) {
+  const [headerRow, ...dataRows] = rows;
+
+  if (!headerRow) {
+    return [];
+  }
+
+  const headers = headerRow.map((header) =>
+    header.replace(/_x000D_\n/g, "").trim(),
+  );
+
+  return dataRows.map(
+    (row) =>
+      Object.fromEntries(
+        headers.map((header, index) => [header, row[index]?.trim() ?? ""]),
+      ) as UniversityRecord,
+  );
+}
+
 function mapFireRecord(record: CsvRecord): EmergencyPointInput | null {
   const latitude = toNumber(record.X좌표);
   const longitude = toNumber(record.Y좌표);
@@ -296,6 +440,65 @@ function mapAedRecord(record: AedRecord): EmergencyPointInput | null {
     source: "aeds",
     sourceRecordId,
     sourceUpdatedAt: null,
+  };
+}
+
+function mapSchoolRecord(record: SchoolRecord): EmergencyPointInput | null {
+  const sourceRecordId = text(record.SCHOOL_ID);
+  const name = text(record.SCHOOL_NM);
+
+  if (!sourceRecordId || !name) {
+    return null;
+  }
+
+  return {
+    address: text(record.RDNMADR) || text(record.LNMADR),
+    category: text(record.SCHOOL_SE) || "학교",
+    latitude: toNumber(record.LATITUDE),
+    longitude: toNumber(record.LONGITUDE),
+    name,
+    parentName:
+      nullableText(record.EDC_SPORT_NM) ?? nullableText(record.CDDC_NM),
+    phone: null,
+    raw: compactRecord(record),
+    source: "schools",
+    sourceRecordId,
+    sourceUpdatedAt:
+      nullableText(record.REFERENCE_DATE) ?? nullableText(record.CHANGE_DATE),
+  };
+}
+
+function mapUniversityRecord(
+  record: UniversityRecord,
+): EmergencyPointInput | null {
+  const sourceRecordId = text(record.학교코드변환) || text(record.학교코드);
+  const name = text(record.학교명);
+
+  if (!sourceRecordId || !name) {
+    return null;
+  }
+
+  return {
+    address:
+      text(record["도로명 주소"]) ||
+      text(record.도로명주소) ||
+      text(record.지번주소),
+    category: text(record.학제) || text(record.학교구분) || "대학교",
+    latitude: toNumber(record.위도),
+    longitude: toNumber(record.경도),
+    name,
+    parentName:
+      nullableText(
+        [record.지역, record.설립구분, record.본분교]
+          .map(text)
+          .filter(Boolean)
+          .join(" / "),
+      ) ?? nullableText(record.법인명),
+    phone: nullableText(record.학교대표번호),
+    raw: compactRecord(record),
+    source: "universities",
+    sourceRecordId,
+    sourceUpdatedAt: UNIVERSITY_SOURCE_UPDATED_AT,
   };
 }
 
@@ -416,27 +619,55 @@ async function geocodeAddress(address: string) {
   }
 }
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  mapper: (item: T) => Promise<R>,
-) {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
+function countGeocoded(points: EmergencyPointInput[]) {
+  return points.filter(
+    (point) => point.latitude !== null && point.longitude !== null,
+  ).length;
+}
 
-  async function worker() {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
+function buildImportCheckpoint(params: {
+  fetchedAt: string;
+  mode: DatasetImportMode;
+  nextIndex: number;
+  points: EmergencyPointInput[];
+  reason: string | null;
+  skippedCount: number;
+  startedAt: string;
+  status: DatasetImportCheckpoint["status"];
+  totalCount: number;
+}): DatasetImportCheckpoint {
+  const geocodedCount = countGeocoded(params.points);
 
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, () => worker()),
-  );
+  return {
+    failedCount: params.points.length - geocodedCount,
+    fetchedAt: params.fetchedAt,
+    geocodedCount,
+    importedCount: params.points.length,
+    mode: params.mode,
+    nextIndex: params.nextIndex,
+    points: params.points,
+    reason: params.reason,
+    skippedCount: params.skippedCount,
+    source: "police-stations",
+    startedAt: params.startedAt,
+    status: params.status,
+    totalCount: params.totalCount,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
-  return results;
+async function savePoliceProgress(params: {
+  fetchedAt: string;
+  mode: DatasetImportMode;
+  nextIndex: number;
+  points: EmergencyPointInput[];
+  reason: string | null;
+  skippedCount: number;
+  startedAt: string;
+  status: DatasetImportCheckpoint["status"];
+  totalCount: number;
+}) {
+  return saveDatasetImportProgress(buildImportCheckpoint(params));
 }
 
 async function importFireStations(): Promise<ImportResult> {
@@ -461,22 +692,86 @@ async function importFireStations(): Promise<ImportResult> {
   };
 }
 
-async function importPoliceStations(): Promise<ImportResult> {
+async function importPoliceStations(
+  mode: DatasetImportMode,
+): Promise<ImportResult> {
   const csv = await downloadCsv("police-stations");
-  const fetchedAt = new Date().toISOString();
   const rows = parseCsv(csv);
-  const coordinates = await mapWithConcurrency(
-    rows,
-    GEOCODE_CONCURRENCY,
-    async (record) => geocodeAddress(text(record.주소)),
-  );
-  const points = rows
-    .map((record, index) => mapPoliceRecord(record, coordinates[index]))
-    .filter((point): point is EmergencyPointInput => point !== null);
-  const skippedCount = rows.length - points.length;
-  const geocodedCount = points.filter(
-    (point) => point.latitude !== null && point.longitude !== null,
-  ).length;
+  const existing =
+    mode === "resume"
+      ? await getDatasetImportCheckpoint("police-stations")
+      : null;
+  const fetchedAt = existing?.fetchedAt ?? new Date().toISOString();
+  const startedAt = existing?.startedAt ?? fetchedAt;
+  const points = existing?.points ?? [];
+  let skippedCount = existing?.skippedCount ?? 0;
+  const startIndex = Math.min(existing?.nextIndex ?? 0, rows.length);
+
+  if (mode === "restart") {
+    await clearDatasetImportProgress("police-stations");
+  }
+
+  await savePoliceProgress({
+    fetchedAt,
+    mode,
+    nextIndex: startIndex,
+    points,
+    reason: null,
+    skippedCount,
+    startedAt,
+    status: "running",
+    totalCount: rows.length,
+  });
+
+  for (let index = startIndex; index < rows.length; index += 1) {
+    const record = rows[index];
+
+    try {
+      const coordinates = await geocodeAddress(text(record.주소));
+      const point = mapPoliceRecord(record, coordinates);
+
+      if (point) {
+        points.push(point);
+      } else {
+        skippedCount += 1;
+      }
+    } catch (error) {
+      if (!isQuotaExceededError(error)) {
+        throw error;
+      }
+
+      const reason =
+        "Kakao Local API daily request quota exceeded. 다음 리셋 이후 이어서 할 수 있습니다.";
+      await savePoliceProgress({
+        fetchedAt,
+        mode,
+        nextIndex: index,
+        points,
+        reason,
+        skippedCount,
+        startedAt,
+        status: "paused",
+        totalCount: rows.length,
+      });
+      throw new DatasetImportPausedError("police-stations", reason);
+    }
+
+    if ((index + 1) % 25 === 0 || index + 1 === rows.length) {
+      await savePoliceProgress({
+        fetchedAt,
+        mode,
+        nextIndex: index + 1,
+        points,
+        reason: null,
+        skippedCount,
+        startedAt,
+        status: "running",
+        totalCount: rows.length,
+      });
+    }
+  }
+
+  const geocodedCount = countGeocoded(points);
 
   return {
     failedCount: points.length - geocodedCount,
@@ -519,23 +814,88 @@ async function importAeds(): Promise<ImportResult> {
   };
 }
 
-export async function updateDataset(source: DatasetSourceId) {
+async function importSchools(): Promise<ImportResult> {
+  const pages: SchoolRecord[][] = [];
+
+  for (let page = 1; page <= 20; page += 1) {
+    const rows = await fetchSchoolPage(page);
+    pages.push(rows);
+
+    if (rows.length < SCHOOL_NUM_OF_ROWS) {
+      break;
+    }
+  }
+
+  const fetchedAt = new Date().toISOString();
+  const rows = pages.flat();
+  const points = rows
+    .map(mapSchoolRecord)
+    .filter((point): point is EmergencyPointInput => point !== null);
+  const geocodedCount = countGeocoded(points);
+
+  return {
+    failedCount: points.length - geocodedCount,
+    fetchedAt,
+    geocodedCount,
+    points,
+    skippedCount: rows.length - points.length,
+  };
+}
+
+async function importUniversities(): Promise<ImportResult> {
+  const buffer = await downloadBufferFromUrl(
+    DATASET_SOURCES.universities.url,
+    "universities",
+  );
+  const fetchedAt = new Date().toISOString();
+  const rows = worksheetRowsToRecords(parseFirstWorksheetRows(buffer));
+  const points = rows
+    .map(mapUniversityRecord)
+    .filter((point): point is EmergencyPointInput => point !== null);
+  const geocodedCount = countGeocoded(points);
+
+  return {
+    failedCount: points.length - geocodedCount,
+    fetchedAt,
+    geocodedCount,
+    points,
+    skippedCount: rows.length - points.length,
+  };
+}
+
+async function importDataset(source: DatasetSourceId, mode: DatasetImportMode) {
+  switch (source) {
+    case "fire-stations":
+      return importFireStations();
+    case "police-stations":
+      return importPoliceStations(mode);
+    case "aeds":
+      return importAeds();
+    case "schools":
+      return importSchools();
+    case "universities":
+      return importUniversities();
+  }
+}
+
+export async function updateDataset(
+  source: DatasetSourceId,
+  options: DatasetUpdateOptions = {},
+) {
+  const mode = options.mode ?? "restart";
+
   try {
     await recordApiLog({
       action: "dataset-update",
       category: "dataset",
       level: "info",
       message: `Dataset update started: ${source}`,
+      metadata: { mode },
       source,
       status: "success",
     });
 
-    const result =
-      source === "fire-stations"
-        ? await importFireStations()
-        : source === "police-stations"
-          ? await importPoliceStations()
-          : await importAeds();
+    const result = await importDataset(source, mode);
 
     const dataset = await replaceDataset({
       ...result,
@@ -576,7 +936,7 @@ export async function updateAllDatasets() {
   const results: DatasetUpdateResult[] = [];
 
   for (const source of Object.keys(DATASET_SOURCES) as DatasetSourceId[]) {
-    results.push(await updateDataset(source));
+    results.push(await updateDataset(source, { mode: "restart" }));
   }
 
   return results;

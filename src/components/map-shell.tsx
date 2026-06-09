@@ -103,16 +103,22 @@ const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
   "fire-stations": "#dc2626",
   "police-stations": "#1d4ed8",
+  schools: "#ca8a04",
+  universities: "#7c3aed",
 };
 const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#10b981",
   "fire-stations": "#f97316",
   "police-stations": "#2563eb",
+  schools: "#facc15",
+  universities: "#8b5cf6",
 };
 const SOURCE_SYMBOL_LABELS: Record<DatasetSourceId, string> = {
   aeds: "AED",
   "fire-stations": "119",
   "police-stations": "POL",
+  schools: "SCH",
+  universities: "UNI",
 };
 
 type PointFeatureProperties = {
@@ -753,6 +759,7 @@ function buildKakaoMapUrl(point: EmergencyPointDetail) {
 function buildPopupHtml(
   point: EmergencyPointDetail,
   dictionary: AppDictionary,
+  sourceLabel: string,
 ) {
   const rows = [
     [dictionary.map.popup.address, point.address],
@@ -771,7 +778,7 @@ function buildPopupHtml(
   return `<article class="${styles.popup}">
     <div class="${styles.popupHeader}">
       <strong>${escapeHtml(`[${point.category}] ${point.name}`)}</strong>
-      <span>${escapeHtml(point.source)}</span>
+      <span>${escapeHtml(sourceLabel)}</span>
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
@@ -844,6 +851,10 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
         SOURCE_HALO_COLORS["police-stations"],
         "aeds",
         SOURCE_HALO_COLORS.aeds,
+        "schools",
+        SOURCE_HALO_COLORS.schools,
+        "universities",
+        SOURCE_HALO_COLORS.universities,
         "#6b7280",
       ],
       "circle-opacity": 0.2,
@@ -864,6 +875,10 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
         SOURCE_COLORS["police-stations"],
         "aeds",
         SOURCE_COLORS.aeds,
+        "schools",
+        SOURCE_COLORS.schools,
+        "universities",
+        SOURCE_COLORS.universities,
         "#374151",
       ],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 9],
@@ -892,6 +907,10 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
         SOURCE_COLORS["police-stations"],
         "aeds",
         SOURCE_COLORS.aeds,
+        "schools",
+        SOURCE_COLORS.schools,
+        "universities",
+        SOURCE_COLORS.universities,
         "#374151",
       ],
       "text-halo-width": 1.2,
@@ -1056,6 +1075,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const pointsRef = useRef<EmergencyPointMarker[]>([]);
   const hazardsRef = useRef<HazardEvent[]>([]);
   const seoulAreasRef = useRef<SeoulAreasData | null>(null);
+  const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
     createMapStyle(initialProvider),
@@ -1102,6 +1122,11 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
     return counts;
   }, [points]);
+  useEffect(() => {
+    sourceLabelsRef.current = new Map(
+      datasets.map((dataset) => [dataset.id, dataset.label]),
+    );
+  }, [datasets]);
   const selectedDatasetCount = datasets.filter(
     (dataset) => visibleSources[dataset.id] ?? true,
   ).length;
@@ -1335,7 +1360,14 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           offset: 16,
         })
           .setLngLat(coordinates)
-          .setHTML(buildPopupHtml(payload.point, dictionary))
+          .setHTML(
+            buildPopupHtml(
+              payload.point,
+              dictionary,
+              sourceLabelsRef.current.get(payload.point.source) ??
+                payload.point.source,
+            ),
+          )
           .addTo(map);
       }
 

@@ -1,9 +1,14 @@
-export type DatasetSourceId = "fire-stations" | "police-stations" | "aeds";
+export type DatasetSourceId =
+  | "fire-stations"
+  | "police-stations"
+  | "aeds"
+  | "schools"
+  | "universities";
 
 export type DatasetSource = {
   id: DatasetSourceId;
   label: string;
-  type: "aed" | "fire" | "police";
+  type: "aed" | "fire" | "police" | "school" | "university";
   url: string;
 };
 
@@ -25,6 +30,18 @@ export const DATASET_SOURCES = {
     label: "AED",
     type: "aed",
     url: "https://apis.data.go.kr/B552657/AEDInfoInqireService/getAedFullDown",
+  },
+  schools: {
+    id: "schools",
+    label: "초중고등학교",
+    type: "school",
+    url: "https://www.data.go.kr/download/standard.json?publicDataPk=15021148&svcTableNm=tn_pubr_public_elesch_mskul_lc_svc",
+  },
+  universities: {
+    id: "universities",
+    label: "대학교",
+    type: "university",
+    url: "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003547770&fileDetailSn=1&dataNm=%EA%B5%90%EC%9C%A1%EB%B6%80_%EB%8C%80%ED%95%99%EA%B5%90%20%EC%A3%BC%EC%86%8C%EA%B8%B0%EB%B0%98%20%EC%A2%8C%ED%91%9C%EC%A0%95%EB%B3%B4_20251126",
   },
 } satisfies Record<DatasetSourceId, DatasetSource>;
 
