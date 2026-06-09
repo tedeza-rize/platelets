@@ -195,7 +195,7 @@
 
 .sourceDropdown {
   display: grid;
-  width: min(260px, calc(100vw - 24px));
+  width: min(312px, calc(100vw - 24px));
   max-height: min(420px, calc(100dvh - 126px));
   gap: 8px;
   margin-top: 8px;
@@ -208,11 +208,52 @@
   padding: 10px;
 }
 
-.sourceDropdown legend {
-  padding: 0;
+.sourceLegend {
+  display: block;
+  float: left;
+  width: 100%;
+  min-width: 0;
   font-size: 0.84rem;
   font-weight: 800;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  padding: 0;
+}
+
+.sourceSearch {
+  display: grid;
+  min-height: 34px;
+  align-items: center;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-surface);
+  color: var(--text-muted);
+  padding: 0 8px;
+}
+
+.sourceSearch span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sourceSearch input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
+.sourceSearch input::placeholder {
+  color: var(--text-muted);
 }
 
 .sourceList {
@@ -256,6 +297,13 @@
   color: var(--text-muted);
   font-size: 0.76rem;
   font-weight: 700;
+}
+
+.sourceEmpty {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  padding: 8px 6px;
 }
 
 .settingItem {

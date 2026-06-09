@@ -10,6 +10,7 @@ import {
   Layers,
   ListFilter,
   MapPin,
+  Search,
   Settings,
 } from "lucide-react";
 import type {
@@ -70,6 +71,14 @@ type PointsResponse = {
   points: EmergencyPointMarker[];
 };
 
+type PointViewport = {
+  maxLatitude: number;
+  maxLongitude: number;
+  minLatitude: number;
+  minLongitude: number;
+  zoom: number;
+};
+
 type PointDetailResponse = {
   point: EmergencyPointDetail;
 };
@@ -84,16 +93,19 @@ const DEFAULT_ZOOM = 16;
 const STYLE_LOAD_TIMEOUT_MS = 8000;
 const POINTS_SOURCE_ID = "emergency-points";
 const POINTS_HALO_LAYER_ID = "emergency-points-halo";
-const POINTS_LAYER_ID = "emergency-points-circle";
+const POINTS_LAYER_ID = "emergency-points-hit-area";
 const POINTS_SYMBOL_LAYER_ID = "emergency-points-symbol";
 const HAZARDS_SOURCE_ID = "hazard-events";
 const HAZARDS_HALO_LAYER_ID = "hazard-events-halo";
 const HAZARDS_LAYER_ID = "hazard-events-circle";
 const SEOUL_AREAS_SOURCE_ID = "seoul-citydata-areas";
-const SEOUL_AREAS_FILL_LAYER_ID = "seoul-citydata-areas-fill";
-const SEOUL_AREAS_LINE_LAYER_ID = "seoul-citydata-areas-line";
+const SEOUL_AREAS_HALO_LAYER_ID = "seoul-citydata-areas-halo";
+const SEOUL_AREAS_LAYER_ID = "seoul-citydata-areas-circle";
+const SEOUL_AREAS_SYMBOL_LAYER_ID = "seoul-citydata-areas-symbol";
 const HAZARD_POLL_INTERVAL_MS = 60_000;
 const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
+const DEFAULT_VISIBLE_SOURCE: DatasetSourceId = "fire-stations";
+const VIEWPORT_POINTS_PADDING_RATIO = 0.16;
 const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
 const VWORLD_BASE_SOURCE_ID = "vworld-base";
 const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
@@ -120,14 +132,28 @@ const SOURCE_SYMBOL_LABELS: Record<DatasetSourceId, string> = {
   schools: "SCH",
   universities: "UNI",
 };
+const SOURCE_ICON_IDS: Record<DatasetSourceId, string> = {
+  aeds: "point-icon-aed",
+  "fire-stations": "point-icon-fire",
+  "police-stations": "point-icon-police",
+  schools: "point-icon-school",
+  universities: "point-icon-university",
+};
 
 type PointFeatureProperties = {
   category: string;
+  iconId: string;
   id: number;
   latitude: number;
   longitude: number;
   source: DatasetSourceId;
   symbolLabel: string;
+};
+
+type SeoulAreaPointProperties = SeoulAreaProperties & {
+  longitude: number;
+  latitude: number;
+  populationLabel: string;
 };
 
 type HazardEvent = {
@@ -616,6 +642,74 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
   return provider === "vworld" ? createVworldStyle() : createOsmStyle();
 }
 
+function isSourceVisible(
+  visibleSources: Partial<Record<DatasetSourceId, boolean>>,
+  source: DatasetSourceId,
+) {
+  return visibleSources[source] ?? source === DEFAULT_VISIBLE_SOURCE;
+}
+
+function getPointLimitForZoom(zoom: number) {
+  if (zoom < 8) {
+    return 600;
+  }
+
+  if (zoom < 10) {
+    return 1_200;
+  }
+
+  if (zoom < 12) {
+    return 2_500;
+  }
+
+  if (zoom < 14) {
+    return 6_000;
+  }
+
+  return 16_000;
+}
+
+function getViewportFromMap(map: MapLibreMap): PointViewport {
+  const bounds = map.getBounds();
+  const south = bounds.getSouth();
+  const north = bounds.getNorth();
+  const west = bounds.getWest();
+  const east = bounds.getEast();
+  const latitudePadding = Math.max(
+    (north - south) * VIEWPORT_POINTS_PADDING_RATIO,
+    0.005,
+  );
+  const longitudePadding = Math.max(
+    (east - west) * VIEWPORT_POINTS_PADDING_RATIO,
+    0.005,
+  );
+
+  return {
+    maxLatitude: Math.min(north + latitudePadding, 90),
+    maxLongitude: Math.min(east + longitudePadding, 180),
+    minLatitude: Math.max(south - latitudePadding, -90),
+    minLongitude: Math.max(west - longitudePadding, -180),
+    zoom: map.getZoom(),
+  };
+}
+
+function buildPointsUrl(source: DatasetSourceId, viewport: PointViewport) {
+  const searchParams = new URLSearchParams({
+    centerLatitude: String((viewport.minLatitude + viewport.maxLatitude) / 2),
+    centerLongitude: String(
+      (viewport.minLongitude + viewport.maxLongitude) / 2,
+    ),
+    limit: String(getPointLimitForZoom(viewport.zoom)),
+    maxLatitude: String(viewport.maxLatitude),
+    maxLongitude: String(viewport.maxLongitude),
+    minLatitude: String(viewport.minLatitude),
+    minLongitude: String(viewport.minLongitude),
+    source,
+  });
+
+  return `/api/points?${searchParams.toString()}`;
+}
+
 function isMappedPoint(
   point: EmergencyPointMarker,
 ): point is MappedEmergencyPoint {
@@ -635,6 +729,7 @@ function createPointData(points: EmergencyPointMarker[]) {
       },
       properties: {
         category: point.category,
+        iconId: SOURCE_ICON_IDS[point.source],
         id: point.id,
         latitude: point.latitude,
         longitude: point.longitude,
@@ -643,6 +738,85 @@ function createPointData(points: EmergencyPointMarker[]) {
       } satisfies PointFeatureProperties,
       type: "Feature" as const,
     })),
+    type: "FeatureCollection" as const,
+  };
+}
+
+function getPolygonCenter(coordinates: number[][][]) {
+  const ring = coordinates[0] ?? [];
+  let signedArea = 0;
+  let centroidX = 0;
+  let centroidY = 0;
+  let minLongitude = Number.POSITIVE_INFINITY;
+  let maxLongitude = Number.NEGATIVE_INFINITY;
+  let minLatitude = Number.POSITIVE_INFINITY;
+  let maxLatitude = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < ring.length; index += 1) {
+    const [longitude, latitude] = ring[index] ?? [];
+
+    if (typeof longitude !== "number" || typeof latitude !== "number") {
+      continue;
+    }
+
+    minLongitude = Math.min(minLongitude, longitude);
+    maxLongitude = Math.max(maxLongitude, longitude);
+    minLatitude = Math.min(minLatitude, latitude);
+    maxLatitude = Math.max(maxLatitude, latitude);
+
+    const [nextLongitude, nextLatitude] = ring[(index + 1) % ring.length] ?? [];
+
+    if (typeof nextLongitude !== "number" || typeof nextLatitude !== "number") {
+      continue;
+    }
+
+    const cross = longitude * nextLatitude - nextLongitude * latitude;
+    signedArea += cross;
+    centroidX += (longitude + nextLongitude) * cross;
+    centroidY += (latitude + nextLatitude) * cross;
+  }
+
+  if (Math.abs(signedArea) > Number.EPSILON) {
+    return [centroidX / (3 * signedArea), centroidY / (3 * signedArea)] as [
+      number,
+      number,
+    ];
+  }
+
+  return [
+    (minLongitude + maxLongitude) / 2,
+    (minLatitude + maxLatitude) / 2,
+  ] as [number, number];
+}
+
+function createSeoulAreaPointData(areas: SeoulAreasData) {
+  return {
+    features: areas.features.map((feature) => {
+      const [longitude, latitude] = getPolygonCenter(
+        feature.geometry.coordinates,
+      );
+      const populationLabel =
+        feature.properties.minPopulation !== undefined &&
+        feature.properties.maxPopulation !== undefined
+          ? `${feature.properties.minPopulation.toLocaleString(
+              "ko-KR",
+            )}-${feature.properties.maxPopulation.toLocaleString("ko-KR")}명`
+          : (feature.properties.congestionLevel ?? feature.properties.areaName);
+
+      return {
+        geometry: {
+          coordinates: [longitude, latitude],
+          type: "Point" as const,
+        },
+        properties: {
+          ...feature.properties,
+          latitude,
+          longitude,
+          populationLabel,
+        } satisfies SeoulAreaPointProperties,
+        type: "Feature" as const,
+      };
+    }),
     type: "FeatureCollection" as const,
   };
 }
@@ -756,6 +930,10 @@ function buildKakaoMapUrl(point: EmergencyPointDetail) {
   )}`;
 }
 
+function buildNaverMapUrl(point: EmergencyPointDetail) {
+  return `https://map.naver.com/p/search/${encodeURIComponent(point.address)}`;
+}
+
 function buildPopupHtml(
   point: EmergencyPointDetail,
   dictionary: AppDictionary,
@@ -782,6 +960,9 @@ function buildPopupHtml(
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
+      <a href="${buildNaverMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.naverMap,
+      )}</a>
       <a href="${buildKakaoMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
         dictionary.map.popup.kakaoMap,
       )}</a>
@@ -822,102 +1003,127 @@ function buildSeoulPopulationPopupHtml(
   </article>`;
 }
 
+function createPointIconImage(source: DatasetSourceId) {
+  const canvas = document.createElement("canvas");
+  const size = 64;
+  const center = size / 2;
+  const context = canvas.getContext("2d");
+
+  canvas.width = size;
+  canvas.height = size;
+
+  if (!context) {
+    return null;
+  }
+
+  context.clearRect(0, 0, size, size);
+  context.fillStyle = SOURCE_COLORS[source];
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 4;
+  context.beginPath();
+  context.arc(center, 24, 18, Math.PI * 0.92, Math.PI * 2.08);
+  context.quadraticCurveTo(center + 19, 41, center, 58);
+  context.quadraticCurveTo(center - 19, 41, center - 18, 24);
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.fillStyle = "#ffffff";
+  context.font = "700 14px Arial, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(SOURCE_SYMBOL_LABELS[source], center, 25);
+
+  return context.getImageData(0, 0, size, size);
+}
+
+function ensurePointIcons(map: MapLibreMap) {
+  for (const source of Object.keys(SOURCE_ICON_IDS) as DatasetSourceId[]) {
+    const iconId = SOURCE_ICON_IDS[source];
+
+    if (map.hasImage(iconId)) {
+      continue;
+    }
+
+    const image = createPointIconImage(source);
+
+    if (image) {
+      map.addImage(iconId, image, { pixelRatio: 2 });
+    }
+  }
+}
+
 function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
   if (!map.isStyleLoaded()) {
     return;
   }
+
+  ensurePointIcons(map);
 
   const pointData = createPointData(points);
   const source = map.getSource(POINTS_SOURCE_ID) as GeoJSONSource | undefined;
 
   if (source) {
     source.setData(pointData);
-    return;
+  } else {
+    map.addSource(POINTS_SOURCE_ID, {
+      data: pointData,
+      type: "geojson",
+    });
   }
 
-  map.addSource(POINTS_SOURCE_ID, {
-    data: pointData,
-    type: "geojson",
-  });
-  map.addLayer({
-    id: POINTS_HALO_LAYER_ID,
-    paint: {
-      "circle-color": [
-        "match",
-        ["get", "source"],
-        "fire-stations",
-        SOURCE_HALO_COLORS["fire-stations"],
-        "police-stations",
-        SOURCE_HALO_COLORS["police-stations"],
-        "aeds",
-        SOURCE_HALO_COLORS.aeds,
-        "schools",
-        SOURCE_HALO_COLORS.schools,
-        "universities",
-        SOURCE_HALO_COLORS.universities,
-        "#6b7280",
-      ],
-      "circle-opacity": 0.2,
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 20],
-    },
-    source: POINTS_SOURCE_ID,
-    type: "circle",
-  });
-  map.addLayer({
-    id: POINTS_LAYER_ID,
-    paint: {
-      "circle-color": [
-        "match",
-        ["get", "source"],
-        "fire-stations",
-        SOURCE_COLORS["fire-stations"],
-        "police-stations",
-        SOURCE_COLORS["police-stations"],
-        "aeds",
-        SOURCE_COLORS.aeds,
-        "schools",
-        SOURCE_COLORS.schools,
-        "universities",
-        SOURCE_COLORS.universities,
-        "#374151",
-      ],
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 9],
-      "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 1.5,
-    },
-    source: POINTS_SOURCE_ID,
-    type: "circle",
-  });
-  map.addLayer({
-    id: POINTS_SYMBOL_LAYER_ID,
-    layout: {
-      "text-allow-overlap": true,
-      "text-field": ["get", "symbolLabel"],
-      "text-font": ["Noto Sans Regular"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 10],
-    },
-    paint: {
-      "text-color": "#ffffff",
-      "text-halo-color": [
-        "match",
-        ["get", "source"],
-        "fire-stations",
-        SOURCE_COLORS["fire-stations"],
-        "police-stations",
-        SOURCE_COLORS["police-stations"],
-        "aeds",
-        SOURCE_COLORS.aeds,
-        "schools",
-        SOURCE_COLORS.schools,
-        "universities",
-        SOURCE_COLORS.universities,
-        "#374151",
-      ],
-      "text-halo-width": 1.2,
-    },
-    source: POINTS_SOURCE_ID,
-    type: "symbol",
-  });
+  if (!map.getLayer(POINTS_HALO_LAYER_ID)) {
+    map.addLayer({
+      id: POINTS_HALO_LAYER_ID,
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "source"],
+          "fire-stations",
+          SOURCE_HALO_COLORS["fire-stations"],
+          "police-stations",
+          SOURCE_HALO_COLORS["police-stations"],
+          "aeds",
+          SOURCE_HALO_COLORS.aeds,
+          "schools",
+          SOURCE_HALO_COLORS.schools,
+          "universities",
+          SOURCE_HALO_COLORS.universities,
+          "#6b7280",
+        ],
+        "circle-opacity": 0.2,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 20],
+      },
+      source: POINTS_SOURCE_ID,
+      type: "circle",
+    });
+  }
+
+  if (!map.getLayer(POINTS_LAYER_ID)) {
+    map.addLayer({
+      id: POINTS_LAYER_ID,
+      paint: {
+        "circle-color": "#ffffff",
+        "circle-opacity": 0,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 16],
+      },
+      source: POINTS_SOURCE_ID,
+      type: "circle",
+    });
+  }
+
+  if (!map.getLayer(POINTS_SYMBOL_LAYER_ID)) {
+    map.addLayer({
+      id: POINTS_SYMBOL_LAYER_ID,
+      layout: {
+        "icon-allow-overlap": true,
+        "icon-anchor": "bottom",
+        "icon-image": ["get", "iconId"],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.45, 12, 0.72],
+      },
+      source: POINTS_SOURCE_ID,
+      type: "symbol",
+    });
+  }
 }
 
 function syncPointLayerWhenReady(
@@ -929,9 +1135,7 @@ function syncPointLayerWhenReady(
     return;
   }
 
-  map.once("idle", () => {
-    syncPointLayer(map, points);
-  });
+  runWhenStyleReady(map, () => syncPointLayer(map, points));
 }
 
 function syncSeoulAreaLayer(map: MapLibreMap, areas: SeoulAreasData | null) {
@@ -939,50 +1143,90 @@ function syncSeoulAreaLayer(map: MapLibreMap, areas: SeoulAreasData | null) {
     return;
   }
 
+  const areaData = createSeoulAreaPointData(areas);
   const source = map.getSource(SEOUL_AREAS_SOURCE_ID) as
     | GeoJSONSource
     | undefined;
 
   if (source) {
-    source.setData(areas);
-    return;
+    source.setData(areaData);
+  } else {
+    map.addSource(SEOUL_AREAS_SOURCE_ID, {
+      data: areaData,
+      type: "geojson",
+    });
   }
 
-  map.addSource(SEOUL_AREAS_SOURCE_ID, {
-    data: areas,
-    type: "geojson",
-  });
-  map.addLayer({
-    id: SEOUL_AREAS_FILL_LAYER_ID,
-    paint: {
-      "fill-color": [
-        "match",
-        ["get", "congestionLevel"],
-        "붐빔",
-        "#dc2626",
-        "약간 붐빔",
-        "#f97316",
-        "보통",
-        "#eab308",
-        "여유",
-        "#16a34a",
-        "#2563eb",
-      ],
-      "fill-opacity": ["case", ["has", "congestionLevel"], 0.28, 0.08],
-    },
-    source: SEOUL_AREAS_SOURCE_ID,
-    type: "fill",
-  });
-  map.addLayer({
-    id: SEOUL_AREAS_LINE_LAYER_ID,
-    paint: {
-      "line-color": "#2563eb",
-      "line-opacity": 0.44,
-      "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 13, 1.6],
-    },
-    source: SEOUL_AREAS_SOURCE_ID,
-    type: "line",
-  });
+  if (!map.getLayer(SEOUL_AREAS_HALO_LAYER_ID)) {
+    map.addLayer({
+      id: SEOUL_AREAS_HALO_LAYER_ID,
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "congestionLevel"],
+          "붐빔",
+          "#dc2626",
+          "약간 붐빔",
+          "#f97316",
+          "보통",
+          "#eab308",
+          "여유",
+          "#16a34a",
+          "#2563eb",
+        ],
+        "circle-opacity": ["case", ["has", "congestionLevel"], 0.2, 0.1],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 12, 14, 24],
+      },
+      source: SEOUL_AREAS_SOURCE_ID,
+      type: "circle",
+    });
+  }
+
+  if (!map.getLayer(SEOUL_AREAS_LAYER_ID)) {
+    map.addLayer({
+      id: SEOUL_AREAS_LAYER_ID,
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "congestionLevel"],
+          "붐빔",
+          "#dc2626",
+          "약간 붐빔",
+          "#f97316",
+          "보통",
+          "#eab308",
+          "여유",
+          "#16a34a",
+          "#2563eb",
+        ],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 5, 14, 9],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 1.6,
+      },
+      source: SEOUL_AREAS_SOURCE_ID,
+      type: "circle",
+    });
+  }
+
+  if (!map.getLayer(SEOUL_AREAS_SYMBOL_LAYER_ID)) {
+    map.addLayer({
+      id: SEOUL_AREAS_SYMBOL_LAYER_ID,
+      layout: {
+        "text-allow-overlap": false,
+        "text-field": ["get", "populationLabel"],
+        "text-font": ["Noto Sans Regular"],
+        "text-offset": [0, 1],
+        "text-size": ["interpolate", ["linear"], ["zoom"], 10, 10, 14, 12],
+      },
+      paint: {
+        "text-color": "#1f2937",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.4,
+      },
+      source: SEOUL_AREAS_SOURCE_ID,
+      type: "symbol",
+    });
+  }
 }
 
 function syncSeoulAreaLayerWhenReady(
@@ -994,9 +1238,7 @@ function syncSeoulAreaLayerWhenReady(
     return;
   }
 
-  map.once("idle", () => {
-    syncSeoulAreaLayer(map, areas);
-  });
+  runWhenStyleReady(map, () => syncSeoulAreaLayer(map, areas));
 }
 
 function syncHazardLayer(map: MapLibreMap, events: HazardEvent[]) {
@@ -1009,50 +1251,55 @@ function syncHazardLayer(map: MapLibreMap, events: HazardEvent[]) {
 
   if (source) {
     source.setData(eventData);
-    return;
+  } else {
+    map.addSource(HAZARDS_SOURCE_ID, {
+      data: eventData,
+      type: "geojson",
+    });
   }
 
-  map.addSource(HAZARDS_SOURCE_ID, {
-    data: eventData,
-    type: "geojson",
-  });
-  map.addLayer({
-    id: HAZARDS_HALO_LAYER_ID,
-    paint: {
-      "circle-color": [
-        "match",
-        ["get", "eventType"],
-        "earthquake",
-        "#f59e0b",
-        "tsunami",
-        "#06b6d4",
-        "#ef4444",
-      ],
-      "circle-opacity": 0.24,
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 12, 12, 30],
-    },
-    source: HAZARDS_SOURCE_ID,
-    type: "circle",
-  });
-  map.addLayer({
-    id: HAZARDS_LAYER_ID,
-    paint: {
-      "circle-color": [
-        "match",
-        ["get", "eventType"],
-        "earthquake",
-        "#d97706",
-        "tsunami",
-        "#0891b2",
-        "#dc2626",
-      ],
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 7, 12, 12],
-      "circle-stroke-color": "#ffffff",
-      "circle-stroke-width": 2,
-    },
-    source: HAZARDS_SOURCE_ID,
-    type: "circle",
-  });
+  if (!map.getLayer(HAZARDS_HALO_LAYER_ID)) {
+    map.addLayer({
+      id: HAZARDS_HALO_LAYER_ID,
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "eventType"],
+          "earthquake",
+          "#f59e0b",
+          "tsunami",
+          "#06b6d4",
+          "#ef4444",
+        ],
+        "circle-opacity": 0.24,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 12, 12, 30],
+      },
+      source: HAZARDS_SOURCE_ID,
+      type: "circle",
+    });
+  }
+
+  if (!map.getLayer(HAZARDS_LAYER_ID)) {
+    map.addLayer({
+      id: HAZARDS_LAYER_ID,
+      paint: {
+        "circle-color": [
+          "match",
+          ["get", "eventType"],
+          "earthquake",
+          "#d97706",
+          "tsunami",
+          "#0891b2",
+          "#dc2626",
+        ],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 4, 7, 12, 12],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+      source: HAZARDS_SOURCE_ID,
+      type: "circle",
+    });
+  }
 }
 
 function syncHazardLayerWhenReady(map: MapLibreMap, events: HazardEvent[]) {
@@ -1061,9 +1308,22 @@ function syncHazardLayerWhenReady(map: MapLibreMap, events: HazardEvent[]) {
     return;
   }
 
-  map.once("idle", () => {
-    syncHazardLayer(map, events);
-  });
+  runWhenStyleReady(map, () => syncHazardLayer(map, events));
+}
+
+function runWhenStyleReady(map: MapLibreMap, callback: () => void) {
+  let didRun = false;
+  const run = () => {
+    if (didRun || !map.isStyleLoaded()) {
+      return;
+    }
+
+    didRun = true;
+    callback();
+  };
+
+  map.once("style.load", run);
+  map.once("idle", run);
 }
 
 export function MapShell({ dictionary, initialProvider }: MapShellProps) {
@@ -1089,8 +1349,10 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const [seoulAreas, setSeoulAreas] = useState<SeoulAreasData | null>(null);
   const [activeHazard, setActiveHazard] = useState<HazardEvent | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isMapReady, setIsMapReady] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [autoFocusHazards, setAutoFocusHazards] = useState(true);
+  const [sourceQuery, setSourceQuery] = useState("");
   const [visibleSources, setVisibleSources] = useState<
     Partial<Record<DatasetSourceId, boolean>>
   >({});
@@ -1101,7 +1363,8 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const selectedProviderLabel =
     dictionary.map.providers[selectedProviderConfig.labelKey];
   const visiblePoints = useMemo(
-    () => points.filter((point) => visibleSources[point.source] ?? true),
+    () =>
+      points.filter((point) => isSourceVisible(visibleSources, point.source)),
     [points, visibleSources],
   );
   const mappedPointCount = visiblePoints.filter(isMappedPoint).length;
@@ -1122,43 +1385,83 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
     return counts;
   }, [points]);
+  const filteredDatasets = useMemo(() => {
+    const query = sourceQuery.trim().toLowerCase();
+
+    if (!query) {
+      return datasets;
+    }
+
+    return datasets.filter((dataset) =>
+      [dataset.id, dataset.label].some((value) =>
+        value.toLowerCase().includes(query),
+      ),
+    );
+  }, [datasets, sourceQuery]);
   useEffect(() => {
     sourceLabelsRef.current = new Map(
       datasets.map((dataset) => [dataset.id, dataset.label]),
     );
   }, [datasets]);
-  const selectedDatasetCount = datasets.filter(
-    (dataset) => visibleSources[dataset.id] ?? true,
+  const selectedDatasetCount = datasets.filter((dataset) =>
+    isSourceVisible(visibleSources, dataset.id),
   ).length;
 
   const refreshData = useCallback(async () => {
-    const [pointsResponse, datasetsResponse, hazardsResponse, seoulResponse] =
+    const [datasetsResponse, hazardsResponse, seoulResponse] =
       await Promise.all([
-        fetch("/api/points", { cache: "no-store" }),
         fetch("/api/datasets", { cache: "no-store" }),
         fetch("/api/hazards", { cache: "no-store" }),
         fetch("/data/seoul-citydata-areas.geojson", { cache: "no-store" }),
       ]);
 
-    if (
-      !pointsResponse.ok ||
-      !datasetsResponse.ok ||
-      !hazardsResponse.ok ||
-      !seoulResponse.ok
-    ) {
+    if (!datasetsResponse.ok || !hazardsResponse.ok || !seoulResponse.ok) {
       throw new Error("Failed to load map data");
     }
 
-    const pointsPayload = (await pointsResponse.json()) as PointsResponse;
     const datasetsPayload = (await datasetsResponse.json()) as DatasetsResponse;
     const hazardsPayload = (await hazardsResponse.json()) as HazardsResponse;
     const seoulPayload = (await seoulResponse.json()) as SeoulAreasData;
 
-    setPoints(pointsPayload.points);
     setDatasets(datasetsPayload.datasets);
     setHazards(hazardsPayload.events);
     setSeoulAreas(seoulPayload);
   }, []);
+
+  const refreshPointsForViewport = useCallback(async () => {
+    const map = mapRef.current;
+
+    if (!map || datasets.length === 0) {
+      return;
+    }
+
+    const selectedSources = datasets
+      .filter((dataset) => isSourceVisible(visibleSources, dataset.id))
+      .map((dataset) => dataset.id);
+
+    if (selectedSources.length === 0) {
+      setPoints([]);
+      return;
+    }
+
+    const viewport = getViewportFromMap(map);
+    const responses = await Promise.all(
+      selectedSources.map((source) =>
+        fetch(buildPointsUrl(source, viewport), { cache: "no-store" }),
+      ),
+    );
+
+    if (responses.some((response) => !response.ok)) {
+      throw new Error("Failed to load viewport points");
+    }
+
+    const payloads = (await Promise.all(
+      responses.map((response) => response.json()),
+    )) as PointsResponse[];
+
+    setPoints(payloads.flatMap((payload) => payload.points));
+    setDataError(null);
+  }, [datasets, visibleSources]);
 
   const focusHazard = useCallback((event: HazardEvent) => {
     setActiveHazard(event);
@@ -1255,12 +1558,56 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       const next: Partial<Record<DatasetSourceId, boolean>> = {};
 
       for (const dataset of datasets) {
-        next[dataset.id] = current[dataset.id] ?? true;
+        next[dataset.id] =
+          current[dataset.id] ?? dataset.id === DEFAULT_VISIBLE_SOURCE;
       }
 
       return next;
     });
   }, [datasets]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    let timeoutId: number | undefined;
+    const map = mapRef.current;
+
+    function scheduleRefresh() {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      timeoutId = window.setTimeout(() => {
+        refreshPointsForViewport().catch((error) => {
+          setDataError(error instanceof Error ? error.message : String(error));
+        });
+      }, 180);
+    }
+
+    scheduleRefresh();
+
+    if (!map) {
+      return () => {
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+        }
+      };
+    }
+
+    map.on("moveend", scheduleRefresh);
+    map.on("zoomend", scheduleRefresh);
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+
+      map.off("moveend", scheduleRefresh);
+      map.off("zoomend", scheduleRefresh);
+    };
+  }, [isMapReady, refreshPointsForViewport]);
 
   useEffect(() => {
     hazardsRef.current = hazards;
@@ -1413,7 +1760,8 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
       map.on("click", POINTS_LAYER_ID, showPointPopup);
       map.on("click", POINTS_SYMBOL_LAYER_ID, showPointPopup);
-      map.on("click", SEOUL_AREAS_FILL_LAYER_ID, showSeoulPopulationPopup);
+      map.on("click", SEOUL_AREAS_LAYER_ID, showSeoulPopulationPopup);
+      map.on("click", SEOUL_AREAS_SYMBOL_LAYER_ID, showSeoulPopulationPopup);
 
       map.on("click", HAZARDS_LAYER_ID, (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
@@ -1446,10 +1794,16 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       map.on("mouseleave", POINTS_SYMBOL_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
-      map.on("mouseenter", SEOUL_AREAS_FILL_LAYER_ID, () => {
+      map.on("mouseenter", SEOUL_AREAS_LAYER_ID, () => {
         map.getCanvas().style.cursor = "pointer";
       });
-      map.on("mouseleave", SEOUL_AREAS_FILL_LAYER_ID, () => {
+      map.on("mouseleave", SEOUL_AREAS_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseenter", SEOUL_AREAS_SYMBOL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", SEOUL_AREAS_SYMBOL_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
       map.on("mouseenter", HAZARDS_LAYER_ID, () => {
@@ -1460,6 +1814,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       });
 
       map.once("load", () => {
+        setIsMapReady(true);
         syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
         syncPointLayerWhenReady(map, pointsRef.current);
         syncHazardLayerWhenReady(map, hazardsRef.current);
@@ -1473,6 +1828,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       popupRef.current?.remove();
       mapRef.current?.remove();
       mapRef.current = null;
+      setIsMapReady(false);
     };
   }, [dictionary, focusHazard]);
 
@@ -1487,6 +1843,12 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
     async function updateStyle() {
       const style = createMapStyle(activeProvider);
+      const syncOverlays = () => {
+        map.resize();
+        syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
+        syncPointLayerWhenReady(map, pointsRef.current);
+        syncHazardLayerWhenReady(map, hazardsRef.current);
+      };
 
       if (isDisposed) {
         return;
@@ -1495,19 +1857,14 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       map.setStyle(style);
 
       timeoutId = window.setTimeout(() => {
-        map.resize();
-        syncPointLayerWhenReady(map, pointsRef.current);
-        syncHazardLayerWhenReady(map, hazardsRef.current);
+        syncOverlays();
       }, STYLE_LOAD_TIMEOUT_MS);
 
-      map.once("styledata", () => {
+      map.once("style.load", () => {
         if (timeoutId) {
           window.clearTimeout(timeoutId);
         }
-        map.resize();
-        syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
-        syncPointLayerWhenReady(map, pointsRef.current);
-        syncHazardLayerWhenReady(map, hazardsRef.current);
+        syncOverlays();
       });
     }
 
@@ -1669,32 +2026,46 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
             </span>
           </button>
           {isSourceMenuOpen ? (
-            <fieldset
-              aria-label={dictionary.map.datasets.sourceMenuTitle}
-              className={styles.sourceDropdown}
-            >
-              <legend>{dictionary.map.datasets.sourceMenuTitle}</legend>
+            <fieldset className={styles.sourceDropdown}>
+              <legend className={styles.sourceLegend}>
+                {dictionary.map.datasets.sourceMenuTitle}
+              </legend>
+              <label className={styles.sourceSearch}>
+                <Search aria-hidden="true" size={15} strokeWidth={2.4} />
+                <span>표시 항목 검색</span>
+                <input
+                  onChange={(event) => setSourceQuery(event.target.value)}
+                  placeholder="검색"
+                  type="search"
+                  value={sourceQuery}
+                />
+              </label>
               <div className={styles.sourceList}>
-                {datasets.map((dataset) => (
+                {filteredDatasets.map((dataset) => (
                   <label className={styles.sourceItem} key={dataset.id}>
                     <input
-                      checked={visibleSources[dataset.id] ?? true}
+                      checked={isSourceVisible(visibleSources, dataset.id)}
                       onChange={() =>
                         setVisibleSources((current) => ({
                           ...current,
-                          [dataset.id]: !(current[dataset.id] ?? true),
+                          [dataset.id]: !isSourceVisible(current, dataset.id),
                         }))
                       }
                       type="checkbox"
                     />
                     <span>{dataset.label}</span>
                     <small>
-                      {(sourcePointCounts.get(dataset.id) ?? 0).toLocaleString(
-                        "ko-KR",
-                      )}
+                      {(
+                        dataset.geocodedCount ||
+                        sourcePointCounts.get(dataset.id) ||
+                        0
+                      ).toLocaleString("ko-KR")}
                     </small>
                   </label>
                 ))}
+                {filteredDatasets.length === 0 ? (
+                  <p className={styles.sourceEmpty}>검색 결과가 없습니다.</p>
+                ) : null}
               </div>
               <label className={styles.settingItem}>
                 <input

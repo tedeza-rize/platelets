@@ -37,8 +37,14 @@ export type PointBoundingBox = {
   minLongitude: number;
 };
 
+export type PointCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
 export type PointSearchOptions = {
   bounds?: PointBoundingBox;
+  center?: PointCoordinate;
   includeUnmapped?: boolean;
   limit?: number;
   source?: DatasetSourceId | null;
@@ -781,9 +787,30 @@ function buildPointWhereClause(options: PointSearchOptions) {
   return { params, where };
 }
 
+function buildPointOrderClause(options: PointSearchOptions, fallback: string) {
+  if (!options.center) {
+    return { orderBy: fallback, orderParams: [] };
+  }
+
+  return {
+    orderBy:
+      "((p.latitude - ?) * (p.latitude - ?) + (p.longitude - ?) * (p.longitude - ?)), p.id",
+    orderParams: [
+      options.center.latitude,
+      options.center.latitude,
+      options.center.longitude,
+      options.center.longitude,
+    ],
+  };
+}
+
 export async function listPointSummaries(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
+  const { orderBy, orderParams } = buildPointOrderClause(
+    options,
+    "p.source, p.name",
+  );
   const limit = clampPointLimit(options.limit, 100_000, 100_000);
   const rows = await all<PointRow>(
     db,
@@ -804,9 +831,9 @@ export async function listPointSummaries(options: PointSearchOptions = {}) {
       FROM points p
       LEFT JOIN dataset_updates u ON u.source = p.source
       ${where}
-      ORDER BY p.source, p.name
+      ORDER BY ${orderBy}
       LIMIT ?`,
-    [...params, limit],
+    [...params, ...orderParams, limit],
   );
 
   return rows.map(mapPointSummaryRow);
@@ -815,6 +842,10 @@ export async function listPointSummaries(options: PointSearchOptions = {}) {
 export async function listPointMarkers(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
+  const { orderBy, orderParams } = buildPointOrderClause(
+    options,
+    "p.source, p.id",
+  );
   const limit = clampPointLimit(options.limit, 100_000, 100_000);
   const rows = await all<PointRow>(
     db,
@@ -834,9 +865,9 @@ export async function listPointMarkers(options: PointSearchOptions = {}) {
         NULL AS fetched_at
       FROM points p
       ${where}
-      ORDER BY p.source, p.id
+      ORDER BY ${orderBy}
       LIMIT ?`,
-    [...params, limit],
+    [...params, ...orderParams, limit],
   );
 
   return rows.map(mapPointMarkerRow);
@@ -845,6 +876,10 @@ export async function listPointMarkers(options: PointSearchOptions = {}) {
 export async function listPoints(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
+  const { orderBy, orderParams } = buildPointOrderClause(
+    options,
+    "p.source, p.name",
+  );
   const limit = clampPointLimit(options.limit);
   const rows = await all<PointRow>(
     db,
@@ -852,9 +887,9 @@ export async function listPoints(options: PointSearchOptions = {}) {
       FROM points p
       LEFT JOIN dataset_updates u ON u.source = p.source
       ${where}
-      ORDER BY p.source, p.name
+      ORDER BY ${orderBy}
       LIMIT ?`,
-    [...params, limit],
+    [...params, ...orderParams, limit],
   );
 
   return rows.map(mapPointRow);

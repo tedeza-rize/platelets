@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
   const maxLatitude = numberParam(searchParams, "maxLatitude");
   const minLongitude = numberParam(searchParams, "minLongitude");
   const maxLongitude = numberParam(searchParams, "maxLongitude");
+  const centerLatitude = numberParam(searchParams, "centerLatitude");
+  const centerLongitude = numberParam(searchParams, "centerLongitude");
 
   if (source && !isDatasetSourceId(source)) {
     return noStoreJson({ error: "Unknown source" }, { status: 400 });
@@ -48,9 +50,15 @@ export async function GET(request: NextRequest) {
   }
 
   if (
-    [limitParam, minLatitude, maxLatitude, minLongitude, maxLongitude].some(
-      Number.isNaN,
-    )
+    [
+      limitParam,
+      minLatitude,
+      maxLatitude,
+      minLongitude,
+      maxLongitude,
+      centerLatitude,
+      centerLongitude,
+    ].some(Number.isNaN)
   ) {
     return noStoreJson(
       { error: "Invalid numeric query parameter" },
@@ -76,6 +84,15 @@ export async function GET(request: NextRequest) {
     return noStoreJson({ error: "Incomplete bounding box" }, { status: 400 });
   }
 
+  const hasCenter = centerLatitude !== null || centerLongitude !== null;
+
+  if (hasCenter && (centerLatitude === null || centerLongitude === null)) {
+    return noStoreJson(
+      { error: "Incomplete center coordinate" },
+      { status: 400 },
+    );
+  }
+
   const selectedSource = source && isDatasetSourceId(source) ? source : null;
   const options = {
     bounds:
@@ -84,6 +101,10 @@ export async function GET(request: NextRequest) {
       minLongitude !== null &&
       maxLongitude !== null
         ? { maxLatitude, maxLongitude, minLatitude, minLongitude }
+        : undefined,
+    center:
+      centerLatitude !== null && centerLongitude !== null
+        ? { latitude: centerLatitude, longitude: centerLongitude }
         : undefined,
     includeUnmapped,
     limit: limitParam ?? undefined,
