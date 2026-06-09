@@ -230,6 +230,7 @@ const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
 const KAKAO_LOCAL_DAILY_LIMIT = 100_000;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
+let writeTransactionQueue: Promise<void> = Promise.resolve();
 
 function run(db: SqliteDatabase, sql: string, params: unknown[] = []) {
   return new Promise<void>((resolve, reject) => {
@@ -265,6 +266,38 @@ function get<T>(db: SqliteDatabase, sql: string, params: unknown[] = []) {
       resolve(row);
     });
   });
+}
+
+async function withWriteTransaction<T>(
+  operation: (db: SqliteDatabase) => Promise<T>,
+) {
+  const previousTransaction = writeTransactionQueue;
+  let releaseTransaction = () => {};
+  writeTransactionQueue = new Promise<void>((resolve) => {
+    releaseTransaction = resolve;
+  });
+
+  await previousTransaction;
+
+  const db = await getDatabase();
+  let transactionStarted = false;
+
+  try {
+    await run(db, "BEGIN IMMEDIATE");
+    transactionStarted = true;
+    const result = await operation(db);
+    await run(db, "COMMIT");
+    transactionStarted = false;
+    return result;
+  } catch (error) {
+    if (transactionStarted) {
+      await run(db, "ROLLBACK").catch(() => undefined);
+    }
+
+    throw error;
+  } finally {
+    releaseTransaction();
+  }
 }
 
 async function initializeDatabase(db: SqliteDatabase) {
@@ -1015,11 +1048,7 @@ export async function upsertHazardEvents(params: {
   events: HazardEventInput[];
   fetchedAt: string;
 }) {
-  const db = await getDatabase();
-
-  await run(db, "BEGIN IMMEDIATE");
-
-  try {
+  await withWriteTransaction(async (db) => {
     for (const event of params.events) {
       await run(
         db,
@@ -1075,12 +1104,7 @@ export async function upsertHazardEvents(params: {
         ],
       );
     }
-
-    await run(db, "COMMIT");
-  } catch (error) {
-    await run(db, "ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 export async function getKakaoLocalUsage() {
@@ -1098,13 +1122,9 @@ export async function getKmaEarthquakeUsage() {
 }
 
 export async function consumeKakaoLocalQuota() {
-  const db = await getDatabase();
   const now = new Date();
   const nowIso = now.toISOString();
-
-  await run(db, "BEGIN IMMEDIATE");
-
-  try {
+  await withWriteTransaction(async (db) => {
     const existing = await getKakaoLocalUsageWindowRow(db);
     const shouldReset =
       existing?.window_ends_at && now >= new Date(existing.window_ends_at);
@@ -1148,24 +1168,15 @@ export async function consumeKakaoLocalQuota() {
         KAKAO_LOCAL_DAILY_LIMIT,
       ],
     );
-
-    await run(db, "COMMIT");
-  } catch (error) {
-    await run(db, "ROLLBACK");
-    throw error;
-  }
+  });
 
   return getKakaoLocalUsage();
 }
 
 export async function consumeKmaEarthquakeQuota(requestCount = 1) {
-  const db = await getDatabase();
   const now = new Date();
   const nowIso = now.toISOString();
-
-  await run(db, "BEGIN IMMEDIATE");
-
-  try {
+  await withWriteTransaction(async (db) => {
     const existing = await getKmaEarthquakeUsageWindowRow(db);
     const shouldReset =
       existing?.window_ends_at && now >= new Date(existing.window_ends_at);
@@ -1209,12 +1220,7 @@ export async function consumeKmaEarthquakeQuota(requestCount = 1) {
         KMA_EARTHQUAKE_DAILY_LIMIT,
       ],
     );
-
-    await run(db, "COMMIT");
-  } catch (error) {
-    await run(db, "ROLLBACK");
-    throw error;
-  }
+  });
 
   return getKmaEarthquakeUsage();
 }
@@ -1251,12 +1257,9 @@ export async function replaceDataset(params: {
   skippedCount: number;
   source: DatasetSourceId;
 }) {
-  const db = await getDatabase();
   const definition = DATASET_SOURCES[params.source];
 
-  await run(db, "BEGIN IMMEDIATE");
-
-  try {
+  await withWriteTransaction(async (db) => {
     await run(db, "DELETE FROM points WHERE source = ?", [params.source]);
 
     for (const point of params.points) {
@@ -1326,12 +1329,7 @@ export async function replaceDataset(params: {
         params.failedCount,
       ],
     );
-
-    await run(db, "COMMIT");
-  } catch (error) {
-    await run(db, "ROLLBACK");
-    throw error;
-  }
+  });
 
   const status = await getDatasetStatus(params.source);
 

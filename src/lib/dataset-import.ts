@@ -465,30 +465,21 @@ async function importPoliceStations(): Promise<ImportResult> {
   const csv = await downloadCsv("police-stations");
   const fetchedAt = new Date().toISOString();
   const rows = parseCsv(csv);
-  let failedCount = 0;
-  let geocodedCount = 0;
   const coordinates = await mapWithConcurrency(
     rows,
     GEOCODE_CONCURRENCY,
-    async (record) => {
-      const coordinate = await geocodeAddress(text(record.주소));
-
-      if (coordinate) {
-        geocodedCount += 1;
-      } else {
-        failedCount += 1;
-      }
-
-      return coordinate;
-    },
+    async (record) => geocodeAddress(text(record.주소)),
   );
   const points = rows
     .map((record, index) => mapPoliceRecord(record, coordinates[index]))
     .filter((point): point is EmergencyPointInput => point !== null);
   const skippedCount = rows.length - points.length;
+  const geocodedCount = points.filter(
+    (point) => point.latitude !== null && point.longitude !== null,
+  ).length;
 
   return {
-    failedCount,
+    failedCount: points.length - geocodedCount,
     fetchedAt,
     geocodedCount,
     points,
