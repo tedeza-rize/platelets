@@ -18,6 +18,7 @@ import type {
   MapGeoJSONFeature,
   MapLayerMouseEvent,
   Map as MapLibreMap,
+  PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -106,6 +107,35 @@ const HAZARD_POLL_INTERVAL_MS = 60_000;
 const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
 const DEFAULT_VISIBLE_SOURCE: DatasetSourceId = "fire-stations";
 const VIEWPORT_POINTS_PADDING_RATIO = 0.16;
+const POINT_HALO_RADIUS: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  6,
+  12,
+  12,
+  28,
+];
+const POINT_HIT_RADIUS: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  6,
+  12,
+  12,
+  22,
+];
+const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  6,
+  0.58,
+  12,
+  0.92,
+  16,
+  1.08,
+];
 const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
 const VWORLD_BASE_SOURCE_ID = "vworld-base";
 const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
@@ -1091,7 +1121,7 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
           "#6b7280",
         ],
         "circle-opacity": 0.2,
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 20],
+        "circle-radius": POINT_HALO_RADIUS,
       },
       source: POINTS_SOURCE_ID,
       type: "circle",
@@ -1104,7 +1134,7 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
       paint: {
         "circle-color": "#ffffff",
         "circle-opacity": 0,
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 16],
+        "circle-radius": POINT_HIT_RADIUS,
       },
       source: POINTS_SOURCE_ID,
       type: "circle",
@@ -1118,7 +1148,7 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
         "icon-allow-overlap": true,
         "icon-anchor": "bottom",
         "icon-image": ["get", "iconId"],
-        "icon-size": ["interpolate", ["linear"], ["zoom"], 6, 0.45, 12, 0.72],
+        "icon-size": POINT_ICON_SIZE,
       },
       source: POINTS_SOURCE_ID,
       type: "symbol",
