@@ -85,6 +85,9 @@ type ProgressState = {
   title: string;
 };
 
+const SUDO_TOKEN_STORAGE_KEY = "platelets:sudo-token";
+const ACCESS_TOKEN_HEADER = "x-platelets-admin-token";
+
 function formatDateTime(value: string | null) {
   if (!value) {
     return "-";
@@ -160,8 +163,21 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [savingNtpServers, setSavingNtpServers] = useState(false);
   const [clockTick, setClockTick] = useState(0);
+  const [sudoAccessToken, setSudoAccessToken] = useState("");
+  const [sudoTokenLoaded, setSudoTokenLoaded] = useState(false);
 
   const title = mode === "sudo" ? "개발자 총 권한 페이지" : "관리자 페이지";
+  const sudoHeaders = useMemo<Record<string, string>>(() => {
+    const token = sudoAccessToken.trim();
+    const headers: Record<string, string> = {};
+
+    if (token) {
+      headers[ACCESS_TOKEN_HEADER] = token;
+    }
+
+    return headers;
+  }, [sudoAccessToken]);
+  const hasSudoToken = mode === "sudo" && sudoAccessToken.trim().length > 0;
   const quotaPercent = useMemo(() => {
     if (!quota || quota.monthlyLimit === 0) {
       return 0;
@@ -230,44 +246,69 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   const refresh = useCallback(async () => {
-    const [
-      datasetsResponse,
-      quotaResponse,
-      kmaQuotaResponse,
-      logsResponse,
-      cooldownsResponse,
-      timeResponse,
-    ] = await Promise.all([
+    const [datasetsResponse, timeResponse] = await Promise.all([
       fetch("/api/datasets", { cache: "no-store" }),
-      fetch("/api/geocoding/quota", { cache: "no-store" }),
-      fetch("/api/hazards/quota", { cache: "no-store" }),
-      fetch(`/api/logs?limit=12&ts=${Date.now()}`, { cache: "no-store" }),
-      fetch("/api/admin/update-cooldowns", { cache: "no-store" }),
       fetch("/api/server-time", { cache: "no-store" }),
     ]);
 
-    if (
-      !datasetsResponse.ok ||
-      !quotaResponse.ok ||
-      !kmaQuotaResponse.ok ||
-      !logsResponse.ok ||
-      !cooldownsResponse.ok ||
-      !timeResponse.ok
-    ) {
+    if (!datasetsResponse.ok || !timeResponse.ok) {
       throw new Error("관리 데이터를 불러오지 못했습니다.");
     }
 
     setDatasets((await datasetsResponse.json()).datasets);
+    const nextTimeStatus = (await timeResponse.json()) as TimeStatus;
+    setTimeStatus(nextTimeStatus);
+    setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
+
+    if (mode !== "sudo" || !hasSudoToken) {
+      setQuota(null);
+      setKmaQuota(null);
+      setLogs([]);
+      setCooldowns([]);
+      return;
+    }
+
+    const [quotaResponse, kmaQuotaResponse, logsResponse, cooldownsResponse] =
+      await Promise.all([
+        fetch("/api/geocoding/quota", {
+          cache: "no-store",
+          headers: sudoHeaders,
+        }),
+        fetch("/api/hazards/quota", {
+          cache: "no-store",
+          headers: sudoHeaders,
+        }),
+        fetch(`/api/logs?limit=12&ts=${Date.now()}`, {
+          cache: "no-store",
+          headers: sudoHeaders,
+        }),
+        fetch("/api/admin/update-cooldowns", {
+          cache: "no-store",
+          headers: sudoHeaders,
+        }),
+      ]);
+
+    if (
+      !quotaResponse.ok ||
+      !kmaQuotaResponse.ok ||
+      !logsResponse.ok ||
+      !cooldownsResponse.ok
+    ) {
+      throw new Error("개발자 권한 데이터를 불러오지 못했습니다.");
+    }
+
     setQuota((await quotaResponse.json()).quota);
     setKmaQuota((await kmaQuotaResponse.json()).quota);
     setLogs((await logsResponse.json()).logs);
     setCooldowns((await cooldownsResponse.json()).cooldowns);
-    const nextTimeStatus = (await timeResponse.json()) as TimeStatus;
-    setTimeStatus(nextTimeStatus);
-    setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
-  }, []);
+  }, [hasSudoToken, mode, sudoHeaders]);
 
   async function updateDataset(source: DatasetSourceId | "all") {
+    if (mode !== "sudo" || !hasSudoToken) {
+      setNotice("개발자 토큰이 필요합니다.");
+      return;
+    }
+
     const blockedCooldown =
       source === "all"
         ? datasets
@@ -303,6 +344,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           });
 
           const response = await fetch(`/api/datasets/${dataset.id}/update`, {
+            headers: sudoHeaders,
             method: "POST",
           });
 
@@ -324,6 +366,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         });
 
         const response = await fetch(`/api/datasets/${source}/update`, {
+          headers: sudoHeaders,
           method: "POST",
         });
 
@@ -353,6 +396,11 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   async function updateHazards() {
+    if (mode !== "sudo" || !hasSudoToken) {
+      setNotice("개발자 토큰이 필요합니다.");
+      return;
+    }
+
     const blockedCooldown = getCooldown("hazards");
 
     if (blockedCooldown && !blockedCooldown.available) {
@@ -373,6 +421,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     try {
       const response = await fetch("/api/hazards/update", {
+        headers: sudoHeaders,
         method: "POST",
       });
 
@@ -402,6 +451,11 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   async function saveNtpServers() {
+    if (mode !== "sudo" || !hasSudoToken) {
+      setNotice("개발자 토큰이 필요합니다.");
+      return;
+    }
+
     setSavingNtpServers(true);
     setNotice("NTP 서버 목록 저장 중");
 
@@ -412,7 +466,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         .filter(Boolean);
       const response = await fetch("/api/ntp/servers", {
         body: JSON.stringify({ servers }),
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...sudoHeaders },
         method: "PUT",
       });
 
@@ -431,6 +485,31 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       setSavingNtpServers(false);
     }
   }
+
+  useEffect(() => {
+    if (mode !== "sudo") {
+      return;
+    }
+
+    setSudoAccessToken(
+      window.sessionStorage.getItem(SUDO_TOKEN_STORAGE_KEY) ?? "",
+    );
+    setSudoTokenLoaded(true);
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "sudo" || !sudoTokenLoaded) {
+      return;
+    }
+
+    const token = sudoAccessToken.trim();
+
+    if (token) {
+      window.sessionStorage.setItem(SUDO_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(SUDO_TOKEN_STORAGE_KEY);
+    }
+  }, [mode, sudoAccessToken, sudoTokenLoaded]);
 
   useEffect(() => {
     refresh().catch((error) => {
@@ -477,12 +556,16 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           <Link className={styles.navLink} href="/admin">
             관리자
           </Link>
-          <Link className={styles.navLink} href="/sudo">
-            개발자
-          </Link>
-          <Link className={styles.navLink} href="/logs">
-            로그
-          </Link>
+          {mode === "sudo" ? (
+            <>
+              <Link className={styles.navLink} href="/sudo">
+                개발자
+              </Link>
+              <Link className={styles.navLink} href="/logs">
+                로그
+              </Link>
+            </>
+          ) : null}
         </nav>
       </header>
 
@@ -503,135 +586,172 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             <span className={styles.muted}>저장된 전체 기록</span>
           </div>
 
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>
-                <TerminalSquare
-                  aria-hidden="true"
-                  size={18}
-                  strokeWidth={2.4}
-                />
-                카카오 로컬 API
-              </span>
-            </div>
-            <strong className={styles.metric}>
-              {(quota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
-              {(quota?.monthlyLimit ?? 100000).toLocaleString("ko-KR")}
-            </strong>
-            <span className={styles.muted}>
-              {quotaPercent}% 사용, 리셋{" "}
-              {formatDateTime(quota?.windowEndsAt ?? null)}
-            </span>
-          </div>
-
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>
-                <AlertTriangle aria-hidden="true" size={18} strokeWidth={2.4} />
-                기상청 지진 API
-              </span>
-            </div>
-            <strong className={styles.metric}>
-              {(kmaQuota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
-              {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString("ko-KR")}
-            </strong>
-            <span className={styles.muted}>
-              {kmaQuotaPercent}% 사용, 리셋{" "}
-              {formatDateTime(kmaQuota?.windowEndsAt ?? null)}
-            </span>
-          </div>
-
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>
-                <ClipboardList aria-hidden="true" size={18} strokeWidth={2.4} />
-                최근 로그
-              </span>
-            </div>
-            <strong className={styles.metric}>{logs.length}</strong>
-            <span className={styles.muted}>최근 12건</span>
-          </div>
-        </section>
-
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>데이터 갱신</span>
-          </div>
-          <div className={styles.actions}>
-            <button
-              className={styles.actionButton}
-              disabled={isUpdating || Boolean(allDatasetCooldown)}
-              onClick={() => updateDataset("all")}
-              title={actionUnavailableLabel(allDatasetCooldown)}
-              type="button"
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={activeUpdate === "all" ? styles.spinning : undefined}
-                size={16}
-                strokeWidth={2.4}
-              />
-              전체
-              {allDatasetCooldown ? (
-                <span className={styles.buttonMeta}>
-                  {formatDuration(allDatasetCooldown.remainingMs)}
-                </span>
-              ) : null}
-            </button>
-            {datasets.map((dataset) => {
-              const cooldown = datasetCooldown(dataset.id);
-
-              return (
-                <button
-                  className={styles.actionButton}
-                  disabled={
-                    isUpdating || Boolean(cooldown && !cooldown.available)
-                  }
-                  key={dataset.id}
-                  onClick={() => updateDataset(dataset.id)}
-                  title={actionUnavailableLabel(cooldown)}
-                  type="button"
-                >
-                  {activeUpdate === dataset.id ? (
-                    <RefreshCw
+          {mode === "sudo" ? (
+            <>
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <TerminalSquare
                       aria-hidden="true"
-                      className={styles.spinning}
-                      size={16}
+                      size={18}
                       strokeWidth={2.4}
                     />
-                  ) : (
-                    datasetIcon(dataset.id)
-                  )}
-                  {dataset.label}
-                  {cooldown && !cooldown.available ? (
-                    <span className={styles.buttonMeta}>
-                      {formatDuration(cooldown.remainingMs)}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-            <button
-              className={styles.actionButton}
-              disabled={
-                isUpdating ||
-                Boolean(hazardsCooldown && !hazardsCooldown.available)
-              }
-              onClick={updateHazards}
-              title={actionUnavailableLabel(hazardsCooldown)}
-              type="button"
-            >
-              <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
-              지진/지진해일
-              {hazardsCooldown && !hazardsCooldown.available ? (
-                <span className={styles.buttonMeta}>
-                  {formatDuration(hazardsCooldown.remainingMs)}
+                    카카오 로컬 API
+                  </span>
+                </div>
+                <strong className={styles.metric}>
+                  {(quota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
+                  {(quota?.monthlyLimit ?? 100000).toLocaleString("ko-KR")}
+                </strong>
+                <span className={styles.muted}>
+                  {quotaPercent}% 사용, 리셋{" "}
+                  {formatDateTime(quota?.windowEndsAt ?? null)}
                 </span>
-              ) : null}
-            </button>
-          </div>
-          <output className={styles.notice}>{notice}</output>
+              </div>
+
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <AlertTriangle
+                      aria-hidden="true"
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                    기상청 지진 API
+                  </span>
+                </div>
+                <strong className={styles.metric}>
+                  {(kmaQuota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
+                  {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString("ko-KR")}
+                </strong>
+                <span className={styles.muted}>
+                  {kmaQuotaPercent}% 사용, 리셋{" "}
+                  {formatDateTime(kmaQuota?.windowEndsAt ?? null)}
+                </span>
+              </div>
+
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <span className={styles.cardTitle}>
+                    <ClipboardList
+                      aria-hidden="true"
+                      size={18}
+                      strokeWidth={2.4}
+                    />
+                    최근 로그
+                  </span>
+                </div>
+                <strong className={styles.metric}>{logs.length}</strong>
+                <span className={styles.muted}>최근 12건</span>
+              </div>
+            </>
+          ) : null}
         </section>
+
+        {mode === "sudo" ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>개발자 권한</span>
+              <span className={styles.muted}>
+                {hasSudoToken ? "토큰 적용됨" : "토큰 필요"}
+              </span>
+            </div>
+            <label className={styles.fieldLabel}>
+              접근 토큰
+              <input
+                autoComplete="current-password"
+                className={styles.textInput}
+                onChange={(event) => setSudoAccessToken(event.target.value)}
+                type="password"
+                value={sudoAccessToken}
+              />
+            </label>
+          </section>
+        ) : null}
+
+        {mode === "sudo" ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>데이터 갱신</span>
+            </div>
+            <div className={styles.actions}>
+              <button
+                className={styles.actionButton}
+                disabled={isUpdating || Boolean(allDatasetCooldown)}
+                onClick={() => updateDataset("all")}
+                title={actionUnavailableLabel(allDatasetCooldown)}
+                type="button"
+              >
+                <RefreshCw
+                  aria-hidden="true"
+                  className={
+                    activeUpdate === "all" ? styles.spinning : undefined
+                  }
+                  size={16}
+                  strokeWidth={2.4}
+                />
+                전체
+                {allDatasetCooldown ? (
+                  <span className={styles.buttonMeta}>
+                    {formatDuration(allDatasetCooldown.remainingMs)}
+                  </span>
+                ) : null}
+              </button>
+              {datasets.map((dataset) => {
+                const cooldown = datasetCooldown(dataset.id);
+
+                return (
+                  <button
+                    className={styles.actionButton}
+                    disabled={
+                      isUpdating || Boolean(cooldown && !cooldown.available)
+                    }
+                    key={dataset.id}
+                    onClick={() => updateDataset(dataset.id)}
+                    title={actionUnavailableLabel(cooldown)}
+                    type="button"
+                  >
+                    {activeUpdate === dataset.id ? (
+                      <RefreshCw
+                        aria-hidden="true"
+                        className={styles.spinning}
+                        size={16}
+                        strokeWidth={2.4}
+                      />
+                    ) : (
+                      datasetIcon(dataset.id)
+                    )}
+                    {dataset.label}
+                    {cooldown && !cooldown.available ? (
+                      <span className={styles.buttonMeta}>
+                        {formatDuration(cooldown.remainingMs)}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+              <button
+                className={styles.actionButton}
+                disabled={
+                  isUpdating ||
+                  Boolean(hazardsCooldown && !hazardsCooldown.available)
+                }
+                onClick={updateHazards}
+                title={actionUnavailableLabel(hazardsCooldown)}
+                type="button"
+              >
+                <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
+                지진/지진해일
+                {hazardsCooldown && !hazardsCooldown.available ? (
+                  <span className={styles.buttonMeta}>
+                    {formatDuration(hazardsCooldown.remainingMs)}
+                  </span>
+                ) : null}
+              </button>
+            </div>
+            <output className={styles.notice}>{notice}</output>
+          </section>
+        ) : null}
 
         {mode === "sudo" ? (
           <section className={styles.card}>
@@ -729,48 +849,50 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           </div>
         </section>
 
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>최근 로그</span>
-            <Link className={styles.navLink} href="/logs">
-              전체 보기
-            </Link>
-          </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>시각</th>
-                  <th>상태</th>
-                  <th>분류</th>
-                  <th>작업</th>
-                  <th>메시지</th>
-                  {mode === "sudo" ? <th>상세</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{formatDateTime(log.eventAt)}</td>
-                    <td className={statusClassName(log.status)}>
-                      {log.status}
-                    </td>
-                    <td>{log.category}</td>
-                    <td>{log.action}</td>
-                    <td>{log.message}</td>
-                    {mode === "sudo" ? (
-                      <td>
-                        <pre className={styles.metadata}>
-                          {JSON.stringify(log.metadata, null, 2)}
-                        </pre>
-                      </td>
-                    ) : null}
+        {mode === "sudo" ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>최근 로그</span>
+              <Link className={styles.navLink} href="/logs">
+                전체 보기
+              </Link>
+            </div>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>시각</th>
+                    <th>상태</th>
+                    <th>분류</th>
+                    <th>작업</th>
+                    <th>메시지</th>
+                    {mode === "sudo" ? <th>상세</th> : null}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody>
+                  {logs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{formatDateTime(log.eventAt)}</td>
+                      <td className={statusClassName(log.status)}>
+                        {log.status}
+                      </td>
+                      <td>{log.category}</td>
+                      <td>{log.action}</td>
+                      <td>{log.message}</td>
+                      {mode === "sudo" ? (
+                        <td>
+                          <pre className={styles.metadata}>
+                            {JSON.stringify(log.metadata, null, 2)}
+                          </pre>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
       </main>
       {progress ? (
         <div className={styles.progressBackdrop} role="presentation">

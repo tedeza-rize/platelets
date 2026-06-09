@@ -1,3 +1,4 @@
+import { requireAccessRole } from "@/lib/access-control";
 import { updateAllDatasets } from "@/lib/dataset-import";
 import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
@@ -17,7 +18,13 @@ export async function GET() {
   return noStoreJson({ datasets });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   const actions = Object.keys(DATASET_SOURCES).map(
     (source) => `dataset:${source}`,
   );

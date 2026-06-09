@@ -1,3 +1,4 @@
+import { requireAccessRole } from "@/lib/access-control";
 import { noStoreJson } from "@/lib/http";
 import {
   getConfiguredNtpServers,
@@ -14,6 +15,12 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   const payload = (await request.json().catch(() => null)) as {
     servers?: unknown;
   } | null;

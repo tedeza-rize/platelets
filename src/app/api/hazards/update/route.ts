@@ -1,3 +1,4 @@
+import { requireAccessRole } from "@/lib/access-control";
 import { updateHazardEvents } from "@/lib/hazard-events";
 import { noStoreJson } from "@/lib/http";
 import {
@@ -9,7 +10,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   try {
     await assertAdminUpdateAvailable("hazards");
     const result = await updateHazardEvents();

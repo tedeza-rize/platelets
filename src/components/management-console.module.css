@@ -177,6 +177,21 @@
   outline: 0;
 }
 
+.textInput {
+  min-height: 38px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  font: inherit;
+  padding: 0 10px;
+}
+
+.textInput:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
 .statusPanel {
   display: grid;
   align-content: start;

@@ -1,3 +1,4 @@
+import { requireAccessRole } from "@/lib/access-control";
 import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import {
@@ -9,6 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   const url = new URL(request.url);
   const requestedActions = url.searchParams.getAll("action");
   const actions =

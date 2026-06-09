@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { requireAccessRole } from "@/lib/access-control";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import {
@@ -36,6 +37,14 @@ export async function GET(request: NextRequest) {
 
   if (source && !isDatasetSourceId(source)) {
     return noStoreJson({ error: "Unknown source" }, { status: 400 });
+  }
+
+  if (includeRaw || detail === "raw") {
+    const forbidden = requireAccessRole(request, "sudo");
+
+    if (forbidden) {
+      return forbidden;
+    }
   }
 
   if (

@@ -1,3 +1,4 @@
+import { requireAccessRole } from "@/lib/access-control";
 import { updateDataset } from "@/lib/dataset-import";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
@@ -11,9 +12,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ source: string }> },
 ) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   const { source } = await context.params;
 
   if (!isDatasetSourceId(source)) {

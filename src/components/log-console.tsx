@@ -18,6 +18,9 @@ type ApiLogEntry = {
   status: "failure" | "skipped" | "success";
 };
 
+const SUDO_TOKEN_STORAGE_KEY = "platelets:sudo-token";
+const ACCESS_TOKEN_HEADER = "x-platelets-admin-token";
+
 function formatDateTime(value: string) {
   const date = new Date(value);
 
@@ -48,8 +51,18 @@ export function LogConsole() {
   const [category, setCategory] = useState("");
   const [source, setSource] = useState("");
   const [notice, setNotice] = useState("");
+  const [sudoAccessToken, setSudoAccessToken] = useState("");
+  const [sudoTokenLoaded, setSudoTokenLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
+    const token = sudoAccessToken.trim();
+
+    if (!token) {
+      setLogs([]);
+      setNotice("개발자 토큰이 필요합니다.");
+      return;
+    }
+
     const params = new URLSearchParams({ limit: "300" });
 
     if (category) {
@@ -62,14 +75,36 @@ export function LogConsole() {
 
     const response = await fetch(`/api/logs?${params.toString()}`, {
       cache: "no-store",
+      headers: { [ACCESS_TOKEN_HEADER]: token },
     });
 
     if (!response.ok) {
-      throw new Error("로그를 불러오지 못했습니다.");
+      throw new Error("개발자 로그를 불러오지 못했습니다.");
     }
 
     setLogs((await response.json()).logs);
-  }, [category, source]);
+  }, [category, source, sudoAccessToken]);
+
+  useEffect(() => {
+    setSudoAccessToken(
+      window.sessionStorage.getItem(SUDO_TOKEN_STORAGE_KEY) ?? "",
+    );
+    setSudoTokenLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sudoTokenLoaded) {
+      return;
+    }
+
+    const token = sudoAccessToken.trim();
+
+    if (token) {
+      window.sessionStorage.setItem(SUDO_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(SUDO_TOKEN_STORAGE_KEY);
+    }
+  }, [sudoAccessToken, sudoTokenLoaded]);
 
   useEffect(() => {
     refresh().catch((error) => {
@@ -95,6 +130,22 @@ export function LogConsole() {
       </header>
 
       <main className={styles.content}>
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle}>개발자 권한</span>
+          </div>
+          <label className={styles.fieldLabel}>
+            접근 토큰
+            <input
+              autoComplete="current-password"
+              className={styles.textInput}
+              onChange={(event) => setSudoAccessToken(event.target.value)}
+              type="password"
+              value={sudoAccessToken}
+            />
+          </label>
+        </section>
+
         <section className={styles.card}>
           <div className={styles.actions}>
             <select

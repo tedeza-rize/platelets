@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { requireAccessRole } from "@/lib/access-control";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import { listApiLogs } from "@/lib/points-db";
@@ -21,6 +22,12 @@ function isLogCategory(value: string): value is LogCategory {
 }
 
 export async function GET(request: NextRequest) {
+  const forbidden = requireAccessRole(request, "sudo");
+
+  if (forbidden) {
+    return forbidden;
+  }
+
   const category = request.nextUrl.searchParams.get("category");
   const source = request.nextUrl.searchParams.get("source");
   const limitValue = Number(request.nextUrl.searchParams.get("limit") ?? 200);
