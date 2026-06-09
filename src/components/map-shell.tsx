@@ -31,22 +31,25 @@ type MapShellProps = {
   initialProvider: MapProvider;
 };
 
-type EmergencyPoint = {
-  address: string;
+type EmergencyPointMarker = {
   category: string;
-  fetchedAt: string | null;
   id: number;
   latitude: number | null;
   longitude: number | null;
+  source: DatasetSourceId;
+};
+
+type EmergencyPointDetail = EmergencyPointMarker & {
+  address: string;
+  fetchedAt: string | null;
   name: string;
   parentName: string | null;
   phone: string | null;
-  source: DatasetSourceId;
   sourceRecordId: string;
   sourceUpdatedAt: string | null;
 };
 
-type MappedEmergencyPoint = EmergencyPoint & {
+type MappedEmergencyPoint = EmergencyPointMarker & {
   latitude: number;
   longitude: number;
 };
@@ -64,7 +67,11 @@ type DatasetStatus = {
 };
 
 type PointsResponse = {
-  points: EmergencyPoint[];
+  points: EmergencyPointMarker[];
+};
+
+type PointDetailResponse = {
+  point: EmergencyPointDetail;
 };
 
 type DatasetsResponse = {
@@ -100,18 +107,11 @@ const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
 };
 
 type PointFeatureProperties = {
-  address: string;
   category: string;
-  fetchedAt: string;
   id: number;
   latitude: number;
   longitude: number;
-  name: string;
-  parentName: string;
-  phone: string;
   source: DatasetSourceId;
-  sourceRecordId: string;
-  sourceUpdatedAt: string;
 };
 
 type HazardEvent = {
@@ -556,7 +556,9 @@ function createMapStyle(provider: MapProvider): StyleSpecification {
   return provider === "vworld" ? createVworldStyle() : createOsmStyle();
 }
 
-function isMappedPoint(point: EmergencyPoint): point is MappedEmergencyPoint {
+function isMappedPoint(
+  point: EmergencyPointMarker,
+): point is MappedEmergencyPoint {
   return point.latitude !== null && point.longitude !== null;
 }
 
@@ -564,7 +566,7 @@ function isMappedHazardEvent(event: HazardEvent): event is MappedHazardEvent {
   return event.latitude !== null && event.longitude !== null;
 }
 
-function createPointData(points: EmergencyPoint[]) {
+function createPointData(points: EmergencyPointMarker[]) {
   return {
     features: points.filter(isMappedPoint).map((point) => ({
       geometry: {
@@ -572,18 +574,11 @@ function createPointData(points: EmergencyPoint[]) {
         type: "Point" as const,
       },
       properties: {
-        address: point.address,
         category: point.category,
-        fetchedAt: point.fetchedAt ?? "",
         id: point.id,
         latitude: point.latitude,
         longitude: point.longitude,
-        name: point.name,
-        parentName: point.parentName ?? "",
-        phone: point.phone ?? "",
         source: point.source,
-        sourceRecordId: point.sourceRecordId,
-        sourceUpdatedAt: point.sourceUpdatedAt ?? "",
       } satisfies PointFeatureProperties,
       type: "Feature" as const,
     })),
@@ -657,21 +652,21 @@ function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
   return eventType === "earthquake" ? "지진" : "지진해일";
 }
 
-function buildKakaoMapUrl(point: PointFeatureProperties) {
+function buildKakaoMapUrl(point: EmergencyPointDetail) {
   return `https://map.kakao.com/link/search/${encodeURIComponent(
     point.address,
   )}`;
 }
 
 function buildPopupHtml(
-  point: PointFeatureProperties,
+  point: EmergencyPointDetail,
   dictionary: AppDictionary,
 ) {
   const rows = [
     [dictionary.map.popup.address, point.address],
     [dictionary.map.popup.phone, point.phone],
     [dictionary.map.popup.sourceUpdatedAt, point.sourceUpdatedAt],
-  ].filter(([, value]) => value);
+  ].filter((row): row is [string, string] => Boolean(row[1]));
   const rowsHtml = rows
     .map(
       ([label, value]) =>
@@ -695,7 +690,7 @@ function buildPopupHtml(
   </article>`;
 }
 
-function syncPointLayer(map: MapLibreMap, points: EmergencyPoint[]) {
+function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
   if (!map.isStyleLoaded()) {
     return;
   }
@@ -755,7 +750,10 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPoint[]) {
   });
 }
 
-function syncPointLayerWhenReady(map: MapLibreMap, points: EmergencyPoint[]) {
+function syncPointLayerWhenReady(
+  map: MapLibreMap,
+  points: EmergencyPointMarker[],
+) {
   if (map.isStyleLoaded()) {
     syncPointLayer(map, points);
     return;
@@ -839,7 +837,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const sourceMenuRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
-  const pointsRef = useRef<EmergencyPoint[]>([]);
+  const pointsRef = useRef<EmergencyPointMarker[]>([]);
   const hazardsRef = useRef<HazardEvent[]>([]);
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
@@ -848,7 +846,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSourceMenuOpen, setIsSourceMenuOpen] = useState(false);
-  const [points, setPoints] = useState<EmergencyPoint[]>([]);
+  const [points, setPoints] = useState<EmergencyPointMarker[]>([]);
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [hazards, setHazards] = useState<HazardEvent[]>([]);
   const [activeHazard, setActiveHazard] = useState<HazardEvent | null>(null);
@@ -1072,7 +1070,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         "top-right",
       );
 
-      map.on("click", POINTS_LAYER_ID, (event: MapLayerMouseEvent) => {
+      map.on("click", POINTS_LAYER_ID, async (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
         const coordinates = (
           feature?.geometry.type === "Point"
@@ -1085,6 +1083,15 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         }
 
         const point = feature.properties as PointFeatureProperties;
+        const response = await fetch(`/api/points/${point.id}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as PointDetailResponse;
         popupRef.current?.remove();
         popupRef.current = new maplibre.Popup({
           closeButton: true,
@@ -1092,7 +1099,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           offset: 16,
         })
           .setLngLat(coordinates)
-          .setHTML(buildPopupHtml(point, dictionary))
+          .setHTML(buildPopupHtml(payload.point, dictionary))
           .addTo(map);
       });
 

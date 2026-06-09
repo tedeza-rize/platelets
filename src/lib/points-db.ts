@@ -23,6 +23,31 @@ export type EmergencyPoint = Omit<EmergencyPointInput, "raw"> & {
   raw: Record<string, string>;
 };
 
+export type EmergencyPointSummary = Omit<EmergencyPoint, "raw">;
+
+export type EmergencyPointMarker = Pick<
+  EmergencyPointSummary,
+  "category" | "id" | "latitude" | "longitude" | "source"
+>;
+
+export type PointBoundingBox = {
+  maxLatitude: number;
+  maxLongitude: number;
+  minLatitude: number;
+  minLongitude: number;
+};
+
+export type PointSearchOptions = {
+  bounds?: PointBoundingBox;
+  includeUnmapped?: boolean;
+  limit?: number;
+  source?: DatasetSourceId | null;
+};
+
+export type NearestPoint = EmergencyPointSummary & {
+  distanceMeters: number;
+};
+
 export type DatasetStatus = {
   error: string | null;
   failedCount: number;
@@ -406,6 +431,45 @@ function mapPointRow(row: PointRow): EmergencyPoint {
   };
 }
 
+function mapPointSummaryRow(row: PointRow): EmergencyPointSummary {
+  return {
+    address: row.address,
+    category: row.category,
+    fetchedAt: row.fetched_at,
+    id: row.id,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    name: row.name,
+    parentName: row.parent_name,
+    phone: row.phone,
+    source: row.source,
+    sourceRecordId: row.source_record_id,
+    sourceUpdatedAt: row.source_updated_at,
+  };
+}
+
+function mapPointMarkerRow(row: PointRow): EmergencyPointMarker {
+  return {
+    category: row.category,
+    id: row.id,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    source: row.source,
+  };
+}
+
+function clampPointLimit(
+  limit: number | undefined,
+  fallback = 5_000,
+  max = 20_000,
+) {
+  if (limit === undefined) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(Math.trunc(limit), 1), max);
+}
+
 function emptyStatus(source: DatasetSourceId): DatasetStatus {
   const definition = DATASET_SOURCES[source];
 
@@ -543,36 +607,206 @@ async function getKmaEarthquakeUsageWindowRow(db: SqliteDatabase) {
   );
 }
 
-export async function listPoints(
-  options: { includeUnmapped?: boolean; source?: DatasetSourceId | null } = {},
-) {
-  const db = await getDatabase();
+function buildPointWhereClause(options: PointSearchOptions) {
   const conditions: string[] = [];
   const params: unknown[] = [];
 
   if (options.source) {
-    conditions.push("source = ?");
+    conditions.push("p.source = ?");
     params.push(options.source);
   }
 
   if (!options.includeUnmapped) {
-    conditions.push("latitude IS NOT NULL");
-    conditions.push("longitude IS NOT NULL");
+    conditions.push("p.latitude IS NOT NULL");
+    conditions.push("p.longitude IS NOT NULL");
+  }
+
+  if (options.bounds) {
+    conditions.push("p.latitude BETWEEN ? AND ?");
+    conditions.push("p.longitude BETWEEN ? AND ?");
+    params.push(options.bounds.minLatitude, options.bounds.maxLatitude);
+    params.push(options.bounds.minLongitude, options.bounds.maxLongitude);
   }
 
   const where =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  return { params, where };
+}
+
+export async function listPointSummaries(options: PointSearchOptions = {}) {
+  const db = await getDatabase();
+  const { params, where } = buildPointWhereClause(options);
+  const limit = clampPointLimit(options.limit, 100_000, 100_000);
+  const rows = await all<PointRow>(
+    db,
+    `SELECT
+        p.id,
+        p.source,
+        p.source_record_id,
+        p.name,
+        p.category,
+        p.address,
+        p.phone,
+        p.parent_name,
+        p.latitude,
+        p.longitude,
+        p.source_updated_at,
+        '' AS raw_json,
+        u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source
+      ${where}
+      ORDER BY p.source, p.name
+      LIMIT ?`,
+    [...params, limit],
+  );
+
+  return rows.map(mapPointSummaryRow);
+}
+
+export async function listPointMarkers(options: PointSearchOptions = {}) {
+  const db = await getDatabase();
+  const { params, where } = buildPointWhereClause(options);
+  const limit = clampPointLimit(options.limit, 100_000, 100_000);
+  const rows = await all<PointRow>(
+    db,
+    `SELECT
+        p.id,
+        p.source,
+        '' AS source_record_id,
+        '' AS name,
+        p.category,
+        '' AS address,
+        NULL AS phone,
+        NULL AS parent_name,
+        p.latitude,
+        p.longitude,
+        NULL AS source_updated_at,
+        '' AS raw_json,
+        NULL AS fetched_at
+      FROM points p
+      ${where}
+      ORDER BY p.source, p.id
+      LIMIT ?`,
+    [...params, limit],
+  );
+
+  return rows.map(mapPointMarkerRow);
+}
+
+export async function listPoints(options: PointSearchOptions = {}) {
+  const db = await getDatabase();
+  const { params, where } = buildPointWhereClause(options);
+  const limit = clampPointLimit(options.limit);
   const rows = await all<PointRow>(
     db,
     `SELECT p.*, u.fetched_at
       FROM points p
       LEFT JOIN dataset_updates u ON u.source = p.source
       ${where}
-      ORDER BY p.source, p.name`,
-    params,
+      ORDER BY p.source, p.name
+      LIMIT ?`,
+    [...params, limit],
   );
 
   return rows.map(mapPointRow);
+}
+
+export async function getPointSummary(id: number) {
+  const db = await getDatabase();
+  const row = await get<PointRow>(
+    db,
+    `SELECT
+        p.id,
+        p.source,
+        p.source_record_id,
+        p.name,
+        p.category,
+        p.address,
+        p.phone,
+        p.parent_name,
+        p.latitude,
+        p.longitude,
+        p.source_updated_at,
+        '' AS raw_json,
+        u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source
+      WHERE p.id = ?`,
+    [id],
+  );
+
+  return row ? mapPointSummaryRow(row) : null;
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function distanceMeters(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+) {
+  const earthRadiusMeters = 6_371_000;
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLon = toRadians(to.longitude - from.longitude);
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export async function findNearestPoints(options: {
+  latitude: number;
+  limit?: number;
+  longitude: number;
+  radiusMeters?: number;
+  source?: DatasetSourceId | null;
+}) {
+  const radiusMeters = Math.min(
+    Math.max(options.radiusMeters ?? 20_000, 500),
+    100_000,
+  );
+  const latitudeDelta = radiusMeters / 111_320;
+  const longitudeDelta =
+    radiusMeters /
+    (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
+  const candidates = await listPointSummaries({
+    bounds: {
+      maxLatitude: options.latitude + latitudeDelta,
+      maxLongitude: options.longitude + longitudeDelta,
+      minLatitude: options.latitude - latitudeDelta,
+      minLongitude: options.longitude - longitudeDelta,
+    },
+    limit: 20_000,
+    source: options.source,
+  });
+
+  return candidates
+    .filter(
+      (
+        point,
+      ): point is EmergencyPointSummary & {
+        latitude: number;
+        longitude: number;
+      } => point.latitude !== null && point.longitude !== null,
+    )
+    .map((point) => ({
+      ...point,
+      distanceMeters: Math.round(
+        distanceMeters(options, {
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }),
+      ),
+    }))
+    .filter((point) => point.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 10), 1), 100));
 }
 
 export async function listApiLogs(
