@@ -124,6 +124,98 @@ a {
   font-size: 18px;
 }
 
+.licensePage {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding: 28px 20px 40px;
+}
+
+.licenseHeader {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.licenseHeader a {
+  width: fit-content;
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.licenseHeader h1 {
+  color: var(--text-strong);
+  font-size: 1.45rem;
+  letter-spacing: 0;
+}
+
+.licenseHeader p {
+  max-width: 760px;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+
+.licenseList {
+  display: grid;
+  gap: 12px;
+}
+
+.licenseCard {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--dropdown-surface);
+  color: var(--text-strong);
+  padding: 16px;
+  box-shadow: var(--control-shadow);
+}
+
+.licenseCard span {
+  color: var(--text-muted);
+  font-family: var(--font-geist-mono);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.licenseCard h2 {
+  margin-top: 3px;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.licenseCard dl {
+  display: grid;
+  gap: 8px;
+}
+
+.licenseCard dl div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.licenseCard dt {
+  color: var(--text-muted);
+  font-weight: 800;
+}
+
+.licenseCard dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.licenseCard dd a {
+  color: #225ea8;
+  font-weight: 700;
+}
+
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
