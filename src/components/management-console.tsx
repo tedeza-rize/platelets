@@ -439,6 +439,20 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }, [refresh]);
 
   useEffect(() => {
+    if (!activeUpdate && !progress) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      refresh().catch((error) => {
+        setNotice(error instanceof Error ? error.message : String(error));
+      });
+    }, 2500);
+
+    return () => window.clearInterval(timer);
+  }, [activeUpdate, progress, refresh]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setClockTick((value) => value + 1);
     }, 1000);
