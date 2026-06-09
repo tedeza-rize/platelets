@@ -6,7 +6,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import sqlite3 from "sqlite3";
 import { z } from "zod/v4";
 
-const DATASET_SOURCE_IDS = ["fire-stations", "police-stations", "aeds"];
+const DATASET_SOURCE_IDS = [
+  "fire-stations",
+  "police-stations",
+  "aeds",
+] as const;
+type DatasetSourceId = (typeof DATASET_SOURCE_IDS)[number];
+type DatasetSourceType = "aed" | "fire" | "police";
+
 const DATASET_SOURCES = {
   aeds: {
     label: "AED",
@@ -20,7 +27,13 @@ const DATASET_SOURCES = {
     label: "경찰서/지구대/파출소",
     type: "police",
   },
-};
+} satisfies Record<
+  DatasetSourceId,
+  {
+    label: string;
+    type: DatasetSourceType;
+  }
+>;
 const POINT_COLUMNS = `
   p.id,
   p.source,
@@ -43,7 +56,111 @@ const forecastDocPath = path.join(
   "AI_FORECAST_AND_RESPONSE.md",
 );
 
-function getDatabase() {
+type SqliteDatabase = sqlite3.Database;
+
+type PointRow = {
+  address: string;
+  category: string;
+  fetched_at: string | null;
+  id: number;
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  parent_name: string | null;
+  phone: string | null;
+  source: DatasetSourceId;
+  source_record_id: string;
+  source_updated_at: string | null;
+};
+
+type DatasetStatusRow = {
+  error: string | null;
+  failed_count: number;
+  fetched_at: string | null;
+  geocoded_count: number;
+  label: string;
+  record_count: number;
+  skipped_count: number;
+  source: DatasetSourceId;
+  updated_at: string | null;
+};
+
+type Coordinate = {
+  latitude: number;
+  longitude: number;
+};
+
+type PointBounds = {
+  maxLatitude: number;
+  maxLongitude: number;
+  minLatitude: number;
+  minLongitude: number;
+};
+
+type PointSearchOptions = {
+  bounds?: PointBounds;
+  includeUnmapped?: boolean;
+  limit?: number;
+  source?: DatasetSourceId;
+};
+
+type PointSummary = {
+  address: string;
+  category: string;
+  fetchedAt: string | null;
+  id: number;
+  latitude: number | null;
+  longitude: number | null;
+  name: string;
+  parentName: string | null;
+  phone: string | null;
+  source: DatasetSourceId;
+  sourceRecordId: string;
+  sourceUpdatedAt: string | null;
+};
+
+type MappedPoint = Omit<PointSummary, "latitude" | "longitude"> & Coordinate;
+
+type NearestPoint = MappedPoint & {
+  distanceMeters: number;
+};
+
+type KakaoDirectionSummary = {
+  distanceMeters: number;
+  durationSeconds: number;
+  fare: unknown;
+  priority: string;
+};
+
+type KakaoDirectionError = {
+  error: string;
+  resultCode?: number | null;
+};
+
+type KakaoDirectionResult = KakaoDirectionError | KakaoDirectionSummary | null;
+
+type ToolResult = {
+  content: Array<{
+    text: string;
+    type: "text";
+  }>;
+  structuredContent: Record<string, unknown>;
+};
+
+type KakaoDirectionsResponse = {
+  routes?: Array<{
+    result_code?: number;
+    result_msg?: string;
+    summary?: {
+      distance?: number;
+      duration?: number;
+      fare?: unknown;
+      priority?: string;
+    };
+  }>;
+};
+
+function getDatabase(): Promise<SqliteDatabase> {
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(
       databasePath,
@@ -59,9 +176,13 @@ function getDatabase() {
   });
 }
 
-function all(db, sql, params = []) {
+function all<TRow>(
+  db: SqliteDatabase,
+  sql: string,
+  params: unknown[] = [],
+): Promise<TRow[]> {
   return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows) => {
+    db.all(sql, params, (error, rows: TRow[]) => {
       if (error) {
         reject(error);
         return;
@@ -71,7 +192,7 @@ function all(db, sql, params = []) {
   });
 }
 
-function closeDatabase(db) {
+function closeDatabase(db: SqliteDatabase): Promise<void> {
   return new Promise((resolve, reject) => {
     db.close((error) => {
       if (error) {
@@ -83,7 +204,9 @@ function closeDatabase(db) {
   });
 }
 
-async function withDatabase(callback) {
+async function withDatabase<TResult>(
+  callback: (db: SqliteDatabase) => Promise<TResult>,
+) {
   const db = await getDatabase();
 
   try {
@@ -93,11 +216,11 @@ async function withDatabase(callback) {
   }
 }
 
-function clamp(value, min, max) {
+function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(Math.trunc(value), min), max);
 }
 
-function pointFromRow(row) {
+function pointFromRow(row: PointRow): PointSummary {
   return {
     address: row.address,
     category: row.category,
@@ -114,9 +237,9 @@ function pointFromRow(row) {
   };
 }
 
-function buildPointWhere(options) {
-  const conditions = [];
-  const params = [];
+function buildPointWhere(options: PointSearchOptions) {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
 
   if (options.source) {
     conditions.push("p.source = ?");
@@ -141,12 +264,12 @@ function buildPointWhere(options) {
   };
 }
 
-async function listPointSummaries(options = {}) {
+async function listPointSummaries(options: PointSearchOptions = {}) {
   const limit = clamp(options.limit ?? 100, 1, 1_000);
   const { params, where } = buildPointWhere(options);
 
   return withDatabase(async (db) => {
-    const rows = await all(
+    const rows = await all<PointRow>(
       db,
       `SELECT ${POINT_COLUMNS}
         FROM points p
@@ -163,7 +286,7 @@ async function listPointSummaries(options = {}) {
 
 async function datasetStatuses() {
   return withDatabase(async (db) => {
-    const rows = await all(
+    const rows = await all<DatasetStatusRow>(
       db,
       `SELECT
         source,
@@ -200,11 +323,11 @@ async function datasetStatuses() {
   });
 }
 
-function toRadians(value) {
+function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
 
-function distanceMeters(from, to) {
+function distanceMeters(from: Coordinate, to: Coordinate) {
   const earthRadiusMeters = 6_371_000;
   const dLat = toRadians(to.latitude - from.latitude);
   const dLon = toRadians(to.longitude - from.longitude);
@@ -217,7 +340,13 @@ function distanceMeters(from, to) {
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function nearestPoints(options) {
+async function nearestPoints(options: {
+  latitude: number;
+  limit?: number;
+  longitude: number;
+  radiusMeters?: number;
+  source?: DatasetSourceId;
+}) {
   const radiusMeters = Math.min(
     Math.max(options.radiusMeters ?? 20_000, 500),
     100_000,
@@ -238,6 +367,10 @@ async function nearestPoints(options) {
   });
 
   return candidates
+    .filter(
+      (point): point is MappedPoint =>
+        point.latitude !== null && point.longitude !== null,
+    )
     .map((point) => ({
       ...point,
       distanceMeters: Math.round(
@@ -247,7 +380,9 @@ async function nearestPoints(options) {
         }),
       ),
     }))
-    .filter((point) => point.distanceMeters <= radiusMeters)
+    .filter(
+      (point): point is NearestPoint => point.distanceMeters <= radiusMeters,
+    )
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
     .slice(0, clamp(options.limit ?? 10, 1, 50));
 }
@@ -260,7 +395,17 @@ function kakaoRestApiKey() {
   );
 }
 
-async function kakaoDirectionSummary(origin, destination, priority) {
+function isKakaoDirectionSummary(
+  route: KakaoDirectionResult,
+): route is KakaoDirectionSummary {
+  return route !== null && !("error" in route);
+}
+
+async function kakaoDirectionSummary(
+  origin: Coordinate,
+  destination: Coordinate,
+  priority: "RECOMMEND" | "TIME" | "DISTANCE",
+): Promise<KakaoDirectionResult> {
   const restApiKey = kakaoRestApiKey();
 
   if (!restApiKey) {
@@ -291,7 +436,7 @@ async function kakaoDirectionSummary(origin, destination, priority) {
     };
   }
 
-  const payload = await response.json();
+  const payload = (await response.json()) as KakaoDirectionsResponse;
   const route = payload.routes?.[0];
 
   if (!route || route.result_code !== 0) {
@@ -302,14 +447,14 @@ async function kakaoDirectionSummary(origin, destination, priority) {
   }
 
   return {
-    distanceMeters: route.summary.distance,
-    durationSeconds: route.summary.duration,
-    fare: route.summary.fare,
-    priority: route.summary.priority,
+    distanceMeters: route.summary?.distance ?? 0,
+    durationSeconds: route.summary?.duration ?? 0,
+    fare: route.summary?.fare ?? null,
+    priority: route.summary?.priority ?? priority,
   };
 }
 
-function asToolResult(payload) {
+function asToolResult(payload: Record<string, unknown>): ToolResult {
   return {
     content: [
       {
@@ -423,30 +568,33 @@ server.registerTool(
       args.maxLongitude,
     ].some((value) => value !== undefined);
 
-    if (
-      hasAnyBound &&
-      [
-        args.minLatitude,
-        args.maxLatitude,
-        args.minLongitude,
-        args.maxLongitude,
-      ].some((value) => value === undefined)
-    ) {
-      return asToolResult({
-        error: "Provide all four bounding box values or none.",
-      });
+    let bounds: PointBounds | undefined;
+
+    if (hasAnyBound) {
+      const { maxLatitude, maxLongitude, minLatitude, minLongitude } = args;
+
+      if (
+        minLatitude === undefined ||
+        maxLatitude === undefined ||
+        minLongitude === undefined ||
+        maxLongitude === undefined
+      ) {
+        return asToolResult({
+          error: "Provide all four bounding box values or none.",
+        });
+      }
+
+      bounds = {
+        maxLatitude,
+        maxLongitude,
+        minLatitude,
+        minLongitude,
+      };
     }
 
     return asToolResult({
       points: await listPointSummaries({
-        bounds: hasAnyBound
-          ? {
-              maxLatitude: args.maxLatitude,
-              maxLongitude: args.maxLongitude,
-              minLatitude: args.minLatitude,
-              minLongitude: args.minLongitude,
-            }
-          : undefined,
+        bounds,
         includeUnmapped: args.includeUnmapped,
         limit: args.limit,
         source: args.source,
@@ -552,15 +700,19 @@ server.registerTool(
       ranked.push({
         ...point,
         route,
-        scoreBasis: route?.durationSeconds
+        scoreBasis: isKakaoDirectionSummary(route)
           ? "kakao-route-duration"
           : "straight-line-distance",
       });
     }
 
     ranked.sort((a, b) => {
-      const aDuration = a.route?.durationSeconds;
-      const bDuration = b.route?.durationSeconds;
+      const aDuration = isKakaoDirectionSummary(a.route)
+        ? a.route.durationSeconds
+        : undefined;
+      const bDuration = isKakaoDirectionSummary(b.route)
+        ? b.route.durationSeconds
+        : undefined;
 
       if (aDuration !== undefined && bDuration !== undefined) {
         return aDuration - bDuration;

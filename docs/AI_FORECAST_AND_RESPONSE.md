@@ -129,7 +129,7 @@ Response fields needed for ranking:
 
 Current implementation:
 
-- `scripts/points-mcp.mjs` can rank existing response points using Kakao route duration when `KAKAO_REST_API_KEY` is set.
+- `scripts/points-mcp.ts` can rank existing response points using Kakao route duration when `KAKAO_REST_API_KEY` is set.
 - If the key is missing or Kakao directions fail, the tool falls back to straight-line distance.
 
 ## MCP Contract For LLMs
@@ -178,6 +178,19 @@ Detail levels:
 - `detail=map` or no detail: marker fields only, for browser map rendering.
 - `detail=summary`: address, name, phone, and source metadata without raw source records.
 - `includeRaw=true`: full raw source record. Use only for admin/debug workflows, not for the map or LLM context by default.
+
+## Access And Secret Boundaries
+
+- Public map and MCP context must use summarized point payloads by default.
+- General agency admins use `/admin` for read-only dataset status. API quota,
+  detailed logs, refresh actions, raw point records, and NTP configuration are
+  intentionally hidden from this page.
+- Developer/operator access uses `/sudo` with `PLATELETS_SUDO_TOKEN`. Server
+  route handlers enforce the token for expensive API-consuming actions and
+  sensitive operational details.
+- Never commit real `KAKAO_REST_API_KEY`, `PUBLIC_DATA_API_KEY`, or
+  `PLATELETS_SUDO_TOKEN` values. Keep them in local deployment environment
+  variables such as `.env.local`.
 
 Point detail:
 

@@ -9,11 +9,12 @@ const MOJIBAKE_PATTERNS = [
   /[ìíîï][\u0080-\u00bf]/u,
   /[êë][\u0080-\u00bf]/u,
   /[àáâã][\u0080-\u00bf]/u,
-  /[�]/u,
-  /[吏愿媛濡]/u,
+  /[\uF9DE\u613F\u5A9B\u6FE1]/u,
 ];
 
-function walk(directory) {
+type EncodingFailure = readonly [filePath: string, reason: string];
+
+function walk(directory: string): string[] {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
 
   return entries.flatMap((entry) => {
@@ -27,7 +28,7 @@ function walk(directory) {
   });
 }
 
-const failures = [];
+const failures: EncodingFailure[] = [];
 
 for (const filePath of walk(ROOT)) {
   const buffer = fs.readFileSync(filePath);

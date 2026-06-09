@@ -2,12 +2,13 @@
   "name": "platelets",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "mcp:points": "node scripts/points-mcp.mjs",
-    "lint": "biome check && node scripts/check-encoding.mjs",
+    "mcp:points": "node scripts/points-mcp.ts",
+    "lint": "biome check && node scripts/check-encoding.ts",
     "format": "biome format --write"
   },
   "dependencies": {
