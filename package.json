@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "mcp:points": "node scripts/points-mcp.mjs",
     "lint": "biome check && node scripts/check-encoding.mjs",
     "format": "biome format --write"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "csv-parse": "^6.2.1",
     "fast-xml-parser": "^5.8.0",
     "lucide-react": "^1.17.0",

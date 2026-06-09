@@ -1,0 +1,193 @@
+# Platelets AI Forecast and Response Plan
+
+## One Line Summary
+
+Platelets is an AI map service that learns from historical 119 emergency call data and external context such as holidays, weather, and earthquakes to forecast regional and hourly increases in 119 demand, then helps fire departments prepare staff, vehicles, and equipment before demand spikes.
+
+## Core Problem
+
+119 demand changes by weekday, weekend, holidays, heat waves, cold waves, heavy rain, typhoons, earthquakes, and local conditions. Operations often react after calls cluster. This service should not claim to predict every accident. Its purpose is to predict where and when 119 call demand is likely to rise, so dispatch centers and field teams can raise monitoring priority, stage ambulances, and prepare response resources earlier.
+
+## Product Direction
+
+The first model target is total 119 call volume by region and time window. A practical first scope is a city such as Busan split by administrative dong or grid cell, predicting demand for the next 1 hour, 3 hours, and 24 hours.
+
+The second target is call-type risk, such as emergency medical, rescue, and fire demand. Treat this as an advanced layer after total demand forecasting is stable.
+
+The map should show predicted call risk by region. Clicking a region should reveal expected call count, increase versus baseline, main contributing factors, and recommended response actions.
+
+Example explanation:
+
+> Busan Haeundae-gu U-dong has high call increase risk from 18:00 to 22:00 today. Main factors: holiday, rain forecast, historical increase for the same weekday and time, expected visitor volume. Recommended response: strengthen ambulance standby and raise dispatch-center monitoring priority.
+
+## Data Plan
+
+Required fire-safety big data platform data:
+
+- 119 incident/call reception records, such as Busan Fire Disaster Headquarters 119 call reception status.
+- Jeju 119 call reception status is also useful because it includes location information, time analysis, regional analysis, and processing outcomes.
+
+External public data:
+
+- Korea Astronomy and Space Science Institute special-day API: holidays, public holidays, commemorative days, and solar terms.
+- Korea Meteorological Administration short-term forecast API: ultra-short nowcast, ultra-short forecast, short-term forecast, and 5 km grid-based weather.
+- Korea Meteorological Administration earthquake API: event time, latitude, longitude, epicenter location, magnitude, intensity, and related disaster-event metadata.
+
+Current application data:
+
+- `points`: fire stations/119 safety centers, police stations, and AED locations.
+- `hazard_events`: earthquake and tsunami events already imported from KMA.
+- `dataset_updates`: source freshness and geocoding coverage.
+
+Hospital/ER data is not yet ingested. Do not present hospital capability ranking as implemented until a dataset is added.
+
+## Model Inputs
+
+Time variables:
+
+- Month, weekday, hour, weekend flag, holiday flag, before/after holiday flag, night flag.
+
+Weather variables:
+
+- Temperature, precipitation, humidity, wind speed, snow flag, heat-wave/cold-wave/heavy-rain/typhoon indicators.
+
+Disaster variables:
+
+- Earthquake occurrence flag, distance to epicenter, magnitude, intensity, elapsed time after event.
+- Earthquakes are rare, so they should start as an anomaly/event module rather than the core driver of ordinary demand.
+
+Regional variables:
+
+- Administrative dong, grid cell, fire-station jurisdiction, historical average call volume, previous-year same-period demand, recent 7-day growth rate.
+
+## Modeling Approach
+
+Start with interpretable baselines:
+
+- Historical average by region/time.
+- Moving average and same-weekday/time baseline.
+
+Then compare against machine-learning models:
+
+- Random Forest, XGBoost, or LightGBM regression for demand count.
+- Separate model or multi-output layer for fire/rescue/emergency-medical demand after the total-volume model is useful.
+
+Evaluation should compare AI predictions against baselines using MAE/RMSE and operational usefulness, such as whether high-risk cells capture real demand spikes.
+
+## Emergency Response Recommendation
+
+When an emergency point is reported, the system should:
+
+1. Match nearby response resources, starting with fire stations/119 safety centers.
+2. Estimate travel time from candidate response resources to the patient or incident location.
+3. Show nearby hospitals/emergency rooms ranked by fastest and most appropriate response, not merely nearest straight-line distance.
+
+For hospitals, ranking must consider patient type and capability:
+
+- Infant or child respiratory distress should prioritize pediatric emergency capability and pediatric beds.
+- Trauma should prioritize trauma center capability and available trauma beds.
+- Cardiac symptoms should prioritize emergency cardiac capability.
+- If the user does not select a patient type, show a default recommendation sorted by likely response speed and general emergency suitability.
+
+Important: The current repository does not yet have a hospital/ER capability dataset. Add one before implementing hospital ranking. Minimum hospital fields:
+
+- `id`, `name`, `address`, `latitude`, `longitude`, `phone`
+- `emergencyRoomAvailable`
+- `departments`
+- `bedCounts` by type, including general ER, ICU, pediatric, neonatal, trauma, isolation
+- `updatedAt`, `source`, `raw`
+
+## Kakao Directions API
+
+Use Kakao Mobility Directions for travel-time-aware ranking.
+
+Endpoint:
+
+```txt
+GET https://apis-navi.kakaomobility.com/v1/directions
+Authorization: KakaoAK ${KAKAO_REST_API_KEY}
+Content-Type: application/json
+```
+
+Core parameters:
+
+- `origin`: `${longitude},${latitude}` or `${longitude},${latitude},name=${name}`.
+- `destination`: `${longitude},${latitude}` or `${longitude},${latitude},name=${name}`.
+- `waypoints`: up to 5, separated by `|`.
+- `priority`: `RECOMMEND`, `TIME`, or `DISTANCE`.
+- `avoid`: optional restrictions such as `ferries`, `toll`, `motorway`, `schoolzone`, `uturn`.
+- `summary`: use `true` for ranking and `false` only when rendering detailed route geometry.
+
+Response fields needed for ranking:
+
+- `routes[0].result_code`
+- `routes[0].result_msg`
+- `routes[0].summary.distance` in meters
+- `routes[0].summary.duration` in seconds
+- `routes[0].summary.fare`
+- `routes[0].sections[].roads[].vertexes` only when route geometry is needed.
+
+Current implementation:
+
+- `scripts/points-mcp.mjs` can rank existing response points using Kakao route duration when `KAKAO_REST_API_KEY` is set.
+- If the key is missing or Kakao directions fail, the tool falls back to straight-line distance.
+
+## MCP Contract For LLMs
+
+Run:
+
+```bash
+npm run mcp:points
+```
+
+Available resources:
+
+- `platelets://docs/forecast-and-response`: this plan.
+- `platelets://schema/points`: emergency point summary schema.
+
+Available tools:
+
+- `dataset_status`: source counts, freshness, and geocoding coverage.
+- `list_points`: bounded point listing for small context windows. Prefer bbox and low limits.
+- `nearest_points`: straight-line nearest resources for an incident coordinate.
+- `rank_response_points`: route-aware ranking for existing response points. Uses Kakao directions when configured.
+
+LLM usage rules:
+
+- Do not request all points unless the user explicitly needs a full export.
+- Prefer `nearest_points` or `list_points` with a bounding box.
+- Treat route duration as operationally stronger than straight-line distance.
+- Do not claim hospital suitability is implemented until hospital/ER capability data is imported.
+- For patient-type-specific hospital recommendations, first check that hospital capability fields exist.
+
+## HTTP Points API
+
+`GET /api/points` now returns lightweight map markers by default. Raw source records are omitted for map performance.
+
+Optional query parameters:
+
+- `source=fire-stations|police-stations|aeds`
+- `includeUnmapped=true`
+- `includeRaw=true`
+- `detail=map|summary`
+- `limit=number`
+- `minLatitude`, `maxLatitude`, `minLongitude`, `maxLongitude`
+
+Detail levels:
+
+- `detail=map` or no detail: marker fields only, for browser map rendering.
+- `detail=summary`: address, name, phone, and source metadata without raw source records.
+- `includeRaw=true`: full raw source record. Use only for admin/debug workflows, not for the map or LLM context by default.
+
+Point detail:
+
+- `GET /api/points/{id}` returns one summary point for popup/detail panels.
+
+## Future Work
+
+- Add 119 call reception data import and regional/time aggregation.
+- Add special-day and weather feature pipelines.
+- Add forecast table and API for region/time risk.
+- Add hospital/ER capability ingestion.
+- Add a route-ranking API for browser UI, backed by the same Kakao directions logic used by MCP.
+- Render forecast heatmaps and incident response recommendations on the map.
