@@ -11,6 +11,7 @@ Create `.env.local` in the project root and set the keys you need:
 KAKAO_REST_API_KEY=your_kakao_rest_api_key
 PUBLIC_DATA_API_KEY=your_data_go_kr_service_key
 PLATELETS_SUDO_TOKEN=use_a_long_random_value
+SEOUL_OPEN_API_KEY=your_seoul_open_data_api_key
 ```
 
 VWorld and OSM map choices both load MapLibre vector styles instead of raster
@@ -25,6 +26,9 @@ and Korea Meteorological Administration earthquake/tsunami events.
 `PLATELETS_SUDO_TOKEN` protects developer-only API usage, dataset refreshes,
 log details, raw point payloads, and NTP configuration. Keep real keys and
 tokens in `.env.local`; do not commit them.
+
+`SEOUL_OPEN_API_KEY` is used server-side for Seoul real-time city population
+lookups when a Seoul 121-place area is selected on the map.
 
 ## Access Levels
 

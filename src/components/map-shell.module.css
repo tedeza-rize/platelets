@@ -61,6 +61,30 @@
   white-space: nowrap;
 }
 
+.navActions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+}
+
+.licenseLink {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  color: var(--nav-text);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0 10px;
+}
+
+.licenseLink:hover,
+.licenseLink:focus-visible {
+  background: var(--nav-action-active);
+  color: var(--nav-text-strong);
+  outline: 0;
+}
+
 .providerMenu {
   position: relative;
   display: inline-grid;

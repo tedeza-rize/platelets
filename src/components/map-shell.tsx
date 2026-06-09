@@ -85,9 +85,13 @@ const STYLE_LOAD_TIMEOUT_MS = 8000;
 const POINTS_SOURCE_ID = "emergency-points";
 const POINTS_HALO_LAYER_ID = "emergency-points-halo";
 const POINTS_LAYER_ID = "emergency-points-circle";
+const POINTS_SYMBOL_LAYER_ID = "emergency-points-symbol";
 const HAZARDS_SOURCE_ID = "hazard-events";
 const HAZARDS_HALO_LAYER_ID = "hazard-events-halo";
 const HAZARDS_LAYER_ID = "hazard-events-circle";
+const SEOUL_AREAS_SOURCE_ID = "seoul-citydata-areas";
+const SEOUL_AREAS_FILL_LAYER_ID = "seoul-citydata-areas-fill";
+const SEOUL_AREAS_LINE_LAYER_ID = "seoul-citydata-areas-line";
 const HAZARD_POLL_INTERVAL_MS = 60_000;
 const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
 const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
@@ -105,6 +109,11 @@ const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
   "fire-stations": "#f97316",
   "police-stations": "#2563eb",
 };
+const SOURCE_SYMBOL_LABELS: Record<DatasetSourceId, string> = {
+  aeds: "AED",
+  "fire-stations": "119",
+  "police-stations": "POL",
+};
 
 type PointFeatureProperties = {
   category: string;
@@ -112,6 +121,7 @@ type PointFeatureProperties = {
   latitude: number;
   longitude: number;
   source: DatasetSourceId;
+  symbolLabel: string;
 };
 
 type HazardEvent = {
@@ -151,6 +161,48 @@ type HazardFeatureProperties = {
   magnitude: string;
   occurredAt: string;
   title: string;
+};
+
+type SeoulAreaProperties = {
+  areaCode: string;
+  areaName: string;
+  category: string;
+  congestionLevel?: string;
+  congestionMessage?: string;
+  englishName: string;
+  maxPopulation?: number;
+  minPopulation?: number;
+  populationTime?: string;
+};
+
+type SeoulAreaFeature = {
+  geometry: {
+    coordinates: number[][][];
+    type: "Polygon";
+  };
+  properties: SeoulAreaProperties;
+  type: "Feature";
+};
+
+type SeoulAreasData = {
+  features: SeoulAreaFeature[];
+  type: "FeatureCollection";
+};
+
+type SeoulPopulationStatus = {
+  areaCode: string;
+  areaName: string;
+  congestionLevel: string | null;
+  congestionMessage: string | null;
+  maxPopulation: number | null;
+  minPopulation: number | null;
+  populationTime: string | null;
+  sourceUpdatedAt: string | null;
+};
+
+type SeoulPopulationResponse = {
+  error?: string;
+  population?: SeoulPopulationStatus;
 };
 
 type HazardsResponse = {
@@ -263,6 +315,7 @@ function createVworldVectorTileUrl(layer: "poi" | "traffic") {
 function createVworldStyle(): StyleSpecification {
   if (!vworldApiKeyExists()) {
     return {
+      glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
       layers: [
         {
           id: "background",
@@ -276,6 +329,7 @@ function createVworldStyle(): StyleSpecification {
   }
 
   return {
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
     layers: [
       {
         id: "background",
@@ -579,6 +633,7 @@ function createPointData(points: EmergencyPointMarker[]) {
         latitude: point.latitude,
         longitude: point.longitude,
         source: point.source,
+        symbolLabel: SOURCE_SYMBOL_LABELS[point.source],
       } satisfies PointFeatureProperties,
       type: "Feature" as const,
     })),
@@ -611,6 +666,33 @@ function createHazardData(events: HazardEvent[]) {
       type: "Feature" as const,
     })),
     type: "FeatureCollection" as const,
+  };
+}
+
+function updateSeoulAreaPopulation(
+  areas: SeoulAreasData,
+  population: SeoulPopulationStatus,
+): SeoulAreasData {
+  return {
+    ...areas,
+    features: areas.features.map((feature) =>
+      feature.properties.areaCode === population.areaCode
+        ? {
+            ...feature,
+            properties: {
+              ...feature.properties,
+              congestionLevel: population.congestionLevel ?? undefined,
+              congestionMessage: population.congestionMessage ?? undefined,
+              maxPopulation: population.maxPopulation ?? undefined,
+              minPopulation: population.minPopulation ?? undefined,
+              populationTime:
+                population.populationTime ??
+                population.sourceUpdatedAt ??
+                undefined,
+            },
+          }
+        : feature,
+    ),
   };
 }
 
@@ -652,6 +734,16 @@ function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
   return eventType === "earthquake" ? "지진" : "지진해일";
 }
 
+function formatPopulationRange(population: SeoulPopulationStatus) {
+  if (population.minPopulation === null || population.maxPopulation === null) {
+    return null;
+  }
+
+  return `${population.minPopulation.toLocaleString(
+    "ko-KR",
+  )} - ${population.maxPopulation.toLocaleString("ko-KR")}명`;
+}
+
 function buildKakaoMapUrl(point: EmergencyPointDetail) {
   return `https://map.kakao.com/link/search/${encodeURIComponent(
     point.address,
@@ -678,8 +770,8 @@ function buildPopupHtml(
 
   return `<article class="${styles.popup}">
     <div class="${styles.popupHeader}">
-      <strong>${escapeHtml(point.name)}</strong>
-      <span>${escapeHtml(point.category)}</span>
+      <strong>${escapeHtml(`[${point.category}] ${point.name}`)}</strong>
+      <span>${escapeHtml(point.source)}</span>
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
@@ -687,6 +779,39 @@ function buildPopupHtml(
         dictionary.map.popup.kakaoMap,
       )}</a>
     </div>
+  </article>`;
+}
+
+function buildSeoulPopulationPopupHtml(
+  area: SeoulAreaProperties,
+  population: SeoulPopulationStatus | null,
+  error: string | null,
+) {
+  const rows = error
+    ? [["상태", error]]
+    : [
+        ["혼잡도", population?.congestionLevel],
+        ["예상 인구", population ? formatPopulationRange(population) : null],
+        ["기준 시각", population?.populationTime],
+        ["분류", area.category],
+        ["메시지", population?.congestionMessage],
+      ];
+  const rowsHtml = rows
+    .filter((row): row is [string, string] => Boolean(row[1]))
+    .map(
+      ([label, value]) =>
+        `<div class="${styles.popupRow}"><dt>${escapeHtml(
+          label,
+        )}</dt><dd>${escapeHtml(value)}</dd></div>`,
+    )
+    .join("");
+
+  return `<article class="${styles.popup}">
+    <div class="${styles.popupHeader}">
+      <strong>${escapeHtml(`[서울 실시간 인구] ${area.areaName}`)}</strong>
+      <span>${escapeHtml(area.category)}</span>
+    </div>
+    <dl class="${styles.popupDetails}">${rowsHtml}</dl>
   </article>`;
 }
 
@@ -748,6 +873,32 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
     source: POINTS_SOURCE_ID,
     type: "circle",
   });
+  map.addLayer({
+    id: POINTS_SYMBOL_LAYER_ID,
+    layout: {
+      "text-allow-overlap": true,
+      "text-field": ["get", "symbolLabel"],
+      "text-font": ["Noto Sans Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 6, 8, 12, 10],
+    },
+    paint: {
+      "text-color": "#ffffff",
+      "text-halo-color": [
+        "match",
+        ["get", "source"],
+        "fire-stations",
+        SOURCE_COLORS["fire-stations"],
+        "police-stations",
+        SOURCE_COLORS["police-stations"],
+        "aeds",
+        SOURCE_COLORS.aeds,
+        "#374151",
+      ],
+      "text-halo-width": 1.2,
+    },
+    source: POINTS_SOURCE_ID,
+    type: "symbol",
+  });
 }
 
 function syncPointLayerWhenReady(
@@ -761,6 +912,71 @@ function syncPointLayerWhenReady(
 
   map.once("idle", () => {
     syncPointLayer(map, points);
+  });
+}
+
+function syncSeoulAreaLayer(map: MapLibreMap, areas: SeoulAreasData | null) {
+  if (!areas || !map.isStyleLoaded()) {
+    return;
+  }
+
+  const source = map.getSource(SEOUL_AREAS_SOURCE_ID) as
+    | GeoJSONSource
+    | undefined;
+
+  if (source) {
+    source.setData(areas);
+    return;
+  }
+
+  map.addSource(SEOUL_AREAS_SOURCE_ID, {
+    data: areas,
+    type: "geojson",
+  });
+  map.addLayer({
+    id: SEOUL_AREAS_FILL_LAYER_ID,
+    paint: {
+      "fill-color": [
+        "match",
+        ["get", "congestionLevel"],
+        "붐빔",
+        "#dc2626",
+        "약간 붐빔",
+        "#f97316",
+        "보통",
+        "#eab308",
+        "여유",
+        "#16a34a",
+        "#2563eb",
+      ],
+      "fill-opacity": ["case", ["has", "congestionLevel"], 0.28, 0.08],
+    },
+    source: SEOUL_AREAS_SOURCE_ID,
+    type: "fill",
+  });
+  map.addLayer({
+    id: SEOUL_AREAS_LINE_LAYER_ID,
+    paint: {
+      "line-color": "#2563eb",
+      "line-opacity": 0.44,
+      "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 13, 1.6],
+    },
+    source: SEOUL_AREAS_SOURCE_ID,
+    type: "line",
+  });
+}
+
+function syncSeoulAreaLayerWhenReady(
+  map: MapLibreMap,
+  areas: SeoulAreasData | null,
+) {
+  if (map.isStyleLoaded()) {
+    syncSeoulAreaLayer(map, areas);
+    return;
+  }
+
+  map.once("idle", () => {
+    syncSeoulAreaLayer(map, areas);
   });
 }
 
@@ -839,6 +1055,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const pointsRef = useRef<EmergencyPointMarker[]>([]);
   const hazardsRef = useRef<HazardEvent[]>([]);
+  const seoulAreasRef = useRef<SeoulAreasData | null>(null);
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
     createMapStyle(initialProvider),
@@ -849,6 +1066,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const [points, setPoints] = useState<EmergencyPointMarker[]>([]);
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [hazards, setHazards] = useState<HazardEvent[]>([]);
+  const [seoulAreas, setSeoulAreas] = useState<SeoulAreasData | null>(null);
   const [activeHazard, setActiveHazard] = useState<HazardEvent | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -889,24 +1107,32 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   ).length;
 
   const refreshData = useCallback(async () => {
-    const [pointsResponse, datasetsResponse, hazardsResponse] =
+    const [pointsResponse, datasetsResponse, hazardsResponse, seoulResponse] =
       await Promise.all([
         fetch("/api/points", { cache: "no-store" }),
         fetch("/api/datasets", { cache: "no-store" }),
         fetch("/api/hazards", { cache: "no-store" }),
+        fetch("/data/seoul-citydata-areas.geojson", { cache: "no-store" }),
       ]);
 
-    if (!pointsResponse.ok || !datasetsResponse.ok || !hazardsResponse.ok) {
+    if (
+      !pointsResponse.ok ||
+      !datasetsResponse.ok ||
+      !hazardsResponse.ok ||
+      !seoulResponse.ok
+    ) {
       throw new Error("Failed to load map data");
     }
 
     const pointsPayload = (await pointsResponse.json()) as PointsResponse;
     const datasetsPayload = (await datasetsResponse.json()) as DatasetsResponse;
     const hazardsPayload = (await hazardsResponse.json()) as HazardsResponse;
+    const seoulPayload = (await seoulResponse.json()) as SeoulAreasData;
 
     setPoints(pointsPayload.points);
     setDatasets(datasetsPayload.datasets);
     setHazards(hazardsPayload.events);
+    setSeoulAreas(seoulPayload);
   }, []);
 
   const focusHazard = useCallback((event: HazardEvent) => {
@@ -1028,6 +1254,16 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   }, [hazards]);
 
   useEffect(() => {
+    seoulAreasRef.current = seoulAreas;
+
+    if (!mapRef.current) {
+      return;
+    }
+
+    syncSeoulAreaLayerWhenReady(mapRef.current, seoulAreas);
+  }, [seoulAreas]);
+
+  useEffect(() => {
     pointsRef.current = visiblePoints;
 
     if (!mapRef.current) {
@@ -1070,7 +1306,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         "top-right",
       );
 
-      map.on("click", POINTS_LAYER_ID, async (event: MapLayerMouseEvent) => {
+      async function showPointPopup(event: MapLayerMouseEvent) {
         const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
         const coordinates = (
           feature?.geometry.type === "Point"
@@ -1101,7 +1337,51 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           .setLngLat(coordinates)
           .setHTML(buildPopupHtml(payload.point, dictionary))
           .addTo(map);
-      });
+      }
+
+      async function showSeoulPopulationPopup(event: MapLayerMouseEvent) {
+        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
+
+        if (!feature?.properties) {
+          return;
+        }
+
+        const area = feature.properties as SeoulAreaProperties;
+        const response = await fetch(
+          `/api/seoul/population?areaCode=${encodeURIComponent(area.areaCode)}`,
+          { cache: "no-store" },
+        );
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as SeoulPopulationResponse;
+        const population = response.ok ? (payload.population ?? null) : null;
+
+        if (population) {
+          setSeoulAreas((current) =>
+            current ? updateSeoulAreaPopulation(current, population) : current,
+          );
+        }
+
+        popupRef.current?.remove();
+        popupRef.current = new maplibre.Popup({
+          closeButton: true,
+          maxWidth: "340px",
+          offset: 12,
+        })
+          .setLngLat(event.lngLat)
+          .setHTML(
+            buildSeoulPopulationPopupHtml(
+              area,
+              population,
+              population ? null : (payload.error ?? "실시간 인구 조회 실패"),
+            ),
+          )
+          .addTo(map);
+      }
+
+      map.on("click", POINTS_LAYER_ID, showPointPopup);
+      map.on("click", POINTS_SYMBOL_LAYER_ID, showPointPopup);
+      map.on("click", SEOUL_AREAS_FILL_LAYER_ID, showSeoulPopulationPopup);
 
       map.on("click", HAZARDS_LAYER_ID, (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
@@ -1128,6 +1408,18 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       map.on("mouseleave", POINTS_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
+      map.on("mouseenter", POINTS_SYMBOL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", POINTS_SYMBOL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseenter", SEOUL_AREAS_FILL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", SEOUL_AREAS_FILL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
       map.on("mouseenter", HAZARDS_LAYER_ID, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -1136,6 +1428,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       });
 
       map.once("load", () => {
+        syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
         syncPointLayerWhenReady(map, pointsRef.current);
         syncHazardLayerWhenReady(map, hazardsRef.current);
       });
@@ -1180,6 +1473,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           window.clearTimeout(timeoutId);
         }
         map.resize();
+        syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
         syncPointLayerWhenReady(map, pointsRef.current);
         syncHazardLayerWhenReady(map, hazardsRef.current);
       });
@@ -1255,56 +1549,67 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
         <h1 className={styles.navTitle}>{dictionary.navigation.title}</h1>
 
-        <div className={styles.providerMenu} ref={providerMenuRef}>
-          <button
-            aria-expanded={isMenuOpen}
-            aria-haspopup="menu"
-            aria-label={dictionary.map.providerMenuLabel.replace(
-              "{provider}",
-              selectedProviderLabel,
-            )}
-            className={styles.providerButton}
-            onClick={() => setIsMenuOpen((current) => !current)}
-            title={selectedProviderLabel}
-            type="button"
-          >
-            <SelectedProviderIcon
-              aria-hidden="true"
-              size={18}
-              strokeWidth={2.5}
-            />
-            <ChevronDown aria-hidden="true" size={14} strokeWidth={2.5} />
-          </button>
-          {isMenuOpen ? (
-            <div className={styles.providerDropdown} role="menu">
-              {(Object.keys(PROVIDERS) as MapProvider[]).map((providerKey) => {
-                const providerConfig = PROVIDERS[providerKey];
-                const Icon = providerConfig.icon;
-                const providerLabel =
-                  dictionary.map.providers[providerConfig.labelKey];
+        <div className={styles.navActions}>
+          <a className={styles.licenseLink} href="/licenses">
+            라이선스
+          </a>
+          <div className={styles.providerMenu} ref={providerMenuRef}>
+            <button
+              aria-expanded={isMenuOpen}
+              aria-haspopup="menu"
+              aria-label={dictionary.map.providerMenuLabel.replace(
+                "{provider}",
+                selectedProviderLabel,
+              )}
+              className={styles.providerButton}
+              onClick={() => setIsMenuOpen((current) => !current)}
+              title={selectedProviderLabel}
+              type="button"
+            >
+              <SelectedProviderIcon
+                aria-hidden="true"
+                size={18}
+                strokeWidth={2.5}
+              />
+              <ChevronDown aria-hidden="true" size={14} strokeWidth={2.5} />
+            </button>
+            {isMenuOpen ? (
+              <div className={styles.providerDropdown} role="menu">
+                {(Object.keys(PROVIDERS) as MapProvider[]).map(
+                  (providerKey) => {
+                    const providerConfig = PROVIDERS[providerKey];
+                    const Icon = providerConfig.icon;
+                    const providerLabel =
+                      dictionary.map.providers[providerConfig.labelKey];
 
-                return (
-                  <button
-                    className={styles.providerItem}
-                    key={providerKey}
-                    onClick={() => {
-                      setProvider(providerKey);
-                      setIsMenuOpen(false);
-                    }}
-                    aria-checked={provider === providerKey}
-                    role="menuitemradio"
-                    type="button"
-                  >
-                    <Icon aria-hidden="true" size={16} strokeWidth={2.4} />
-                    <span>{providerLabel}</span>
-                    {provider === providerKey ? (
-                      <Check aria-hidden="true" size={15} strokeWidth={2.6} />
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
+                    return (
+                      <button
+                        className={styles.providerItem}
+                        key={providerKey}
+                        onClick={() => {
+                          setProvider(providerKey);
+                          setIsMenuOpen(false);
+                        }}
+                        aria-checked={provider === providerKey}
+                        role="menuitemradio"
+                        type="button"
+                      >
+                        <Icon aria-hidden="true" size={16} strokeWidth={2.4} />
+                        <span>{providerLabel}</span>
+                        {provider === providerKey ? (
+                          <Check
+                            aria-hidden="true"
+                            size={15}
+                            strokeWidth={2.6}
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
       </nav>
 
