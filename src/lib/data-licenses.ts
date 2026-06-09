@@ -21,6 +21,47 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "서울 121개 핫스팟 영역 표시와 클릭 시 실시간 혼잡도/인구 범위 조회",
   },
   {
+    id: "vworld-map-tiles",
+    license: "브이월드 이용약관 및 오픈API 이용정책 준수",
+    notes:
+      "브이월드 API 키는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로만 주입한다. 타일 저작권 표기는 지도 attribution에 유지한다.",
+    provider: "공간정보산업진흥원 / 브이월드",
+    sourceName: "브이월드 WMTS 배경지도, 교통, POI 벡터 타일",
+    sourceUrl: "https://www.vworld.kr/",
+    usage: "기본 지도 배경, 도로/POI 지도 레이어",
+  },
+  {
+    id: "openfreemap-openstreetmap",
+    license:
+      "OpenStreetMap ODbL, OpenMapTiles 라이선스, OpenFreeMap 이용 조건 준수",
+    notes:
+      "OSM 제공자 전환 시 벡터 타일과 글꼴을 불러온다. 지도 attribution에 OpenFreeMap, OpenMapTiles, OpenStreetMap 표기를 유지한다.",
+    provider: "OpenFreeMap / OpenMapTiles / OpenStreetMap contributors",
+    sourceName: "OpenFreeMap 벡터 타일과 OpenStreetMap 기반 지도 데이터",
+    sourceUrl: "https://openfreemap.org/",
+    usage: "OSM 지도 배경과 지명/도로/건물 레이어",
+  },
+  {
+    id: "kakao-local-geocoding",
+    license: "카카오 Developers 이용약관 및 Local API 정책 준수",
+    notes:
+      "주소 좌표 변환에만 사용하며 KAKAO_REST_API_KEY는 서버 환경변수로만 보관한다. 원문 API 응답은 sudo/debug 용도 외 공개하지 않는다.",
+    provider: "카카오",
+    sourceName: "Kakao Local 주소 검색 API",
+    sourceUrl: "https://developers.kakao.com/docs/latest/ko/local/dev-guide",
+    usage: "주소 기반 공공 데이터의 위도/경도 보강",
+  },
+  {
+    id: "naver-kakao-map-links",
+    license: "각 지도 서비스 링크/이용약관 준수",
+    notes:
+      "포인트 상세 팝업에서 외부 지도 검색 링크만 제공하며, 별도 API 호출이나 키 저장은 하지 않는다.",
+    provider: "네이버 / 카카오",
+    sourceName: "네이버 지도, 카카오맵 웹 검색 링크",
+    sourceUrl: "https://map.naver.com/",
+    usage: "시설 위치를 외부 지도에서 열기",
+  },
+  {
     id: "fire-stations",
     license: "공공데이터포털 개별 데이터셋 이용허락조건 확인 필요",
     notes:
