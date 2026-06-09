@@ -68,3 +68,53 @@
   color: var(--text-muted);
   font-weight: 700;
 }
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkboxLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.checkboxLabel input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-mark);
+}
+
+.actionButton {
+  min-width: 64px;
+  height: 36px;
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+@media (max-width: 420px) {
+  .details div {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actionButton {
+    width: 100%;
+  }
+}

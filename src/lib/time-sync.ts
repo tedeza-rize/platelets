@@ -35,13 +35,20 @@ export type ServerTimeStatus = {
     selected: NtpServerResult | null;
   };
   ntpServers: string[];
+  serverReceivedAt: string;
+  serverRespondedAt: string;
   serverTime: string;
   thresholdMs: number;
 };
 
+type CachedServerTimeStatus = Omit<
+  ServerTimeStatus,
+  "serverReceivedAt" | "serverRespondedAt" | "serverTime"
+>;
+
 let cachedStatus: {
   expiresAt: number;
-  promise: Promise<ServerTimeStatus>;
+  promise: Promise<CachedServerTimeStatus>;
 } | null = null;
 
 function parseNtpTimestamp(buffer: Buffer, offset: number) {
@@ -210,7 +217,7 @@ function queryNtpServer(host: string): Promise<NtpServerResult> {
   });
 }
 
-async function buildServerTimeStatus(): Promise<ServerTimeStatus> {
+async function buildServerTimeStatus(): Promise<CachedServerTimeStatus> {
   const ntpServers = await getConfiguredNtpServers();
   const responses = await Promise.all(ntpServers.map(queryNtpServer));
   const validResponses = responses
@@ -233,12 +240,13 @@ async function buildServerTimeStatus(): Promise<ServerTimeStatus> {
       selected,
     },
     ntpServers,
-    serverTime: new Date().toISOString(),
     thresholdMs: TIME_SKEW_THRESHOLD_MS,
   };
 }
 
-export async function getServerTimeStatus() {
+export async function getServerTimeStatus(
+  options: { serverReceivedAt?: Date } = {},
+) {
   const now = Date.now();
 
   if (!cachedStatus || cachedStatus.expiresAt <= now) {
@@ -248,5 +256,13 @@ export async function getServerTimeStatus() {
     };
   }
 
-  return cachedStatus.promise;
+  const status = await cachedStatus.promise;
+  const respondedAt = new Date();
+
+  return {
+    ...status,
+    serverReceivedAt: (options.serverReceivedAt ?? respondedAt).toISOString(),
+    serverRespondedAt: respondedAt.toISOString(),
+    serverTime: respondedAt.toISOString(),
+  };
 }
