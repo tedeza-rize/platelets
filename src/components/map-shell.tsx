@@ -663,10 +663,6 @@ function buildKakaoMapUrl(point: PointFeatureProperties) {
   )}`;
 }
 
-function buildNaverMapUrl(point: PointFeatureProperties) {
-  return `https://map.naver.com/p/search/${encodeURIComponent(point.address)}`;
-}
-
 function buildPopupHtml(
   point: PointFeatureProperties,
   dictionary: AppDictionary,
@@ -692,9 +688,6 @@ function buildPopupHtml(
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
-      <a href="${buildNaverMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
-        dictionary.map.popup.naverMap,
-      )}</a>
       <a href="${buildKakaoMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
         dictionary.map.popup.kakaoMap,
       )}</a>

@@ -31,7 +31,7 @@ type DatasetStatus = {
 
 type ApiUsageWindow = {
   monthlyLimit: number;
-  provider: "kma-earthquake" | "naver-geocoding";
+  provider: "kakao-local" | "kma-earthquake";
   registeredAt: string | null;
   updatedAt: string | null;
   usedCount: number;
@@ -497,15 +497,15 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                   size={18}
                   strokeWidth={2.4}
                 />
-                네이버 지오코딩
+                카카오 로컬 API
               </span>
             </div>
             <strong className={styles.metric}>
               {(quota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
-              {(quota?.monthlyLimit ?? 300000).toLocaleString("ko-KR")}
+              {(quota?.monthlyLimit ?? 100000).toLocaleString("ko-KR")}
             </strong>
             <span className={styles.muted}>
-              {quotaPercent}% 사용, 만료{" "}
+              {quotaPercent}% 사용, 리셋{" "}
               {formatDateTime(quota?.windowEndsAt ?? null)}
             </span>
           </div>

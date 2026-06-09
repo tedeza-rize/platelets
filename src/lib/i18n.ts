@@ -33,7 +33,6 @@ export type MapDictionary = {
   popup: {
     address: string;
     kakaoMap: string;
-    naverMap: string;
     phone: string;
     sourceUpdatedAt: string;
   };
@@ -90,7 +89,6 @@ const dictionaries: Record<Locale, AppDictionary> = {
       popup: {
         address: "주소",
         kakaoMap: "카카오맵",
-        naverMap: "네이버 지도",
         phone: "전화",
         sourceUpdatedAt: "자료 기준일",
       },
@@ -143,7 +141,6 @@ const dictionaries: Record<Locale, AppDictionary> = {
       popup: {
         address: "Address",
         kakaoMap: "Kakao Map",
-        naverMap: "Naver Map",
         phone: "Phone",
         sourceUpdatedAt: "Source date",
       },
