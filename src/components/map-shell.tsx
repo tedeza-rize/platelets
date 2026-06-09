@@ -826,12 +826,10 @@ function createSeoulAreaPointData(areas: SeoulAreasData) {
         feature.geometry.coordinates,
       );
       const populationLabel =
-        feature.properties.minPopulation !== undefined &&
-        feature.properties.maxPopulation !== undefined
-          ? `${feature.properties.minPopulation.toLocaleString(
-              "ko-KR",
-            )}-${feature.properties.maxPopulation.toLocaleString("ko-KR")}명`
-          : (feature.properties.congestionLevel ?? feature.properties.areaName);
+        formatPopulationRangeValues(
+          feature.properties.minPopulation,
+          feature.properties.maxPopulation,
+        ) ?? "";
 
       return {
         geometry: {
@@ -944,14 +942,24 @@ function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
   return eventType === "earthquake" ? "지진" : "지진해일";
 }
 
-function formatPopulationRange(population: SeoulPopulationStatus) {
-  if (population.minPopulation === null || population.maxPopulation === null) {
+function formatPopulationRangeValues(
+  minPopulation: number | null | undefined,
+  maxPopulation: number | null | undefined,
+) {
+  if (typeof minPopulation !== "number" || typeof maxPopulation !== "number") {
     return null;
   }
 
-  return `${population.minPopulation.toLocaleString(
+  return `${minPopulation.toLocaleString(
     "ko-KR",
-  )} - ${population.maxPopulation.toLocaleString("ko-KR")}명`;
+  )} - ${maxPopulation.toLocaleString("ko-KR")}명`;
+}
+
+function formatPopulationRange(population: SeoulPopulationStatus) {
+  return formatPopulationRangeValues(
+    population.minPopulation,
+    population.maxPopulation,
+  );
 }
 
 function buildKakaoMapUrl(point: EmergencyPointDetail) {
@@ -1008,11 +1016,9 @@ function buildSeoulPopulationPopupHtml(
   const rows = error
     ? [["상태", error]]
     : [
-        ["혼잡도", population?.congestionLevel],
-        ["예상 인구", population ? formatPopulationRange(population) : null],
+        ["예상 인원", population ? formatPopulationRange(population) : null],
         ["기준 시각", population?.populationTime],
         ["분류", area.category],
-        ["메시지", population?.congestionMessage],
       ];
   const rowsHtml = rows
     .filter((row): row is [string, string] => Boolean(row[1]))
@@ -1790,6 +1796,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
 
       map.on("click", POINTS_LAYER_ID, showPointPopup);
       map.on("click", POINTS_SYMBOL_LAYER_ID, showPointPopup);
+      map.on("click", SEOUL_AREAS_HALO_LAYER_ID, showSeoulPopulationPopup);
       map.on("click", SEOUL_AREAS_LAYER_ID, showSeoulPopulationPopup);
       map.on("click", SEOUL_AREAS_SYMBOL_LAYER_ID, showSeoulPopulationPopup);
 
@@ -1822,6 +1829,12 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         map.getCanvas().style.cursor = "pointer";
       });
       map.on("mouseleave", POINTS_SYMBOL_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "";
+      });
+      map.on("mouseenter", SEOUL_AREAS_HALO_LAYER_ID, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", SEOUL_AREAS_HALO_LAYER_ID, () => {
         map.getCanvas().style.cursor = "";
       });
       map.on("mouseenter", SEOUL_AREAS_LAYER_ID, () => {

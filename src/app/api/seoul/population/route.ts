@@ -22,7 +22,7 @@ type SeoulPopulationStatus = {
   sourceUpdatedAt: string | null;
 };
 
-type SeoulCitydataRow = {
+type SeoulCitydataRow = SeoulLivePopulationStatus & {
   AREA_CD?: string;
   AREA_NM?: string;
   LIVE_PPLTN_STTS?: SeoulLivePopulationStatus | SeoulLivePopulationStatus[];
@@ -115,7 +115,11 @@ function findCitydataRow(value: unknown): SeoulCitydataRow | null {
 function firstPopulationStatus(row: SeoulCitydataRow) {
   const status = row.LIVE_PPLTN_STTS;
 
-  return Array.isArray(status) ? status[0] : status;
+  if (Array.isArray(status)) {
+    return status[0] ?? row;
+  }
+
+  return status ?? row;
 }
 
 function mapPopulationStatus(row: SeoulCitydataRow): SeoulPopulationStatus {
