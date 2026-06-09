@@ -8,8 +8,7 @@ basemaps.
 Create `.env.local` in the project root and set the keys you need:
 
 ```bash
-NAVER_MAPS_CLIENT_ID=your_naver_cloud_platform_maps_api_key_id
-NAVER_MAPS_CLIENT_SECRET=your_naver_cloud_platform_maps_api_key
+KAKAO_REST_API_KEY=your_kakao_rest_api_key
 PUBLIC_DATA_API_KEY=your_data_go_kr_service_key
 ```
 
@@ -19,9 +18,8 @@ tile layers.
 `PUBLIC_DATA_API_KEY` is shared by public data portal integrations such as AED
 and Korea Meteorological Administration earthquake/tsunami events.
 
-`NAVER_MAPS_CLIENT_ID` and `NAVER_MAPS_CLIENT_SECRET` must be the Naver Cloud
-Platform Maps Geocoding API Key ID and API Key used with the
-`x-ncp-apigw-api-key-id` and `x-ncp-apigw-api-key` headers.
+`KAKAO_REST_API_KEY` is used by Kakao Local address search with the
+`Authorization: KakaoAK ${KAKAO_REST_API_KEY}` header.
 
 ## Development
 

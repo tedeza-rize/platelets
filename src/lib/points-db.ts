@@ -63,7 +63,7 @@ export type ApiLogEntry = Required<
 
 export type ApiUsageWindow = {
   monthlyLimit: number;
-  provider: "kma-earthquake" | "naver-geocoding";
+  provider: "kakao-local" | "kma-earthquake";
   registeredAt: string | null;
   updatedAt: string | null;
   usedCount: number;
@@ -202,7 +202,7 @@ const dataDirectory = path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
-const NAVER_GEOCODING_MONTHLY_LIMIT = 300_000;
+const KAKAO_LOCAL_DAILY_LIMIT = 100_000;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 
@@ -453,10 +453,10 @@ function mapApiLogRow(row: ApiLogRow): ApiLogEntry {
   };
 }
 
-function emptyNaverUsageWindow(): ApiUsageWindow {
+function emptyKakaoLocalUsageWindow(): ApiUsageWindow {
   return {
-    monthlyLimit: NAVER_GEOCODING_MONTHLY_LIMIT,
-    provider: "naver-geocoding",
+    monthlyLimit: KAKAO_LOCAL_DAILY_LIMIT,
+    provider: "kakao-local",
     registeredAt: null,
     updatedAt: null,
     usedCount: 0,
@@ -510,12 +510,6 @@ function mapHazardEventRow(row: HazardEventRow): HazardEvent {
   };
 }
 
-function addOneMonth(value: Date) {
-  const next = new Date(value);
-  next.setMonth(next.getMonth() + 1);
-  return next;
-}
-
 function nextKstMidnight(value: Date) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",
@@ -533,11 +527,11 @@ function nextKstMidnight(value: Date) {
   return new Date(Date.UTC(year, month - 1, day + 1, -9, 0, 0));
 }
 
-async function getNaverUsageWindowRow(db: SqliteDatabase) {
+async function getKakaoLocalUsageWindowRow(db: SqliteDatabase) {
   return get<ApiUsageWindowRow>(
     db,
     "SELECT * FROM api_usage_windows WHERE provider = ?",
-    ["naver-geocoding"],
+    ["kakao-local"],
   );
 }
 
@@ -855,11 +849,11 @@ export async function upsertHazardEvents(params: {
   }
 }
 
-export async function getNaverGeocodingUsage() {
+export async function getKakaoLocalUsage() {
   const db = await getDatabase();
-  const row = await getNaverUsageWindowRow(db);
+  const row = await getKakaoLocalUsageWindowRow(db);
 
-  return row ? mapUsageWindowRow(row) : emptyNaverUsageWindow();
+  return row ? mapUsageWindowRow(row) : emptyKakaoLocalUsageWindow();
 }
 
 export async function getKmaEarthquakeUsage() {
@@ -869,7 +863,7 @@ export async function getKmaEarthquakeUsage() {
   return row ? mapUsageWindowRow(row) : emptyKmaEarthquakeUsageWindow();
 }
 
-export async function consumeNaverGeocodingQuota() {
+export async function consumeKakaoLocalQuota() {
   const db = await getDatabase();
   const now = new Date();
   const nowIso = now.toISOString();
@@ -877,7 +871,7 @@ export async function consumeNaverGeocodingQuota() {
   await run(db, "BEGIN IMMEDIATE");
 
   try {
-    const existing = await getNaverUsageWindowRow(db);
+    const existing = await getKakaoLocalUsageWindowRow(db);
     const shouldReset =
       existing?.window_ends_at && now >= new Date(existing.window_ends_at);
     const windowStartedAt =
@@ -886,11 +880,11 @@ export async function consumeNaverGeocodingQuota() {
     const windowEndsAt =
       existing && !shouldReset && existing.window_ends_at
         ? existing.window_ends_at
-        : addOneMonth(now).toISOString();
+        : nextKstMidnight(now).toISOString();
     const currentUsedCount = existing && !shouldReset ? existing.used_count : 0;
 
-    if (currentUsedCount >= NAVER_GEOCODING_MONTHLY_LIMIT) {
-      throw new Error("Naver geocoding monthly quota exceeded");
+    if (currentUsedCount >= KAKAO_LOCAL_DAILY_LIMIT) {
+      throw new Error("Kakao Local API daily request quota exceeded");
     }
 
     await run(
@@ -912,12 +906,12 @@ export async function consumeNaverGeocodingQuota() {
         monthly_limit = excluded.monthly_limit,
         updated_at = CURRENT_TIMESTAMP`,
       [
-        "naver-geocoding",
+        "kakao-local",
         registeredAt,
         windowStartedAt,
         windowEndsAt,
         currentUsedCount + 1,
-        NAVER_GEOCODING_MONTHLY_LIMIT,
+        KAKAO_LOCAL_DAILY_LIMIT,
       ],
     );
 
@@ -927,7 +921,7 @@ export async function consumeNaverGeocodingQuota() {
     throw error;
   }
 
-  return getNaverGeocodingUsage();
+  return getKakaoLocalUsage();
 }
 
 export async function consumeKmaEarthquakeQuota(requestCount = 1) {

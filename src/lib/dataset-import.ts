@@ -3,7 +3,7 @@ import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
-  consumeNaverGeocodingQuota,
+  consumeKakaoLocalQuota,
   type DatasetUpdateResult,
   type EmergencyPointInput,
   recordApiLog,
@@ -23,20 +23,25 @@ type ImportResult = {
   skippedCount: number;
 };
 
-type NaverGeocodingResponse = {
-  addresses?: Array<{
-    jibunAddress?: string;
-    roadAddress?: string;
+type KakaoAddressSearchResponse = {
+  documents?: Array<{
+    address?: {
+      address_name?: string;
+    } | null;
+    address_name?: string;
+    road_address?: {
+      address_name?: string;
+    } | null;
     x?: string;
     y?: string;
   }>;
-  errorMessage?: string;
   meta?: {
-    count?: number;
-    page?: number;
-    totalCount?: number;
+    is_end?: boolean;
+    pageable_count?: number;
+    total_count?: number;
   };
-  status?: string;
+  errorType?: string;
+  message?: string;
 };
 
 const CSV_ENCODING = "euc-kr";
@@ -111,28 +116,12 @@ async function downloadCsv(source: DatasetSourceId) {
   throw lastError;
 }
 
-function getNaverCredentials() {
-  const keyId =
-    process.env.NAVER_MAPS_CLIENT_ID?.trim() ??
-    process.env.NAVER_MAPS_API_KEY_ID?.trim() ??
-    process.env.NCP_APIGW_API_KEY_ID?.trim();
-  const key =
-    process.env.NAVER_MAPS_CLIENT_SECRET?.trim() ??
-    process.env.NAVER_MAPS_API_KEY?.trim() ??
-    process.env.NCP_APIGW_API_KEY?.trim();
-
-  if (!keyId || !key) {
-    return null;
-  }
-
-  return {
-    key,
-    keyId,
-    source:
-      process.env.NAVER_MAPS_CLIENT_ID || process.env.NAVER_MAPS_CLIENT_SECRET
-        ? "NAVER_MAPS_CLIENT_ID/NAVER_MAPS_CLIENT_SECRET"
-        : "legacy NCP API gateway env",
-  };
+function getKakaoRestApiKey() {
+  return (
+    process.env.KAKAO_REST_API_KEY?.trim() ??
+    process.env.KAKAO_LOCAL_REST_API_KEY?.trim() ??
+    null
+  );
 }
 
 function parseCsv(csv: string) {
@@ -317,39 +306,36 @@ function compactRecord(record: CsvRecord) {
 }
 
 async function geocodeAddress(address: string) {
-  const credentials = getNaverCredentials();
+  const restApiKey = getKakaoRestApiKey();
 
   if (!address) {
     return null;
   }
 
-  if (!credentials) {
+  if (!restApiKey) {
     await recordApiLog({
       action: "geocode",
       category: "geocoding",
       level: "warn",
-      message: "Naver geocoding skipped because API credentials are missing.",
+      message: "Kakao Local geocoding skipped because REST API key is missing.",
       metadata: { address },
       status: "skipped",
     });
     return null;
   }
 
-  await consumeNaverGeocodingQuota();
+  await consumeKakaoLocalQuota();
 
-  const url = new URL(
-    "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode",
-  );
+  const url = new URL("https://dapi.kakao.com/v2/local/search/address.json");
   url.searchParams.set("query", address);
-  url.searchParams.set("count", "1");
+  url.searchParams.set("size", "1");
 
   try {
     const response = await fetch(url, {
       cache: "no-store",
       headers: {
         Accept: "application/json",
-        "x-ncp-apigw-api-key": credentials.key,
-        "x-ncp-apigw-api-key-id": credentials.keyId,
+        Authorization: `KakaoAK ${restApiKey}`,
       },
     });
 
@@ -358,16 +344,15 @@ async function geocodeAddress(address: string) {
         action: "geocode",
         category: "geocoding",
         level: "error",
-        message: `Naver geocoding failed with HTTP ${response.status}.`,
+        message: `Kakao Local geocoding failed with HTTP ${response.status}.`,
         metadata: {
           address,
-          credentialSource: credentials.source,
-          naverHint:
-            response.status === 401
-              ? "Use Naver Cloud Platform Maps Geocoding API Key ID/API Key and confirm the service/restriction settings."
+          kakaoHint:
+            response.status === 401 || response.status === 403
+              ? "Check KAKAO_REST_API_KEY and Kakao Map/Local API activation for the app."
               : null,
           statusCode: response.status,
-          usedHeaders: ["x-ncp-apigw-api-key-id", "x-ncp-apigw-api-key"],
+          usedHeaders: ["Authorization: KakaoAK"],
         },
         requestCount: 1,
         status: "failure",
@@ -375,8 +360,8 @@ async function geocodeAddress(address: string) {
       return null;
     }
 
-    const payload = (await response.json()) as NaverGeocodingResponse;
-    const firstAddress = payload.addresses?.[0];
+    const payload = (await response.json()) as KakaoAddressSearchResponse;
+    const firstAddress = payload.documents?.[0];
     const longitude = Number(firstAddress?.x);
     const latitude = Number(firstAddress?.y);
 
@@ -385,13 +370,12 @@ async function geocodeAddress(address: string) {
         action: "geocode",
         category: "geocoding",
         level: "warn",
-        message: "Naver geocoding returned no coordinate result.",
+        message: "Kakao Local geocoding returned no coordinate result.",
         metadata: {
           address,
-          count: payload.meta?.count,
-          errorMessage: payload.errorMessage,
-          status: payload.status,
-          totalCount: payload.meta?.totalCount,
+          errorMessage: payload.message,
+          errorType: payload.errorType,
+          totalCount: payload.meta?.total_count,
         },
         requestCount: 1,
         status: "skipped",
@@ -403,12 +387,15 @@ async function geocodeAddress(address: string) {
       action: "geocode",
       category: "geocoding",
       level: "info",
-      message: "Naver geocoding returned a coordinate result.",
+      message: "Kakao Local geocoding returned a coordinate result.",
       metadata: {
         address,
         latitude,
         longitude,
-        matchedAddress: firstAddress?.roadAddress || firstAddress?.jibunAddress,
+        matchedAddress:
+          firstAddress?.road_address?.address_name ??
+          firstAddress?.address?.address_name ??
+          firstAddress?.address_name,
       },
       requestCount: 1,
       status: "success",
