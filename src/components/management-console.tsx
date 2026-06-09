@@ -2,10 +2,12 @@
 
 import {
   AlertTriangle,
+  BookOpen,
   ClipboardList,
   Clock3,
   Database,
   Flame,
+  GraduationCap,
   HeartPulse,
   RefreshCw,
   Save,
@@ -23,10 +25,27 @@ type DatasetStatus = {
   fetchedAt: string | null;
   geocodedCount: number;
   id: DatasetSourceId;
+  importProgress: DatasetImportProgress | null;
   label: string;
   recordCount: number;
   skippedCount: number;
   updatedAt: string | null;
+};
+
+type DatasetImportProgress = {
+  failedCount: number;
+  fetchedAt: string;
+  geocodedCount: number;
+  importedCount: number;
+  mode: "restart" | "resume";
+  nextIndex: number;
+  reason: string | null;
+  skippedCount: number;
+  source: DatasetSourceId;
+  startedAt: string;
+  status: "paused" | "running";
+  totalCount: number;
+  updatedAt: string;
 };
 
 type ApiUsageWindow = {
@@ -147,7 +166,29 @@ function datasetIcon(source: DatasetSourceId) {
     return <Shield aria-hidden="true" size={16} strokeWidth={2.4} />;
   }
 
+  if (source === "schools") {
+    return <BookOpen aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
+  if (source === "universities") {
+    return <GraduationCap aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
   return <HeartPulse aria-hidden="true" size={16} strokeWidth={2.4} />;
+}
+
+function formatImportProgress(progress: DatasetImportProgress | null) {
+  if (!progress) {
+    return "-";
+  }
+
+  const label = progress.status === "paused" ? "일시중단" : "진행 중";
+
+  return `${label} ${progress.nextIndex.toLocaleString(
+    "ko-KR",
+  )}/${progress.totalCount.toLocaleString(
+    "ko-KR",
+  )}, 좌표 ${progress.geocodedCount.toLocaleString("ko-KR")}`;
 }
 
 export function ManagementConsole({ mode }: ManagementConsoleProps) {
@@ -303,7 +344,34 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     setCooldowns((await cooldownsResponse.json()).cooldowns);
   }, [hasSudoToken, mode, sudoHeaders]);
 
-  async function updateDataset(source: DatasetSourceId | "all") {
+  async function requestDatasetUpdate(
+    source: DatasetSourceId,
+    mode: "restart" | "resume",
+  ) {
+    const response = await fetch(`/api/datasets/${source}/update`, {
+      body: JSON.stringify({ mode }),
+      headers: { "Content-Type": "application/json", ...sudoHeaders },
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseUpdateError(response, "업데이트 실패"));
+    }
+
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+      paused?: boolean;
+    } | null;
+
+    return payload?.paused
+      ? (payload.error ?? "업데이트가 일시중단되었습니다.")
+      : null;
+  }
+
+  async function updateDataset(
+    source: DatasetSourceId | "all",
+    updateMode: "restart" | "resume" = "restart",
+  ) {
     if (mode !== "sudo" || !hasSudoToken) {
       setNotice("개발자 토큰이 필요합니다.");
       return;
@@ -334,6 +402,8 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     });
 
     try {
+      let pausedMessage: string | null = null;
+
       if (source === "all") {
         for (const [index, dataset] of datasets.entries()) {
           setProgress({
@@ -343,18 +413,10 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             title: "전체 데이터 갱신",
           });
 
-          const response = await fetch(`/api/datasets/${dataset.id}/update`, {
-            headers: sudoHeaders,
-            method: "POST",
-          });
+          pausedMessage = await requestDatasetUpdate(dataset.id, "restart");
 
-          if (!response.ok) {
-            throw new Error(
-              await parseUpdateError(
-                response,
-                `${dataset.label} 업데이트 실패`,
-              ),
-            );
+          if (pausedMessage) {
+            break;
           }
         }
       } else {
@@ -365,14 +427,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           title: "데이터셋 갱신",
         });
 
-        const response = await fetch(`/api/datasets/${source}/update`, {
-          headers: sudoHeaders,
-          method: "POST",
-        });
-
-        if (!response.ok) {
-          throw new Error(await parseUpdateError(response, "업데이트 실패"));
-        }
+        pausedMessage = await requestDatasetUpdate(source, updateMode);
       }
 
       setProgress({
@@ -381,9 +436,9 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
       });
       await refresh();
-      setNotice("업데이트 완료");
+      setNotice(pausedMessage ?? "업데이트 완료");
       setProgress({
-        currentStep: "완료",
+        currentStep: pausedMessage ? "일시중단" : "완료",
         percent: 100,
         title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
       });
@@ -533,6 +588,16 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
+      refresh().catch((error) => {
+        setNotice(error instanceof Error ? error.message : String(error));
+      });
+    }, 10_000);
+
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
       setClockTick((value) => value + 1);
     }, 1000);
 
@@ -544,6 +609,9 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       .map((dataset) => datasetCooldown(dataset.id))
       .find((cooldown) => cooldown && !cooldown.available) ?? null;
   const hazardsCooldown = getCooldown("hazards");
+  const pausedDatasets = datasets.filter(
+    (dataset) => dataset.importProgress?.status === "paused",
+  );
 
   return (
     <div className={styles.page}>
@@ -730,6 +798,48 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                   </button>
                 );
               })}
+              {pausedDatasets.map((dataset) => {
+                const cooldown = datasetCooldown(dataset.id);
+                const disabled =
+                  isUpdating || Boolean(cooldown && !cooldown.available);
+
+                return (
+                  <div
+                    className={styles.resumeGroup}
+                    key={`${dataset.id}-resume`}
+                  >
+                    <span>{dataset.label}</span>
+                    <button
+                      className={styles.actionButton}
+                      disabled={disabled}
+                      onClick={() => updateDataset(dataset.id, "restart")}
+                      title={actionUnavailableLabel(cooldown)}
+                      type="button"
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        size={16}
+                        strokeWidth={2.4}
+                      />
+                      처음부터 다시 하기
+                    </button>
+                    <button
+                      className={styles.actionButton}
+                      disabled={disabled}
+                      onClick={() => updateDataset(dataset.id, "resume")}
+                      title={actionUnavailableLabel(cooldown)}
+                      type="button"
+                    >
+                      <RefreshCw
+                        aria-hidden="true"
+                        size={16}
+                        strokeWidth={2.4}
+                      />
+                      이어서 하기
+                    </button>
+                  </div>
+                );
+              })}
               <button
                 className={styles.actionButton}
                 disabled={
@@ -829,6 +939,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                   <th>기록</th>
                   <th>좌표</th>
                   <th>실패</th>
+                  <th>진행</th>
                   <th>가져온 시각</th>
                   {mode === "sudo" ? <th>오류</th> : null}
                 </tr>
@@ -840,6 +951,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                     <td>{dataset.recordCount.toLocaleString("ko-KR")}</td>
                     <td>{dataset.geocodedCount.toLocaleString("ko-KR")}</td>
                     <td>{dataset.failedCount.toLocaleString("ko-KR")}</td>
+                    <td>{formatImportProgress(dataset.importProgress)}</td>
                     <td>{formatDateTime(dataset.fetchedAt)}</td>
                     {mode === "sudo" ? <td>{dataset.error ?? "-"}</td> : null}
                   </tr>

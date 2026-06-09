@@ -111,6 +111,27 @@
   gap: 10px;
 }
 
+.resumeGroup {
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: minmax(130px, 1fr) repeat(2, minmax(170px, 1fr));
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  background: var(--notice-bg);
+  color: var(--text-strong);
+  padding: 8px;
+}
+
+.resumeGroup > span {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .actionButton {
   display: inline-flex;
   min-height: 38px;
@@ -374,6 +395,7 @@
 
   .summaryGrid,
   .actions,
+  .resumeGroup,
   .settingsGrid {
     grid-template-columns: 1fr;
   }
