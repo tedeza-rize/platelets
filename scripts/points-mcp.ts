@@ -178,6 +178,15 @@ type EmergencyScenario =
   | "delivery"
   | "elderly-fall";
 
+const STRICT_EMERGENCY_SCENARIOS = new Set<EmergencyScenario>([
+  "pediatric-respiratory",
+  "cardiac",
+  "stroke",
+  "trauma",
+  "burn",
+  "delivery",
+]);
+
 type EmergencyCandidate = MappedPoint & {
   raw: Record<string, string>;
   distanceMeters: number;
@@ -512,6 +521,61 @@ function numeric(raw: Record<string, string>, keys: string[]) {
   return null;
 }
 
+function isEmergencyOperating(candidate: {
+  category: string;
+  raw: Record<string, string>;
+}) {
+  const text = rawSearchText(candidate.raw);
+
+  return (
+    candidate.raw.dutyEryn === "1" ||
+    /응급|권역|지역응급|센터/.test(candidate.category) ||
+    /응급실|응급의료/.test(text)
+  );
+}
+
+function passesEmergencyScenarioMinimum(params: {
+  availability: number;
+  candidate: { category: string; raw: Record<string, string> };
+  capability: number;
+  emergencyBeds: number | null;
+  scenario: EmergencyScenario;
+}) {
+  if (!isEmergencyOperating(params.candidate)) {
+    return {
+      passed: false,
+      reason: "emergency-operation-not-confirmed",
+    };
+  }
+
+  if (params.emergencyBeds !== null && params.emergencyBeds <= 0) {
+    return {
+      passed: false,
+      reason: "no-emergency-bed-available",
+    };
+  }
+
+  if (!STRICT_EMERGENCY_SCENARIOS.has(params.scenario)) {
+    return {
+      passed: true,
+      reason: "basic-emergency-minimum-passed",
+    };
+  }
+
+  const highGradeEmergencyCenter =
+    gradeRatio(params.candidate.category) >= 0.65;
+  const passed =
+    params.capability >= 0.5 ||
+    (highGradeEmergencyCenter && params.availability >= 0.45);
+
+  return {
+    passed,
+    reason: passed
+      ? "scenario-minimum-passed"
+      : "scenario-capability-not-confirmed",
+  };
+}
+
 const EMERGENCY_SCENARIO_TERMS: Record<EmergencyScenario, string[]> = {
   burn: ["화상", "외과", "성형외과", "중환자", "수술"],
   cardiac: ["심장", "순환기", "흉부외과", "심근경색", "중환자"],
@@ -621,6 +685,18 @@ async function recommendEmergencyHospitalsForMcp(options: {
     );
     const availability =
       emergencyBeds === null ? 0.45 : emergencyBeds > 0 ? 1 : 0.05;
+    const minimum = passesEmergencyScenarioMinimum({
+      availability,
+      candidate,
+      capability,
+      emergencyBeds,
+      scenario: options.scenario,
+    });
+
+    if (!minimum.passed) {
+      continue;
+    }
+
     const travel = Math.max(0.05, 1 - durationSeconds / 60 / 90);
     const score =
       Math.round(
@@ -647,6 +723,7 @@ async function recommendEmergencyHospitalsForMcp(options: {
       scoreBasis: isKakaoDirectionSummary(route)
         ? "kakao-route-duration-and-medical-suitability"
         : "estimated-road-time-and-medical-suitability",
+      scenarioMinimum: minimum.reason,
       sourceUpdatedAt: candidate.sourceUpdatedAt,
     });
   }

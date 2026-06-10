@@ -95,6 +95,15 @@ const WEIGHTS: Record<EmergencyScenario, ScoreWeights> = {
   },
 };
 
+const STRICT_SCENARIOS = new Set<EmergencyScenario>([
+  "pediatric-respiratory",
+  "cardiac",
+  "stroke",
+  "trauma",
+  "burn",
+  "delivery",
+]);
+
 const CAPABILITY_TERMS: Record<
   Exclude<ScoreCategory, "travelTime" | "availability" | "gradeStability">,
   Record<EmergencyScenario, string[]>
@@ -186,6 +195,79 @@ function gradeRatio(category: string) {
   if (/지역응급의료센터/.test(category)) return 0.85;
   if (/지역응급의료기관/.test(category)) return 0.65;
   return 0.45;
+}
+
+function isEmergencyOperating(candidate: {
+  category: string;
+  raw: Record<string, string>;
+}) {
+  return (
+    candidate.raw.dutyEryn === "1" ||
+    /응급|권역|지역응급|센터/.test(candidate.category) ||
+    /응급실|응급의료/.test(rawSearchText(candidate.raw))
+  );
+}
+
+function passesScenarioMinimum(params: {
+  availabilityRatio: number;
+  bedRatio: number;
+  candidate: { category: string; raw: Record<string, string> };
+  criticalCareRatio: number;
+  emergencyBeds: number | null;
+  scenario: EmergencyScenario;
+  specialtyRatio: number;
+}) {
+  if (!isEmergencyOperating(params.candidate)) {
+    return {
+      passed: false,
+      reason: "응급실 운영 여부를 확인할 수 없음",
+    };
+  }
+
+  if (params.emergencyBeds !== null && params.emergencyBeds <= 0) {
+    return {
+      passed: false,
+      reason: "응급실 가용병상 없음",
+    };
+  }
+
+  if (!STRICT_SCENARIOS.has(params.scenario)) {
+    return {
+      passed: true,
+      reason: "기본 응급 진료 최소 조건 통과",
+    };
+  }
+
+  const highGradeEmergencyCenter =
+    gradeRatio(params.candidate.category) >= 0.65;
+  const specialtyMatch = params.specialtyRatio >= 0.5;
+  const bedMatch = params.bedRatio >= 0.5 || params.availabilityRatio >= 0.65;
+  const criticalMatch = params.criticalCareRatio >= 0.4;
+
+  if (params.scenario === "pediatric-respiratory") {
+    const passed =
+      (specialtyMatch || bedMatch || highGradeEmergencyCenter) &&
+      (bedMatch || criticalMatch || highGradeEmergencyCenter);
+
+    return {
+      passed,
+      reason: passed
+        ? "소아·호흡곤란 최소 수용 조건 통과"
+        : "소아·호흡곤란 대응 근거 부족",
+    };
+  }
+
+  const passed =
+    specialtyMatch ||
+    criticalMatch ||
+    (highGradeEmergencyCenter && params.availabilityRatio >= 0.45);
+
+  return {
+    passed,
+    reason: passed
+      ? "상황별 중증 수용 최소 조건 통과"
+      : "상황별 진료역량 근거 부족",
+  };
 }
 
 async function mapWithConcurrency<T, R>(
@@ -292,6 +374,15 @@ export async function recommendEmergencyHospitals(params: {
         specialty: termRatio(text, CAPABILITY_TERMS.specialty[params.scenario]),
         travelTime: Math.max(0.05, 1 - travelMinutes / 90),
       };
+      const minimum = passesScenarioMinimum({
+        availabilityRatio,
+        bedRatio,
+        candidate,
+        criticalCareRatio: ratios.criticalCare,
+        emergencyBeds,
+        scenario: params.scenario,
+        specialtyRatio: ratios.specialty,
+      });
       const scoreBreakdown = Object.fromEntries(
         Object.entries(weights).map(([key, weight]) => [
           key,
@@ -310,6 +401,7 @@ export async function recommendEmergencyHospitals(params: {
           : emergencyBeds > 0
             ? `응급실 가용병상 ${emergencyBeds}개`
             : "응급실 가용병상 없음",
+        minimum.reason,
       ];
 
       if (ratios.specialty >= 0.7 && params.scenario !== "general") {
@@ -333,9 +425,11 @@ export async function recommendEmergencyHospitals(params: {
         reasons,
         score,
         scoreBreakdown,
+        scenarioMinimumPassed: minimum.passed,
         sourceUpdatedAt: candidate.sourceUpdatedAt,
       };
     })
+    .filter((hospital) => hospital.scenarioMinimumPassed)
     .sort(
       (left, right) =>
         right.score - left.score ||
