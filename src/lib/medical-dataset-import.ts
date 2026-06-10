@@ -37,6 +37,8 @@ const HOSPITAL_BASE_URL =
   "https://apis.data.go.kr/B552657/HsptlAsembySearchService";
 const EMERGENCY_BASE_URL =
   "https://apis.data.go.kr/B552657/ErmctInfoInqireService";
+const HIRA_PHARMACY_URL =
+  "https://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList";
 
 function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -117,6 +119,7 @@ async function fetchPublicDataPage(params: {
   operation: string;
   pageNo: number;
   searchParams?: Record<string, string>;
+  serviceKeyParam?: "ServiceKey" | "serviceKey";
   source: DatasetSourceId;
   url: string;
 }) {
@@ -129,7 +132,7 @@ async function fetchPublicDataPage(params: {
   }
 
   const url = new URL(params.url);
-  url.searchParams.set("serviceKey", serviceKey);
+  url.searchParams.set(params.serviceKeyParam ?? "serviceKey", serviceKey);
   url.searchParams.set("pageNo", String(params.pageNo));
   url.searchParams.set("numOfRows", String(PUBLIC_DATA_ROWS_PER_PAGE));
 
@@ -175,6 +178,7 @@ async function fetchPublicDataPage(params: {
 async function fetchAllPublicData(params: {
   operation: string;
   searchParams?: Record<string, string>;
+  serviceKeyParam?: "ServiceKey" | "serviceKey";
   source: DatasetSourceId;
   url: string;
 }) {
@@ -231,6 +235,32 @@ function mapPharmacyRecord(record: SourceRecord): EmergencyPointInput | null {
     name,
     parentName: null,
     phone: nullableText(record.dutyTel1),
+    raw: compactRecord(record),
+    source: "pharmacies",
+    sourceRecordId,
+    sourceUpdatedAt: null,
+  };
+}
+
+function mapHiraPharmacyRecord(
+  record: SourceRecord,
+): EmergencyPointInput | null {
+  const name = text(record.yadmNm);
+  const address = text(record.addr);
+  const sourceRecordId = text(record.ykiho) || `${name}|${address}`;
+
+  if (!sourceRecordId || !name) {
+    return null;
+  }
+
+  return {
+    address,
+    category: "약국",
+    latitude: toNumber(record.YPos) ?? toNumber(record.yPos),
+    longitude: toNumber(record.XPos) ?? toNumber(record.xPos),
+    name,
+    parentName: "건강보험심사평가원 약국정보서비스",
+    phone: nullableText(record.telno),
     raw: compactRecord(record),
     source: "pharmacies",
     sourceRecordId,
@@ -390,16 +420,45 @@ export async function importChildcareCenters(report: DatasetProgressReporter) {
 
 export async function importPharmacies(report: DatasetProgressReporter) {
   await report("requesting", 10, "전국 약국 FullData를 요청하고 있습니다.");
-  const rows = await fetchAllPublicData({
-    operation: "getParmacyFullDown",
-    source: "pharmacies",
-    url: DATASET_SOURCES.pharmacies.url,
-  });
+  let rows: SourceRecord[];
+  let mapper = mapPharmacyRecord;
+
+  try {
+    rows = await fetchAllPublicData({
+      operation: "getParmacyFullDown",
+      source: "pharmacies",
+      url: DATASET_SOURCES.pharmacies.url,
+    });
+  } catch (nmcError) {
+    await report(
+      "requesting",
+      22,
+      "국립중앙의료원 약국 API가 차단되어 HIRA 약국정보서비스를 시도합니다.",
+    );
+
+    try {
+      rows = await fetchAllPublicData({
+        operation: "getParmacyBasisList",
+        serviceKeyParam: "ServiceKey",
+        source: "pharmacies",
+        url: HIRA_PHARMACY_URL,
+      });
+      mapper = mapHiraPharmacyRecord;
+    } catch (hiraError) {
+      throw new Error(
+        `약국 데이터 조회가 실패했습니다. NMC(getParmacyFullDown): ${
+          nmcError instanceof Error ? nmcError.message : String(nmcError)
+        }; HIRA(getParmacyBasisList): ${
+          hiraError instanceof Error ? hiraError.message : String(hiraError)
+        }. 두 서비스의 공공데이터포털 활용신청/승인 상태를 확인하세요.`,
+      );
+    }
+  }
 
   await report("receiving", 50, "전국 약국 API 응답을 모두 받았습니다.");
   await report("processing", 68, "약국 위치와 운영정보를 정규화했습니다.");
 
-  return pointResult(rows, mapPharmacyRecord);
+  return pointResult(rows, mapper);
 }
 
 export async function importHospitals(report: DatasetProgressReporter) {

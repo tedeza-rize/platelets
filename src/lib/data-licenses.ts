@@ -123,11 +123,12 @@ export const DATA_LICENSE_ENTRIES = [
   },
   {
     id: "pharmacies",
-    license: "이용허락범위 제한 없음",
+    license:
+      "NMC: 이용허락범위 제한 없음, HIRA: 공공데이터포털 개별 이용조건 준수",
     notes:
-      "전국 약국 FullData API를 최대 페이지 크기로 순회한다. PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관한다.",
-    provider: "국립중앙의료원 / 공공데이터포털",
-    sourceName: "전국 약국 정보 조회 서비스",
+      "NMC FullData를 우선 사용한다. NMC가 403이면 HIRA 약국정보서비스를 시도한다. 두 서비스 모두 PUBLIC_DATA_API_KEY를 서버 환경변수로만 보관하며, 활용신청이 승인되지 않으면 403이 발생할 수 있다.",
+    provider: "국립중앙의료원 / 건강보험심사평가원 / 공공데이터포털",
+    sourceName: "전국 약국 정보 조회 서비스, 건강보험심사평가원_약국정보서비스",
     sourceUrl: "https://www.data.go.kr/data/15000576/openapi.do",
     usage: "약국 위치, 연락처, 운영시간 지도 포인트",
   },
