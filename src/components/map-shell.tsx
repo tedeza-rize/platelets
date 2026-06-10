@@ -151,7 +151,6 @@ const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
 const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
 const VWORLD_BASE_SOURCE_ID = "vworld-base";
 const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
-const VWORLD_POI_SOURCE_ID = "vworld-poi";
 const OPENFREEMAP_SOURCE_ID = "openmaptiles";
 const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
@@ -319,13 +318,6 @@ const VWORLD_TRAFFIC_LINE_LAYERS = [
   ["nsid_data.vl_rodway_bndry_1518", "#c9c4ba", 0.7],
 ] as const;
 
-const VWORLD_POI_SOURCE_LAYERS = [
-  ["twin_upoi.mv_vctl_poi_10", 10, 12],
-  ["twin_upoi.mv_vctl_poi_11", 12, 14],
-  ["twin_upoi.mv_vctl_poi_13", 14, 16],
-  ["twin_upoi.mv_vctl_poi_15", 16, 20],
-] as const;
-
 type VectorPalette = {
   background: string;
   boundary: string;
@@ -386,7 +378,7 @@ function createVworldTileUrl(path: string) {
   )}`;
 }
 
-function createVworldVectorTileUrl(layer: "poi" | "traffic") {
+function createVworldVectorTileUrl(layer: "traffic") {
   return `https://api.vworld.kr/req/wmts/vector/getTile/${VWORLD_API_KEY}/${layer}/{z}/{x}/{y}.pbf`;
 }
 
@@ -440,21 +432,6 @@ function createVworldStyle(): StyleSpecification {
           type: "line",
         }),
       ),
-      ...VWORLD_POI_SOURCE_LAYERS.map(([sourceLayer, minzoom, maxzoom]) => ({
-        id: `vworld-poi-${sourceLayer.slice(-2)}`,
-        maxzoom,
-        minzoom,
-        paint: {
-          "circle-color": "#315f8f",
-          "circle-opacity": 0.48,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2, 16, 5],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 1,
-        },
-        source: VWORLD_POI_SOURCE_ID,
-        "source-layer": sourceLayer,
-        type: "circle",
-      })),
     ],
     sources: {
       [VWORLD_BASE_SOURCE_ID]: {
@@ -465,12 +442,6 @@ function createVworldStyle(): StyleSpecification {
         tileSize: 256,
         tiles: [createVworldTileUrl("{key}/Base/{z}/{x}/{y}.png")],
         type: "raster",
-      },
-      [VWORLD_POI_SOURCE_ID]: {
-        maxzoom: 19,
-        minzoom: 6,
-        tiles: [createVworldVectorTileUrl("poi")],
-        type: "vector",
       },
       [VWORLD_TRAFFIC_SOURCE_ID]: {
         maxzoom: 19,
@@ -1616,17 +1587,31 @@ function syncEmergencyRouteLayerWhenReady(
 
 function runWhenStyleReady(map: MapLibreMap, callback: () => void) {
   let didRun = false;
+  let retryId: number | undefined;
+  let attempts = 0;
   const run = () => {
-    if (didRun || !map.isStyleLoaded()) {
+    if (didRun) {
       return;
     }
 
-    didRun = true;
-    callback();
+    if (map.isStyleLoaded()) {
+      didRun = true;
+      if (retryId) {
+        window.clearTimeout(retryId);
+      }
+      callback();
+      return;
+    }
+
+    if (attempts < 80) {
+      attempts += 1;
+      retryId = window.setTimeout(run, 50);
+    }
   };
 
   map.once("style.load", run);
   map.once("idle", run);
+  run();
 }
 
 export function MapShell({ dictionary, initialProvider }: MapShellProps) {
@@ -2065,17 +2050,23 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
       );
 
       async function showPointPopup(feature: MapGeoJSONFeature) {
-        const coordinates = (
-          feature?.geometry.type === "Point"
-            ? feature.geometry.coordinates
-            : null
-        ) as [number, number] | null;
-
-        if (!feature?.properties || !coordinates) {
+        if (!feature?.properties) {
           return;
         }
 
         const point = feature.properties as PointFeatureProperties;
+        const coordinates: [number, number] = [
+          Number(point.longitude),
+          Number(point.latitude),
+        ];
+
+        if (
+          !Number.isFinite(coordinates[0]) ||
+          !Number.isFinite(coordinates[1])
+        ) {
+          return;
+        }
+
         const response = await fetch(`/api/points/${point.id}`, {
           cache: "no-store",
         });
@@ -2103,16 +2094,25 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           .addTo(map);
       }
 
-      async function showSeoulPopulationPopup(
-        feature: MapGeoJSONFeature,
-        longitude: number,
-        latitude: number,
-      ) {
+      async function showSeoulPopulationPopup(feature: MapGeoJSONFeature) {
         if (!feature?.properties) {
           return;
         }
 
         const area = feature.properties as SeoulAreaProperties;
+        const point = feature.properties as SeoulAreaPointProperties;
+        const coordinates: [number, number] = [
+          Number(point.longitude),
+          Number(point.latitude),
+        ];
+
+        if (
+          !Number.isFinite(coordinates[0]) ||
+          !Number.isFinite(coordinates[1])
+        ) {
+          return;
+        }
+
         const response = await fetch(
           `/api/seoul/population?areaCode=${encodeURIComponent(area.areaCode)}`,
           { cache: "no-store" },
@@ -2134,7 +2134,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           maxWidth: "340px",
           offset: 12,
         })
-          .setLngLat([longitude, latitude])
+          .setLngLat(coordinates)
           .setHTML(
             buildSeoulPopulationPopupHtml(
               area,
@@ -2180,11 +2180,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           feature.layer.id === SEOUL_AREAS_LAYER_ID ||
           feature.layer.id === SEOUL_AREAS_SYMBOL_LAYER_ID
         ) {
-          await showSeoulPopulationPopup(
-            feature,
-            event.lngLat.lng,
-            event.lngLat.lat,
-          );
+          await showSeoulPopulationPopup(feature);
           return;
         }
 
@@ -2374,9 +2370,6 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           <a className={styles.desktopLinkActive} href="/">
             지도
           </a>
-          <a className={styles.desktopLink} href="/licenses">
-            라이선스
-          </a>
           <a className={styles.desktopLink} href="/ai">
             AI 분석
           </a>
@@ -2393,6 +2386,14 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
             <Search aria-hidden="true" size={18} strokeWidth={2.2} />
             <span>시설 검색</span>
           </button>
+          <a
+            aria-label="데이터 출처 및 라이선스"
+            className={styles.navIconLink}
+            href="/licenses"
+            title="데이터 출처 및 라이선스"
+          >
+            <ShieldCheck aria-hidden="true" size={18} strokeWidth={2.5} />
+          </a>
           <div className={styles.providerMenu} ref={providerMenuRef}>
             <button
               aria-expanded={isMenuOpen}
@@ -2513,6 +2514,34 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
             </fieldset>
           ) : null}
         </div>
+        <div className={styles.mobileMapTools} ref={mobileProviderMenuRef}>
+          <a
+            aria-label="데이터 출처 및 라이선스"
+            className={styles.mobileToolButton}
+            href="/licenses"
+            title="데이터 출처 및 라이선스"
+          >
+            <ShieldCheck aria-hidden="true" size={18} strokeWidth={2.5} />
+          </a>
+          <button
+            aria-expanded={isMenuOpen}
+            aria-label={dictionary.map.providerMenuLabel.replace(
+              "{provider}",
+              selectedProviderLabel,
+            )}
+            className={styles.mobileToolButton}
+            onClick={() => setIsMenuOpen((current) => !current)}
+            title={selectedProviderLabel}
+            type="button"
+          >
+            <SelectedProviderIcon
+              aria-hidden="true"
+              size={18}
+              strokeWidth={2.5}
+            />
+          </button>
+          {renderProviderDropdown(styles.mobileProviderDropdown)}
+        </div>
         <section
           aria-label={dictionary.map.datasets.panelLabel}
           className={styles.datasetPanel}
@@ -2624,10 +2653,6 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           <Search aria-hidden="true" size={20} strokeWidth={2.5} />
           <span>시설</span>
         </button>
-        <a href="/licenses">
-          <ShieldCheck aria-hidden="true" size={20} strokeWidth={2.5} />
-          <span>라이선스</span>
-        </a>
         <a href="/ai">
           <Sparkles aria-hidden="true" size={20} strokeWidth={2.5} />
           <span>AI</span>
@@ -2636,25 +2661,6 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           <UserCog aria-hidden="true" size={20} strokeWidth={2.5} />
           <span>관리</span>
         </a>
-        <div className={styles.mobileProviderMenu} ref={mobileProviderMenuRef}>
-          <button
-            aria-expanded={isMenuOpen}
-            aria-label={dictionary.map.providerMenuLabel.replace(
-              "{provider}",
-              selectedProviderLabel,
-            )}
-            onClick={() => setIsMenuOpen((current) => !current)}
-            type="button"
-          >
-            <SelectedProviderIcon
-              aria-hidden="true"
-              size={20}
-              strokeWidth={2.5}
-            />
-            <span>지도층</span>
-          </button>
-          {renderProviderDropdown(styles.mobileProviderDropdown)}
-        </div>
       </nav>
     </div>
   );

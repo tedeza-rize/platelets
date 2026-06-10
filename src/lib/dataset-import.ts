@@ -399,15 +399,15 @@ function mapPoliceRecord(
   const station = text(record.관서명);
   const category = text(record.구분) || "경찰";
 
-  if (!sourceRecordId || !station) {
+  if (!sourceRecordId || !station || !coordinates) {
     return null;
   }
 
   return {
     address: text(record.주소),
     category,
-    latitude: coordinates?.latitude ?? null,
-    longitude: coordinates?.longitude ?? null,
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
     name: `${office} ${station}${category}`.trim(),
     parentName: nullableText(record.시도청),
     phone: null,

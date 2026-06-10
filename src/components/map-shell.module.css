@@ -132,7 +132,32 @@
   outline: 0;
 }
 
+.navIconLink {
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.navIconLink:hover,
+.navIconLink:focus-visible {
+  border-color: #8b7cf6;
+  color: #7258e8;
+  outline: 0;
+}
+
 .mobileNav {
+  display: none;
+}
+
+.mobileMapTools {
   display: none;
 }
 
@@ -418,7 +443,7 @@
 .sourceMenu {
   position: absolute;
   top: 18px;
-  right: 10px;
+  right: 72px;
   z-index: 950;
   display: grid;
   justify-items: end;
@@ -858,15 +883,14 @@
     z-index: 1100;
     display: grid;
     align-items: stretch;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     border-top: 1px solid var(--border);
     background: var(--dropdown-surface);
     box-shadow: 0 -8px 24px rgb(24 32 28 / 10%);
   }
 
   .mobileNav > a,
-  .mobileNav > button,
-  .mobileProviderMenu > button {
+  .mobileNav > button {
     display: grid;
     min-width: 0;
     place-items: center;
@@ -884,24 +908,45 @@
   .mobileNav > a:focus-visible,
   .mobileNav > button:hover,
   .mobileNav > button:focus-visible,
-  .mobileProviderMenu > button:hover,
-  .mobileProviderMenu > button:focus-visible,
   .mobileNavActive {
     background: color-mix(in srgb, #7258e8 10%, transparent);
     color: #7258e8;
     outline: 0;
   }
 
-  .mobileProviderMenu {
-    position: relative;
-    display: grid;
-    min-width: 0;
+  .mobileMapTools {
+    position: absolute;
+    top: 54px;
+    right: 72px;
+    z-index: 960;
+    display: inline-flex;
+    gap: 7px;
+  }
+
+  .mobileToolButton {
+    display: inline-grid;
+    width: 38px;
+    height: 34px;
+    place-items: center;
+    border: 1px solid var(--control-border);
+    border-radius: 8px;
+    background: var(--control-selected);
+    color: var(--text-strong);
+    cursor: pointer;
+    box-shadow: var(--control-shadow);
+  }
+
+  .mobileToolButton:hover,
+  .mobileToolButton:focus-visible {
+    border-color: var(--focus-ring);
+    color: #7258e8;
+    outline: 0;
   }
 
   .mobileProviderDropdown {
     position: absolute;
     right: 8px;
-    bottom: calc(100% + 8px);
+    top: calc(100% + 8px);
     z-index: 1200;
     display: grid;
     min-width: 154px;
@@ -929,7 +974,7 @@
 
   .sourceMenu {
     top: 12px;
-    right: 10px;
+    right: 72px;
   }
 
   .emergencyLauncher {
