@@ -21,6 +21,7 @@ import type {
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import type { AppDictionary } from "@/lib/i18n";
@@ -112,29 +113,29 @@ const POINT_HALO_RADIUS: PropertyValueSpecification<number> = [
   ["linear"],
   ["zoom"],
   6,
+  18,
   12,
-  12,
-  28,
+  42,
 ];
 const POINT_HIT_RADIUS: PropertyValueSpecification<number> = [
   "interpolate",
   ["linear"],
   ["zoom"],
   6,
+  18,
   12,
-  12,
-  22,
+  33,
 ];
 const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
   "interpolate",
   ["linear"],
   ["zoom"],
   6,
-  0.58,
+  0.87,
   12,
-  0.92,
+  1.38,
   16,
-  1.08,
+  1.62,
 ];
 const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
 const VWORLD_BASE_SOURCE_ID = "vworld-base";
@@ -155,13 +156,6 @@ const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
   schools: "#facc15",
   universities: "#8b5cf6",
 };
-const SOURCE_SYMBOL_LABELS: Record<DatasetSourceId, string> = {
-  aeds: "AED",
-  "fire-stations": "119",
-  "police-stations": "POL",
-  schools: "SCH",
-  universities: "UNI",
-};
 const SOURCE_ICON_IDS: Record<DatasetSourceId, string> = {
   aeds: "point-icon-aed",
   "fire-stations": "point-icon-fire",
@@ -177,7 +171,6 @@ type PointFeatureProperties = {
   latitude: number;
   longitude: number;
   source: DatasetSourceId;
-  symbolLabel: string;
 };
 
 type SeoulAreaPointProperties = SeoulAreaProperties & {
@@ -750,6 +743,50 @@ function isMappedHazardEvent(event: HazardEvent): event is MappedHazardEvent {
   return event.latitude !== null && event.longitude !== null;
 }
 
+function isDomesticHazardEvent(event: HazardEvent) {
+  if (event.eventType !== "earthquake") {
+    return true;
+  }
+
+  if (event.latitude === null || event.longitude === null) {
+    return false;
+  }
+
+  if (/(?:북한|일본|중국|러시아|대만|필리핀|인도네시아)/.test(event.location)) {
+    return false;
+  }
+
+  return (
+    event.latitude >= 32.5 &&
+    event.latitude <= 39.5 &&
+    event.longitude >= 123.5 &&
+    event.longitude <= 132.5
+  );
+}
+
+function safeKmaImageUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (
+      url.hostname !== "weather.go.kr" &&
+      !url.hostname.endsWith(".weather.go.kr")
+    ) {
+      return null;
+    }
+
+    url.protocol = "https:";
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function createPointData(points: EmergencyPointMarker[]) {
   return {
     features: points.filter(isMappedPoint).map((point) => ({
@@ -764,7 +801,6 @@ function createPointData(points: EmergencyPointMarker[]) {
         latitude: point.latitude,
         longitude: point.longitude,
         source: point.source,
-        symbolLabel: SOURCE_SYMBOL_LABELS[point.source],
       } satisfies PointFeatureProperties,
       type: "Feature" as const,
     })),
@@ -851,28 +887,31 @@ function createSeoulAreaPointData(areas: SeoulAreasData) {
 
 function createHazardData(events: HazardEvent[]) {
   return {
-    features: events.filter(isMappedHazardEvent).map((event) => ({
-      geometry: {
-        coordinates: [event.longitude, event.latitude],
-        type: "Point" as const,
-      },
-      properties: {
-        depth: event.depth ?? "",
-        description: event.description ?? "",
-        eventId: event.eventId,
-        eventType: event.eventType,
-        imageUrl: event.imageUrl ?? "",
-        intensity: event.intensity ?? "",
-        issuedAt: event.issuedAt ?? "",
-        latitude: event.latitude,
-        location: event.location,
-        longitude: event.longitude,
-        magnitude: event.magnitude ?? "",
-        occurredAt: event.occurredAt ?? "",
-        title: event.title,
-      } satisfies HazardFeatureProperties,
-      type: "Feature" as const,
-    })),
+    features: events
+      .filter(isDomesticHazardEvent)
+      .filter(isMappedHazardEvent)
+      .map((event) => ({
+        geometry: {
+          coordinates: [event.longitude, event.latitude],
+          type: "Point" as const,
+        },
+        properties: {
+          depth: event.depth ?? "",
+          description: event.description ?? "",
+          eventId: event.eventId,
+          eventType: event.eventType,
+          imageUrl: event.imageUrl ?? "",
+          intensity: event.intensity ?? "",
+          issuedAt: event.issuedAt ?? "",
+          latitude: event.latitude,
+          location: event.location,
+          longitude: event.longitude,
+          magnitude: event.magnitude ?? "",
+          occurredAt: event.occurredAt ?? "",
+          title: event.title,
+        } satisfies HazardFeatureProperties,
+        type: "Feature" as const,
+      })),
     type: "FeatureCollection" as const,
   };
 }
@@ -932,10 +971,13 @@ function formatDateTime(value: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("ko-KR", {
+  const formatted = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
+    timeZone: "Asia/Seoul",
     timeStyle: "short",
   }).format(date);
+
+  return `${formatted} KST`;
 }
 
 function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
@@ -1063,11 +1105,99 @@ function createPointIconImage(source: DatasetSourceId) {
   context.closePath();
   context.fill();
   context.stroke();
+  context.save();
+  context.translate(center, 24);
+  context.strokeStyle = "#ffffff";
   context.fillStyle = "#ffffff";
-  context.font = "700 14px Arial, sans-serif";
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(SOURCE_SYMBOL_LABELS[source], center, 25);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = 3.4;
+
+  if (source === "aeds") {
+    context.beginPath();
+    context.moveTo(0, 9);
+    context.bezierCurveTo(-13, 1, -12, -9, -5, -10);
+    context.bezierCurveTo(-1, -11, 0, -7, 0, -5);
+    context.bezierCurveTo(0, -7, 2, -11, 6, -10);
+    context.bezierCurveTo(13, -8, 13, 1, 0, 9);
+    context.fill();
+    context.strokeStyle = SOURCE_COLORS[source];
+    context.lineWidth = 2.5;
+    context.beginPath();
+    context.moveTo(-5, 0);
+    context.lineTo(-1, 0);
+    context.lineTo(1, -4);
+    context.lineTo(3, 4);
+    context.lineTo(5, 0);
+    context.lineTo(8, 0);
+    context.stroke();
+  } else if (source === "fire-stations") {
+    context.beginPath();
+    context.moveTo(1, -12);
+    context.bezierCurveTo(5, -5, 12, -2, 9, 6);
+    context.bezierCurveTo(7, 12, -6, 12, -9, 5);
+    context.bezierCurveTo(-11, -1, -4, -5, -3, -10);
+    context.bezierCurveTo(0, -7, 1, -3, 1, 0);
+    context.bezierCurveTo(5, -4, 4, -8, 1, -12);
+    context.fill();
+  } else if (source === "police-stations") {
+    context.beginPath();
+    context.moveTo(0, -12);
+    context.lineTo(11, -8);
+    context.lineTo(9, 3);
+    context.quadraticCurveTo(7, 10, 0, 13);
+    context.quadraticCurveTo(-7, 10, -9, 3);
+    context.lineTo(-11, -8);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(0, -6);
+    context.lineTo(2, -1);
+    context.lineTo(7, -1);
+    context.lineTo(3, 2);
+    context.lineTo(5, 7);
+    context.lineTo(0, 4);
+    context.lineTo(-5, 7);
+    context.lineTo(-3, 2);
+    context.lineTo(-7, -1);
+    context.lineTo(-2, -1);
+    context.closePath();
+    context.fill();
+  } else if (source === "schools") {
+    context.beginPath();
+    context.moveTo(-12, -8);
+    context.quadraticCurveTo(-5, -10, 0, -5);
+    context.quadraticCurveTo(5, -10, 12, -8);
+    context.lineTo(12, 9);
+    context.quadraticCurveTo(5, 7, 0, 11);
+    context.quadraticCurveTo(-5, 7, -12, 9);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(0, -5);
+    context.lineTo(0, 11);
+    context.stroke();
+  } else {
+    context.beginPath();
+    context.moveTo(-14, -5);
+    context.lineTo(0, -12);
+    context.lineTo(14, -5);
+    context.lineTo(0, 2);
+    context.closePath();
+    context.fill();
+    context.beginPath();
+    context.moveTo(-8, 0);
+    context.lineTo(-8, 7);
+    context.quadraticCurveTo(0, 12, 8, 7);
+    context.lineTo(8, 0);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(14, -5);
+    context.lineTo(14, 7);
+    context.stroke();
+  }
+
+  context.restore();
 
   return context.getImageData(0, 0, size, size);
 }
@@ -1442,6 +1572,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const selectedDatasetCount = datasets.filter((dataset) =>
     isSourceVisible(visibleSources, dataset.id),
   ).length;
+  const activeHazardImageUrl = safeKmaImageUrl(activeHazard?.imageUrl ?? null);
 
   const refreshData = useCallback(async () => {
     const [datasetsResponse, hazardsResponse, seoulResponse] =
@@ -1503,6 +1634,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     setActiveHazard(event);
 
     if (
+      !isDomesticHazardEvent(event) ||
       event.latitude === null ||
       event.longitude === null ||
       !mapRef.current
@@ -1529,7 +1661,8 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     const previousIds = knownHazardIdsRef.current;
     const nextIds = new Set(payload.events.map((event) => event.eventId));
     const newEvent = payload.events.find(
-      (event) => !previousIds.has(event.eventId),
+      (event) =>
+        !previousIds.has(event.eventId) && isDomesticHazardEvent(event),
     );
 
     setHazards(payload.events);
@@ -1714,8 +1847,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         "top-right",
       );
 
-      async function showPointPopup(event: MapLayerMouseEvent) {
-        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
+      async function showPointPopup(feature: MapGeoJSONFeature) {
         const coordinates = (
           feature?.geometry.type === "Point"
             ? feature.geometry.coordinates
@@ -1754,9 +1886,11 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           .addTo(map);
       }
 
-      async function showSeoulPopulationPopup(event: MapLayerMouseEvent) {
-        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
-
+      async function showSeoulPopulationPopup(
+        feature: MapGeoJSONFeature,
+        longitude: number,
+        latitude: number,
+      ) {
         if (!feature?.properties) {
           return;
         }
@@ -1783,7 +1917,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           maxWidth: "340px",
           offset: 12,
         })
-          .setLngLat(event.lngLat)
+          .setLngLat([longitude, latitude])
           .setHTML(
             buildSeoulPopulationPopupHtml(
               area,
@@ -1794,16 +1928,46 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           .addTo(map);
       }
 
-      map.on("click", POINTS_LAYER_ID, showPointPopup);
-      map.on("click", POINTS_SYMBOL_LAYER_ID, showPointPopup);
-      map.on("click", SEOUL_AREAS_HALO_LAYER_ID, showSeoulPopulationPopup);
-      map.on("click", SEOUL_AREAS_LAYER_ID, showSeoulPopulationPopup);
-      map.on("click", SEOUL_AREAS_SYMBOL_LAYER_ID, showSeoulPopulationPopup);
+      map.on("click", async (event: MapLayerMouseEvent) => {
+        const layers = [
+          POINTS_SYMBOL_LAYER_ID,
+          POINTS_LAYER_ID,
+          SEOUL_AREAS_SYMBOL_LAYER_ID,
+          SEOUL_AREAS_LAYER_ID,
+          SEOUL_AREAS_HALO_LAYER_ID,
+          HAZARDS_LAYER_ID,
+        ].filter((layerId) => map.getLayer(layerId));
 
-      map.on("click", HAZARDS_LAYER_ID, (event: MapLayerMouseEvent) => {
-        const feature = event.features?.[0] as MapGeoJSONFeature | undefined;
+        if (layers.length === 0) {
+          return;
+        }
+
+        const feature = map.queryRenderedFeatures(event.point, { layers })[0] as
+          | MapGeoJSONFeature
+          | undefined;
 
         if (!feature?.properties) {
+          return;
+        }
+
+        if (
+          feature.layer.id === POINTS_LAYER_ID ||
+          feature.layer.id === POINTS_SYMBOL_LAYER_ID
+        ) {
+          await showPointPopup(feature);
+          return;
+        }
+
+        if (
+          feature.layer.id === SEOUL_AREAS_HALO_LAYER_ID ||
+          feature.layer.id === SEOUL_AREAS_LAYER_ID ||
+          feature.layer.id === SEOUL_AREAS_SYMBOL_LAYER_ID
+        ) {
+          await showSeoulPopulationPopup(
+            feature,
+            event.lngLat.lng,
+            event.lngLat.lat,
+          );
           return;
         }
 
@@ -2208,15 +2372,19 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
                   {activeHazard.description}
                 </p>
               ) : null}
-              {activeHazard.imageUrl ? (
-                <a
-                  className={styles.hazardLink}
-                  href={activeHazard.imageUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  기상청 이미지 보기
-                </a>
+              {activeHazardImageUrl ? (
+                <figure className={styles.hazardImageFrame}>
+                  <Image
+                    alt={`${activeHazard.title} 기상청 관측 이미지`}
+                    className={styles.hazardImage}
+                    height={800}
+                    loading="lazy"
+                    src={activeHazardImageUrl}
+                    unoptimized
+                    width={1200}
+                  />
+                  <figcaption>기상청 제공 이미지</figcaption>
+                </figure>
               ) : null}
             </section>
           </div>

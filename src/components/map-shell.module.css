@@ -487,17 +487,28 @@
   padding: 10px;
 }
 
-.hazardLink {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  background: #225ea8;
-  color: #ffffff;
-  font-size: 0.84rem;
-  font-weight: 800;
-  padding: 0 12px;
+.hazardImageFrame {
+  display: grid;
+  gap: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  padding: 8px;
+}
+
+.hazardImage {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  border-radius: 5px;
+  object-fit: contain;
+}
+
+.hazardImageFrame figcaption {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  text-align: center;
 }
 
 .popup {
