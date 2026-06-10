@@ -112,6 +112,10 @@ type PointRow = {
   source_updated_at: string | null;
 };
 
+type PointWithRawRow = PointRow & {
+  raw_json: string;
+};
+
 type DatasetStatusRow = {
   error: string | null;
   failed_count: number;
@@ -161,6 +165,21 @@ type PointSummary = {
 type MappedPoint = Omit<PointSummary, "latitude" | "longitude"> & Coordinate;
 
 type NearestPoint = MappedPoint & {
+  distanceMeters: number;
+};
+
+type EmergencyScenario =
+  | "general"
+  | "pediatric-respiratory"
+  | "cardiac"
+  | "stroke"
+  | "trauma"
+  | "burn"
+  | "delivery"
+  | "elderly-fall";
+
+type EmergencyCandidate = MappedPoint & {
+  raw: Record<string, string>;
   distanceMeters: number;
 };
 
@@ -451,6 +470,194 @@ async function nearestPoints(options: {
     )
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
     .slice(0, clamp(options.limit ?? 10, 1, 50));
+}
+
+function pointWithRawFromRow(row: PointWithRawRow): PointSummary & {
+  raw: Record<string, string>;
+} {
+  return {
+    ...pointFromRow(row),
+    raw: JSON.parse(row.raw_json) as Record<string, string>,
+  };
+}
+
+function gradeRatio(category: string) {
+  if (/권역|전문/.test(category)) return 1;
+  if (/지역응급의료센터/.test(category)) return 0.85;
+  if (/지역응급의료기관/.test(category)) return 0.65;
+  return 0.45;
+}
+
+function rawSearchText(raw: Record<string, string>) {
+  return Object.entries(raw)
+    .filter(([key, value]) => value && !key.toLowerCase().includes("addr"))
+    .map(([key, value]) => `${key} ${value}`)
+    .join(" ")
+    .toLowerCase();
+}
+
+function termRatio(text: string, terms: string[]) {
+  if (terms.length === 0) return 0.5;
+  const matches = terms.filter((term) =>
+    text.includes(term.toLowerCase()),
+  ).length;
+  return Math.min(1, 0.2 + matches / Math.min(3, terms.length));
+}
+
+function numeric(raw: Record<string, string>, keys: string[]) {
+  for (const key of keys) {
+    const value = Number(raw[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+const EMERGENCY_SCENARIO_TERMS: Record<EmergencyScenario, string[]> = {
+  burn: ["화상", "외과", "성형외과", "중환자", "수술"],
+  cardiac: ["심장", "순환기", "흉부외과", "심근경색", "중환자"],
+  delivery: ["산부인과", "분만", "신생아", "응급분만"],
+  "elderly-fall": ["정형외과", "신경외과", "내과", "골절"],
+  general: ["응급의학", "응급실", "내과", "외과"],
+  "pediatric-respiratory": ["소아청소년과", "소아", "호흡", "신생아", "중환자"],
+  stroke: ["신경과", "신경외과", "뇌혈관", "뇌경색", "뇌출혈"],
+  trauma: ["외상", "외과", "정형외과", "신경외과", "중환자", "수술"],
+};
+
+async function nearestEmergencyCandidates(options: {
+  latitude: number;
+  limit?: number;
+  longitude: number;
+  radiusMeters?: number;
+}) {
+  const radiusMeters = Math.min(
+    Math.max(options.radiusMeters ?? 120_000, 1_000),
+    200_000,
+  );
+  const latitudeDelta = radiusMeters / 111_320;
+  const longitudeDelta =
+    radiusMeters /
+    (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
+
+  return withDatabase(async (db) => {
+    const rows = await all<PointWithRawRow>(
+      db,
+      `SELECT ${POINT_COLUMNS}, p.raw_json
+        FROM points p
+        LEFT JOIN dataset_updates u ON u.source = p.source
+        WHERE p.source = 'emergency-medical-institutions'
+          AND p.latitude BETWEEN ? AND ?
+          AND p.longitude BETWEEN ? AND ?
+        ORDER BY ((p.latitude - ?) * (p.latitude - ?) + (p.longitude - ?) * (p.longitude - ?)), p.id
+        LIMIT ?`,
+      [
+        options.latitude - latitudeDelta,
+        options.latitude + latitudeDelta,
+        options.longitude - longitudeDelta,
+        options.longitude + longitudeDelta,
+        options.latitude,
+        options.latitude,
+        options.longitude,
+        options.longitude,
+        5_000,
+      ],
+    );
+
+    return rows
+      .map(pointWithRawFromRow)
+      .filter(
+        (point): point is EmergencyCandidate =>
+          point.latitude !== null && point.longitude !== null,
+      )
+      .map((point) => ({
+        ...point,
+        distanceMeters: Math.round(
+          distanceMeters(options, {
+            latitude: point.latitude,
+            longitude: point.longitude,
+          }),
+        ),
+      }))
+      .filter((point) => point.distanceMeters <= radiusMeters)
+      .sort((left, right) => left.distanceMeters - right.distanceMeters)
+      .slice(0, clamp(options.limit ?? 12, 1, 50));
+  });
+}
+
+async function recommendEmergencyHospitalsForMcp(options: {
+  latitude: number;
+  limit?: number;
+  longitude: number;
+  radiusMeters?: number;
+  scenario: EmergencyScenario;
+  useDirections?: boolean;
+}) {
+  const origin = { latitude: options.latitude, longitude: options.longitude };
+  const candidates = await nearestEmergencyCandidates({
+    ...origin,
+    limit: Math.max((options.limit ?? 8) * 3, 12),
+    radiusMeters: options.radiusMeters,
+  });
+  const results = [];
+
+  for (const candidate of candidates.slice(0, 12)) {
+    const route =
+      options.useDirections !== false
+        ? await kakaoDirectionSummary(
+            origin,
+            {
+              latitude: candidate.latitude,
+              longitude: candidate.longitude,
+            },
+            "TIME",
+          )
+        : null;
+    const durationSeconds = isKakaoDirectionSummary(route)
+      ? route.durationSeconds
+      : Math.round((candidate.distanceMeters * 1.25) / 11.1);
+    const emergencyBeds = numeric(candidate.raw, ["realtimeBed.hvec", "hvec"]);
+    const capability = termRatio(
+      rawSearchText(candidate.raw),
+      EMERGENCY_SCENARIO_TERMS[options.scenario],
+    );
+    const availability =
+      emergencyBeds === null ? 0.45 : emergencyBeds > 0 ? 1 : 0.05;
+    const travel = Math.max(0.05, 1 - durationSeconds / 60 / 90);
+    const score =
+      Math.round(
+        (travel * 45 +
+          capability * 25 +
+          availability * 20 +
+          gradeRatio(candidate.category) * 10) *
+          10,
+      ) / 10;
+
+    results.push({
+      address: candidate.address,
+      category: candidate.category,
+      distanceMeters: isKakaoDirectionSummary(route)
+        ? route.distanceMeters
+        : Math.round(candidate.distanceMeters * 1.25),
+      durationSeconds,
+      emergencyBeds,
+      id: candidate.id,
+      name: candidate.name,
+      phone: candidate.phone,
+      route,
+      score,
+      scoreBasis: isKakaoDirectionSummary(route)
+        ? "kakao-route-duration-and-medical-suitability"
+        : "estimated-road-time-and-medical-suitability",
+      sourceUpdatedAt: candidate.sourceUpdatedAt,
+    });
+  }
+
+  return results
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.durationSeconds - right.durationSeconds,
+    )
+    .slice(0, clamp(options.limit ?? 8, 1, 12));
 }
 
 function kakaoRestApiKey() {
@@ -768,7 +975,7 @@ server.registerTool(
         .optional()
         .default("unknown")
         .describe(
-          "Hospital capability ranking is future work until ER/hospital capacity data is ingested.",
+          "Use recommend_emergency_hospitals for hospital suitability ranking. This tool ranks generic response points.",
         ),
       priority: z
         .enum(["RECOMMEND", "TIME", "DISTANCE"])
@@ -843,10 +1050,57 @@ server.registerTool(
         ...incident,
         patientType: args.patientType,
       },
-      note: "Hospital/ER suitability needs a hospital capability dataset. Current ranking covers existing response points only.",
+      note: "This generic tool ranks response points. Use recommend_emergency_hospitals for hospital suitability scoring.",
       points: ranked.slice(0, args.limit),
     });
   },
+);
+
+server.registerTool(
+  "recommend_emergency_hospitals",
+  {
+    description:
+      "Recommend emergency hospitals using road-time evidence when Kakao is configured and medical suitability from stored emergency institution data.",
+    inputSchema: {
+      latitude: z.number().min(32).max(39),
+      limit: z.number().int().min(1).max(12).optional().default(8),
+      longitude: z.number().min(124).max(132),
+      radiusMeters: z
+        .number()
+        .int()
+        .min(1000)
+        .max(200000)
+        .optional()
+        .default(120000),
+      scenario: z
+        .enum([
+          "general",
+          "pediatric-respiratory",
+          "cardiac",
+          "stroke",
+          "trauma",
+          "burn",
+          "delivery",
+          "elderly-fall",
+        ])
+        .optional()
+        .default("general"),
+      useDirections: z.boolean().optional().default(true),
+    },
+    title: "Recommend Emergency Hospitals",
+  },
+  async (args) =>
+    asToolResult({
+      hospitals: await recommendEmergencyHospitalsForMcp({
+        latitude: args.latitude,
+        limit: args.limit,
+        longitude: args.longitude,
+        radiusMeters: args.radiusMeters,
+        scenario: args.scenario,
+        useDirections: args.useDirections,
+      }),
+      scenario: args.scenario,
+    }),
 );
 
 const transport = new StdioServerTransport();
