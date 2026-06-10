@@ -26,6 +26,10 @@ export function LicenseBrowser({ entries }: LicenseBrowserProps) {
         entry.provider,
         entry.sourceName,
         entry.sourceUrl,
+        ...(entry.sourceUrls ?? []).flatMap((source) => [
+          source.label,
+          source.url,
+        ]),
         entry.usage,
       ].some((value) => value.toLowerCase().includes(normalizedQuery)),
     );
@@ -108,14 +112,25 @@ export function LicenseBrowser({ entries }: LicenseBrowserProps) {
               <div>
                 <dt>출처</dt>
                 <dd>
-                  <a href={entry.sourceUrl} rel="noreferrer" target="_blank">
-                    <span>{entry.sourceUrl}</span>
-                    <ExternalLink
-                      aria-hidden="true"
-                      size={14}
-                      strokeWidth={2.5}
-                    />
-                  </a>
+                  {(
+                    entry.sourceUrls ?? [
+                      { label: entry.sourceUrl, url: entry.sourceUrl },
+                    ]
+                  ).map((source) => (
+                    <a
+                      href={source.url}
+                      key={source.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <span>{source.label}</span>
+                      <ExternalLink
+                        aria-hidden="true"
+                        size={14}
+                        strokeWidth={2.5}
+                      />
+                    </a>
+                  ))}
                 </dd>
               </div>
               <div>

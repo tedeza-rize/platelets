@@ -5,6 +5,7 @@ export type DataLicenseEntry = {
   provider: string;
   sourceName: string;
   sourceUrl: string;
+  sourceUrls?: readonly { label: string; url: string }[];
   usage: string;
 };
 
@@ -132,6 +133,20 @@ export const DATA_LICENSE_ENTRIES = [
     sourceName:
       "전국 약국 정보 조회 서비스, 건강보험심사평가원_약국정보서비스, 행정안전부_건강_약국 조회서비스",
     sourceUrl: "https://www.data.go.kr/data/15000576/openapi.do",
+    sourceUrls: [
+      {
+        label: "국립중앙의료원_전국 약국 정보 조회 서비스",
+        url: "https://www.data.go.kr/data/15000576/openapi.do",
+      },
+      {
+        label: "건강보험심사평가원_약국정보서비스",
+        url: "https://www.data.go.kr/data/15001673/openapi.do",
+      },
+      {
+        label: "행정안전부_건강_약국 조회서비스",
+        url: "https://www.data.go.kr/data/15154822/openapi.do",
+      },
+    ],
     usage: "약국 위치, 연락처, 운영시간 지도 포인트",
   },
   {
