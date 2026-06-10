@@ -1,3 +1,4 @@
+import { lookup } from "node:dns/promises";
 import { getAppSetting, setAppSetting } from "@/lib/points-db";
 
 export type AiApiMode = "responses" | "chat-completions";
@@ -61,6 +62,21 @@ function isPrivateHostname(hostname: string) {
   );
 }
 
+function isPrivateAddress(address: string) {
+  const normalized = address.toLowerCase();
+
+  if (
+    normalized === "::1" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
+  ) {
+    return true;
+  }
+
+  return isPrivateHostname(normalized.replace(/^::ffff:/, ""));
+}
+
 export function validateAiBaseUrl(value: string) {
   const url = new URL(value.trim());
 
@@ -80,6 +96,21 @@ export function validateAiBaseUrl(value: string) {
   }
 
   return url.toString().replace(/\/$/, "");
+}
+
+export async function assertAiBaseUrlSafe(value: string) {
+  const validated = validateAiBaseUrl(value);
+
+  if (process.env.AI_ALLOW_PRIVATE_BASE_URL === "true") {
+    return validated;
+  }
+
+  const addresses = await lookup(new URL(validated).hostname, { all: true });
+  if (addresses.some(({ address }) => isPrivateAddress(address))) {
+    throw new Error("사설망으로 연결되는 AI 프록시 URL은 허용되지 않습니다.");
+  }
+
+  return validated;
 }
 
 export async function getAiSettings() {
@@ -113,7 +144,9 @@ export async function saveAiSettings(input: Partial<AiSettings>) {
   const settings: AiSettings = {
     apiMode:
       input.apiMode === "chat-completions" ? "chat-completions" : "responses",
-    baseUrl: validateAiBaseUrl(input.baseUrl || DEFAULT_AI_SETTINGS.baseUrl),
+    baseUrl: await assertAiBaseUrlSafe(
+      input.baseUrl || DEFAULT_AI_SETTINGS.baseUrl,
+    ),
     model: input.model?.trim().slice(0, 120) || DEFAULT_AI_SETTINGS.model,
     reasoningEffort: [
       "none",

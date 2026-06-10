@@ -4,6 +4,7 @@ import {
   recommendEmergencyHospitals,
 } from "@/lib/emergency-recommendation";
 import { noStoreJson } from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,13 @@ const SCENARIOS = new Set<EmergencyScenario>([
 ]);
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, {
+    bucket: "emergency-recommendations",
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   const payload = (await request.json().catch(() => null)) as {
     incidentType?: unknown;
     latitude?: unknown;
@@ -35,10 +43,10 @@ export async function POST(request: Request) {
   if (
     !Number.isFinite(latitude) ||
     !Number.isFinite(longitude) ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
+    latitude < 32 ||
+    latitude > 39 ||
+    longitude < 124 ||
+    longitude > 132
   ) {
     return noStoreJson(
       { error: "올바른 사고 위치가 필요합니다." },

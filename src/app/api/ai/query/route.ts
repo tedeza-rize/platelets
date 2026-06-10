@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { requireAccessRole } from "@/lib/access-control";
 import { buildAiGrounding } from "@/lib/ai-grounding";
-import { getAiSettings } from "@/lib/ai-settings";
+import { assertAiBaseUrlSafe, getAiSettings } from "@/lib/ai-settings";
 import { noStoreJson } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     const latitudeText = String(payload?.latitude ?? "").trim();
     const longitudeText = String(payload?.longitude ?? "").trim();
     const settings = await getAiSettings();
+    const safeBaseUrl = await assertAiBaseUrlSafe(settings.baseUrl);
     const grounding = await buildAiGrounding({
       latitude: latitudeText ? Number(latitudeText) : undefined,
       longitude: longitudeText ? Number(longitudeText) : undefined,
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     });
     const client = new OpenAI({
       apiKey,
-      baseURL: settings.baseUrl,
+      baseURL: safeBaseUrl,
       maxRetries: 1,
       timeout: 60_000,
     });
