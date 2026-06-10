@@ -906,6 +906,21 @@ export async function listPoints(options: PointSearchOptions = {}) {
   return rows.map(mapPointRow);
 }
 
+export async function listEmergencyHospitalFallbackPoints() {
+  const db = await getDatabase();
+  const rows = await all<PointRow>(
+    db,
+    `SELECT p.*, u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source
+      WHERE p.source = 'hospitals'
+        AND json_extract(p.raw_json, '$.dutyEryn') = '1'
+      ORDER BY p.name`,
+  );
+
+  return rows.map(mapPointRow);
+}
+
 export async function getPointSummary(id: number) {
   const db = await getDatabase();
   const row = await get<PointRow>(
@@ -1000,6 +1015,54 @@ export async function findNearestPoints(options: {
     .filter((point) => point.distanceMeters <= radiusMeters)
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
     .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 10), 1), 100));
+}
+
+export async function findNearestEmergencyInstitutions(options: {
+  latitude: number;
+  limit?: number;
+  longitude: number;
+  radiusMeters?: number;
+}) {
+  const radiusMeters = Math.min(
+    Math.max(options.radiusMeters ?? 100_000, 1_000),
+    200_000,
+  );
+  const latitudeDelta = radiusMeters / 111_320;
+  const longitudeDelta =
+    radiusMeters /
+    (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
+  const candidates = await listPoints({
+    bounds: {
+      maxLatitude: options.latitude + latitudeDelta,
+      maxLongitude: options.longitude + longitudeDelta,
+      minLatitude: options.latitude - latitudeDelta,
+      minLongitude: options.longitude - longitudeDelta,
+    },
+    limit: 5_000,
+    source: "emergency-medical-institutions",
+  });
+
+  return candidates
+    .filter(
+      (
+        point,
+      ): point is EmergencyPoint & {
+        latitude: number;
+        longitude: number;
+      } => point.latitude !== null && point.longitude !== null,
+    )
+    .map((point) => ({
+      ...point,
+      distanceMeters: Math.round(
+        distanceMeters(options, {
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }),
+      ),
+    }))
+    .filter((point) => point.distanceMeters <= radiusMeters)
+    .sort((left, right) => left.distanceMeters - right.distanceMeters)
+    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 30), 1), 100));
 }
 
 export async function listApiLogs(

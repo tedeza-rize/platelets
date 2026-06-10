@@ -1,0 +1,359 @@
+import {
+  calculateEmergencyRoute,
+  hasKakaoMobilityKey,
+  haversineMeters,
+} from "@/lib/emergency-routing";
+import {
+  findNearestEmergencyInstitutions,
+  findNearestPoints,
+} from "@/lib/points-db";
+
+export type EmergencyScenario =
+  | "general"
+  | "pediatric-respiratory"
+  | "cardiac"
+  | "stroke"
+  | "trauma"
+  | "burn"
+  | "delivery"
+  | "elderly-fall";
+
+type ScoreCategory =
+  | "travelTime"
+  | "specialty"
+  | "bedType"
+  | "criticalCare"
+  | "availability"
+  | "gradeStability";
+
+type ScoreWeights = Record<ScoreCategory, number>;
+
+const WEIGHTS: Record<EmergencyScenario, ScoreWeights> = {
+  general: {
+    availability: 20,
+    bedType: 10,
+    criticalCare: 0,
+    gradeStability: 10,
+    specialty: 10,
+    travelTime: 50,
+  },
+  "pediatric-respiratory": {
+    availability: 10,
+    bedType: 25,
+    criticalCare: 15,
+    gradeStability: 0,
+    specialty: 25,
+    travelTime: 25,
+  },
+  cardiac: {
+    availability: 10,
+    bedType: 15,
+    criticalCare: 15,
+    gradeStability: 0,
+    specialty: 30,
+    travelTime: 30,
+  },
+  stroke: {
+    availability: 10,
+    bedType: 15,
+    criticalCare: 20,
+    gradeStability: 0,
+    specialty: 30,
+    travelTime: 25,
+  },
+  trauma: {
+    availability: 10,
+    bedType: 20,
+    criticalCare: 20,
+    gradeStability: 0,
+    specialty: 25,
+    travelTime: 25,
+  },
+  burn: {
+    availability: 10,
+    bedType: 20,
+    criticalCare: 15,
+    gradeStability: 0,
+    specialty: 30,
+    travelTime: 25,
+  },
+  delivery: {
+    availability: 10,
+    bedType: 25,
+    criticalCare: 10,
+    gradeStability: 0,
+    specialty: 30,
+    travelTime: 25,
+  },
+  "elderly-fall": {
+    availability: 10,
+    bedType: 15,
+    criticalCare: 10,
+    gradeStability: 5,
+    specialty: 25,
+    travelTime: 35,
+  },
+};
+
+const CAPABILITY_TERMS: Record<
+  Exclude<ScoreCategory, "travelTime" | "availability" | "gradeStability">,
+  Record<EmergencyScenario, string[]>
+> = {
+  bedType: {
+    burn: ["중환자", "수술", "화상", "hvcc", "hvoc"],
+    cardiac: ["중환자", "흉부", "심혈관", "hvcc", "hvccc"],
+    delivery: ["분만", "신생아", "인큐베이터", "hv3", "hvncc"],
+    "elderly-fall": ["일반병상", "중환자", "수술", "hvgc", "hvoc"],
+    general: ["응급실", "일반병상", "hvec", "hvgc"],
+    "pediatric-respiratory": ["소아", "신생아", "중환자", "hvncc", "hvcc"],
+    stroke: ["중환자", "신경", "수술", "hvicc", "hvoc"],
+    trauma: ["외상", "중환자", "수술", "hvcc", "hvoc"],
+  },
+  criticalCare: {
+    burn: ["화상", "중증", "수술"],
+    cardiac: ["심근경색", "심혈관", "흉통", "중증"],
+    delivery: ["응급분만", "신생아", "미숙아"],
+    "elderly-fall": ["골절", "신경외과", "중증"],
+    general: ["응급", "중증"],
+    "pediatric-respiratory": ["소아", "호흡", "인공호흡", "중증"],
+    stroke: ["뇌경색", "뇌출혈", "재관류", "중증"],
+    trauma: ["외상", "사지접합", "수술", "중증"],
+  },
+  specialty: {
+    burn: ["화상", "외과", "성형외과"],
+    cardiac: ["심장", "순환기", "흉부외과", "내과"],
+    delivery: ["산부인과", "분만", "신생아"],
+    "elderly-fall": ["정형외과", "신경외과", "내과"],
+    general: ["응급의학", "내과", "외과"],
+    "pediatric-respiratory": ["소아청소년과", "소아", "호흡기"],
+    stroke: ["신경과", "신경외과", "뇌혈관"],
+    trauma: ["외상", "외과", "정형외과", "신경외과"],
+  },
+};
+
+function numeric(raw: Record<string, string>, keys: string[]) {
+  for (const key of keys) {
+    const value = Number(raw[key]);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function rawSearchText(raw: Record<string, string>) {
+  return Object.entries(raw)
+    .filter(([key, value]) => value && !key.toLowerCase().includes("addr"))
+    .map(([key, value]) => `${key} ${value}`)
+    .join(" ")
+    .toLowerCase();
+}
+
+function termRatio(text: string, terms: string[]) {
+  if (terms.length === 0) {
+    return 0.5;
+  }
+
+  const matches = terms.filter((term) =>
+    text.includes(term.toLowerCase()),
+  ).length;
+  return Math.min(1, 0.2 + matches / Math.min(3, terms.length));
+}
+
+function freshnessRatio(value: string | null) {
+  if (!value) {
+    return 0.35;
+  }
+
+  const compact = value.replace(/[^0-9]/g, "");
+  const parsed =
+    compact.length >= 12
+      ? Date.parse(
+          `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}T${compact.slice(8, 10)}:${compact.slice(10, 12)}:00+09:00`,
+        )
+      : Date.parse(value);
+
+  if (!Number.isFinite(parsed)) {
+    return 0.35;
+  }
+
+  const ageMinutes = Math.max(0, (Date.now() - parsed) / 60_000);
+  return Math.max(0.15, 1 - ageMinutes / (24 * 60));
+}
+
+function gradeRatio(category: string) {
+  if (/권역|전문/.test(category)) return 1;
+  if (/지역응급의료센터/.test(category)) return 0.85;
+  if (/지역응급의료기관/.test(category)) return 0.65;
+  return 0.45;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+) {
+  const output = new Array<R>(values.length);
+  let index = 0;
+
+  async function worker() {
+    while (index < values.length) {
+      const current = index;
+      index += 1;
+      output[current] = await mapper(values[current]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return output;
+}
+
+export async function recommendEmergencyHospitals(params: {
+  latitude: number;
+  longitude: number;
+  scenario: EmergencyScenario;
+}) {
+  const origin = { latitude: params.latitude, longitude: params.longitude };
+  const candidates = await findNearestEmergencyInstitutions({
+    ...origin,
+    limit: 12,
+    radiusMeters: 120_000,
+  });
+  const useKakaoEta = hasKakaoMobilityKey();
+  const withEta = await mapWithConcurrency(candidates, 3, async (candidate) => {
+    if (useKakaoEta) {
+      try {
+        const route = await calculateEmergencyRoute({
+          destination: {
+            latitude: candidate.latitude,
+            longitude: candidate.longitude,
+          },
+          origin,
+          provider: "kakao",
+        });
+        return {
+          candidate,
+          distanceMeters: route.distanceMeters,
+          durationSeconds: route.durationSeconds,
+          etaSource: "kakao" as const,
+        };
+      } catch {
+        // One failed route must not discard the remaining hospitals.
+      }
+    }
+
+    const roadDistance = Math.max(
+      candidate.distanceMeters * 1.25,
+      haversineMeters(origin, candidate),
+    );
+    return {
+      candidate,
+      distanceMeters: Math.round(roadDistance),
+      durationSeconds: Math.round(roadDistance / 11.1),
+      etaSource: "estimated" as const,
+    };
+  });
+  const weights = WEIGHTS[params.scenario];
+
+  return withEta
+    .filter(({ candidate }) => Boolean(candidate.phone))
+    .map(({ candidate, distanceMeters, durationSeconds, etaSource }) => {
+      const text = rawSearchText(candidate.raw);
+      const emergencyBeds = numeric(candidate.raw, [
+        "realtimeBed.hvec",
+        "hvec",
+      ]);
+      const bedRatio =
+        emergencyBeds === null
+          ? termRatio(text, CAPABILITY_TERMS.bedType[params.scenario])
+          : emergencyBeds > 0
+            ? 1
+            : 0.1;
+      const availabilityRatio =
+        emergencyBeds === null
+          ? 0.45
+          : emergencyBeds > 0
+            ? Math.min(1, 0.65 + emergencyBeds / 20)
+            : 0.05;
+      const travelMinutes = durationSeconds / 60;
+      const ratios: Record<ScoreCategory, number> = {
+        availability: availabilityRatio,
+        bedType: bedRatio,
+        criticalCare: termRatio(
+          text,
+          CAPABILITY_TERMS.criticalCare[params.scenario],
+        ),
+        gradeStability:
+          (gradeRatio(candidate.category) +
+            freshnessRatio(candidate.sourceUpdatedAt)) /
+          2,
+        specialty: termRatio(text, CAPABILITY_TERMS.specialty[params.scenario]),
+        travelTime: Math.max(0.05, 1 - travelMinutes / 90),
+      };
+      const scoreBreakdown = Object.fromEntries(
+        Object.entries(weights).map(([key, weight]) => [
+          key,
+          Math.round(weight * ratios[key as ScoreCategory] * 10) / 10,
+        ]),
+      ) as Record<ScoreCategory, number>;
+      const score =
+        Math.round(
+          Object.values(scoreBreakdown).reduce((sum, value) => sum + value, 0) *
+            10,
+        ) / 10;
+      const reasons = [
+        `${Math.max(1, Math.round(travelMinutes))}분 예상`,
+        emergencyBeds === null
+          ? "응급실 병상 정보 미확인"
+          : emergencyBeds > 0
+            ? `응급실 가용병상 ${emergencyBeds}개`
+            : "응급실 가용병상 없음",
+      ];
+
+      if (ratios.specialty >= 0.7 && params.scenario !== "general") {
+        reasons.push("상황 관련 진료역량 확인");
+      }
+      if (etaSource === "estimated") {
+        reasons.push("도로 ETA 추정값");
+      }
+
+      return {
+        address: candidate.address,
+        category: candidate.category,
+        distanceMeters,
+        durationSeconds,
+        etaSource,
+        id: candidate.id,
+        latitude: candidate.latitude,
+        longitude: candidate.longitude,
+        name: candidate.name,
+        phone: candidate.phone,
+        reasons,
+        score,
+        scoreBreakdown,
+        sourceUpdatedAt: candidate.sourceUpdatedAt,
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.durationSeconds - right.durationSeconds,
+    )
+    .slice(0, 8);
+}
+
+export async function findEmergencyDispatchStation(params: {
+  latitude: number;
+  longitude: number;
+}) {
+  const [station] = await findNearestPoints({
+    ...params,
+    limit: 1,
+    radiusMeters: 80_000,
+    source: "fire-stations",
+  });
+
+  return station ?? null;
+}

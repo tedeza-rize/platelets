@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  Ambulance,
   Check,
   ChevronDown,
   Database,
@@ -28,6 +29,10 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import type { AppDictionary } from "@/lib/i18n";
+import {
+  type EmergencyRouteResult,
+  EmergencyRoutingPanel,
+} from "./emergency-routing-panel";
 import styles from "./map-shell.module.css";
 
 type MapProvider = "vworld" | "osm";
@@ -107,6 +112,8 @@ const SEOUL_AREAS_SOURCE_ID = "seoul-citydata-areas";
 const SEOUL_AREAS_HALO_LAYER_ID = "seoul-citydata-areas-halo";
 const SEOUL_AREAS_LAYER_ID = "seoul-citydata-areas-circle";
 const SEOUL_AREAS_SYMBOL_LAYER_ID = "seoul-citydata-areas-symbol";
+const EMERGENCY_ROUTE_SOURCE_ID = "emergency-route";
+const EMERGENCY_ROUTE_LAYER_ID = "emergency-route-line";
 const HAZARD_POLL_INTERVAL_MS = 60_000;
 const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
 const DEFAULT_VISIBLE_SOURCE: DatasetSourceId = "fire-stations";
@@ -1540,6 +1547,72 @@ function syncHazardLayerWhenReady(map: MapLibreMap, events: HazardEvent[]) {
   runWhenStyleReady(map, () => syncHazardLayer(map, events));
 }
 
+function syncEmergencyRouteLayer(
+  map: MapLibreMap,
+  route: EmergencyRouteResult | null,
+) {
+  if (!map.isStyleLoaded()) {
+    return;
+  }
+
+  const data = {
+    features: route
+      ? [
+          {
+            geometry: {
+              coordinates: route.coordinates,
+              type: "LineString" as const,
+            },
+            properties: { provider: route.provider },
+            type: "Feature" as const,
+          },
+        ]
+      : [],
+    type: "FeatureCollection",
+  } as const;
+  const source = map.getSource(EMERGENCY_ROUTE_SOURCE_ID) as
+    | GeoJSONSource
+    | undefined;
+
+  if (source) {
+    source.setData(data);
+  } else {
+    map.addSource(EMERGENCY_ROUTE_SOURCE_ID, { data, type: "geojson" });
+  }
+
+  if (!map.getLayer(EMERGENCY_ROUTE_LAYER_ID)) {
+    map.addLayer({
+      id: EMERGENCY_ROUTE_LAYER_ID,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-color": [
+          "match",
+          ["get", "provider"],
+          "kakao",
+          "#7c3aed",
+          "#dc2626",
+        ],
+        "line-opacity": 0.9,
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 4, 15, 7],
+      },
+      source: EMERGENCY_ROUTE_SOURCE_ID,
+      type: "line",
+    });
+  }
+}
+
+function syncEmergencyRouteLayerWhenReady(
+  map: MapLibreMap,
+  route: EmergencyRouteResult | null,
+) {
+  if (map.isStyleLoaded()) {
+    syncEmergencyRouteLayer(map, route);
+    return;
+  }
+
+  runWhenStyleReady(map, () => syncEmergencyRouteLayer(map, route));
+}
+
 function runWhenStyleReady(map: MapLibreMap, callback: () => void) {
   let didRun = false;
   const run = () => {
@@ -1566,6 +1639,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const pointsRef = useRef<EmergencyPointMarker[]>([]);
   const hazardsRef = useRef<HazardEvent[]>([]);
   const seoulAreasRef = useRef<SeoulAreasData | null>(null);
+  const emergencyRouteRef = useRef<EmergencyRouteResult | null>(null);
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
@@ -1579,6 +1653,13 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const [hazards, setHazards] = useState<HazardEvent[]>([]);
   const [seoulAreas, setSeoulAreas] = useState<SeoulAreasData | null>(null);
   const [activeHazard, setActiveHazard] = useState<HazardEvent | null>(null);
+  const [isEmergencyPanelOpen, setIsEmergencyPanelOpen] = useState(false);
+  const [emergencyOrigin, setEmergencyOrigin] = useState({
+    latitude: SEOUL_CENTER[0],
+    longitude: SEOUL_CENTER[1],
+  });
+  const [emergencyRoute, setEmergencyRoute] =
+    useState<EmergencyRouteResult | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -1922,6 +2003,34 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   }, [visiblePoints]);
 
   useEffect(() => {
+    emergencyRouteRef.current = emergencyRoute;
+
+    if (!mapRef.current) {
+      return;
+    }
+
+    syncEmergencyRouteLayerWhenReady(mapRef.current, emergencyRoute);
+
+    if (!emergencyRoute || emergencyRoute.coordinates.length < 2) {
+      return;
+    }
+
+    const longitudes = emergencyRoute.coordinates.map(
+      ([longitude]) => longitude,
+    );
+    const latitudes = emergencyRoute.coordinates.map(
+      ([, latitude]) => latitude,
+    );
+    mapRef.current.fitBounds(
+      [
+        [Math.min(...longitudes), Math.min(...latitudes)],
+        [Math.max(...longitudes), Math.max(...latitudes)],
+      ],
+      { duration: 800, padding: 72 },
+    );
+  }, [emergencyRoute]);
+
+  useEffect(() => {
     let isDisposed = false;
 
     async function initializeMap() {
@@ -2132,6 +2241,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
         syncPointLayerWhenReady(map, pointsRef.current);
         syncHazardLayerWhenReady(map, hazardsRef.current);
+        syncEmergencyRouteLayerWhenReady(map, emergencyRouteRef.current);
       });
     }
 
@@ -2162,6 +2272,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
         syncPointLayerWhenReady(map, pointsRef.current);
         syncHazardLayerWhenReady(map, hazardsRef.current);
+        syncEmergencyRouteLayerWhenReady(map, emergencyRouteRef.current);
       };
 
       if (isDisposed) {
@@ -2239,6 +2350,16 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     };
   }, [isSourceMenuOpen]);
 
+  function openEmergencyPanel() {
+    const center = mapRef.current?.getCenter();
+
+    if (center) {
+      setEmergencyOrigin({ latitude: center.lat, longitude: center.lng });
+    }
+
+    setIsEmergencyPanelOpen(true);
+  }
+
   return (
     <div className={styles.page}>
       <nav className={styles.navbar} aria-label={dictionary.navigation.label}>
@@ -2300,6 +2421,21 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           ref={mapContainerRef}
           role="application"
         />
+        <button
+          className={styles.emergencyLauncher}
+          onClick={openEmergencyPanel}
+          type="button"
+        >
+          <Ambulance aria-hidden="true" size={18} strokeWidth={2.5} />
+          <span>응급 출동·이송</span>
+        </button>
+        {isEmergencyPanelOpen ? (
+          <EmergencyRoutingPanel
+            onClose={() => setIsEmergencyPanelOpen(false)}
+            onRoute={setEmergencyRoute}
+            origin={emergencyOrigin}
+          />
+        ) : null}
         <div className={styles.sourceMenu} ref={sourceMenuRef}>
           <button
             aria-expanded={isSourceMenuOpen}

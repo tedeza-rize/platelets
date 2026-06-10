@@ -2,7 +2,11 @@ import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import type { DatasetProgressReporter } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
-import { type EmergencyPointInput, recordApiLog } from "@/lib/points-db";
+import {
+  type EmergencyPointInput,
+  listEmergencyHospitalFallbackPoints,
+  recordApiLog,
+} from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
 
 type SourceRecord = Record<string, unknown>;
@@ -438,11 +442,46 @@ export async function importEmergencyMedicalInstitutions(
   report: DatasetProgressReporter,
 ) {
   await report("requesting", 10, "전국 응급의료기관 목록을 요청하고 있습니다.");
-  const rows = await fetchAllPublicData({
-    operation: "getEgytListInfoInqire",
-    source: "emergency-medical-institutions",
-    url: DATASET_SOURCES["emergency-medical-institutions"].url,
-  });
+  let rows: SourceRecord[];
+
+  try {
+    rows = await fetchAllPublicData({
+      operation: "getEgytListInfoInqire",
+      source: "emergency-medical-institutions",
+      url: DATASET_SOURCES["emergency-medical-institutions"].url,
+    });
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("(403)")) {
+      throw error;
+    }
+
+    const hospitals = await listEmergencyHospitalFallbackPoints();
+    rows = hospitals.map((hospital) => ({
+      ...hospital.raw,
+      derivedFromHospitalDataset: "Y",
+      dutyAddr: hospital.address,
+      dutyEmclsName:
+        hospital.raw.dutyEmclsName || hospital.category || "응급실운영기관",
+      dutyName: hospital.name,
+      dutyTel1: hospital.raw.dutyTel1 || hospital.phone || "",
+      dutyTel3: hospital.raw.dutyTel3 || hospital.phone || "",
+      hpid: hospital.sourceRecordId,
+      wgs84Lat: hospital.latitude,
+      wgs84Lon: hospital.longitude,
+    }));
+    await report(
+      "receiving",
+      24,
+      `응급 전용 API가 승인되지 않아 병의원 FullData의 응급실 운영기관 ${rows.length.toLocaleString("ko-KR")}곳을 사용합니다.`,
+    );
+    await report(
+      "processing",
+      70,
+      "기관 등급과 응급실 운영정보를 정규화했습니다. 실시간 병상은 전용 API 승인 후 병합됩니다.",
+    );
+
+    return pointResult(rows, mapEmergencyRecord);
+  }
   await report("receiving", 28, "응급의료기관 목록을 받았습니다.");
   const areas = Array.from(
     new Map(

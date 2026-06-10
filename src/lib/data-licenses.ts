@@ -35,11 +35,21 @@ export const DATA_LICENSE_ENTRIES = [
     license:
       "OpenStreetMap ODbL, OpenMapTiles 라이선스, OpenFreeMap 이용 조건 준수",
     notes:
-      "OSM 제공자 전환 시 벡터 타일과 글꼴을 불러온다. 지도 attribution에 OpenFreeMap, OpenMapTiles, OpenStreetMap 표기를 유지한다.",
+      "OSM 제공자 전환 시 벡터 타일과 글꼴을 불러온다. 자체 경로 계산은 Overpass 도로 그래프의 일방통행과 접근제한 태그를 적용하지만 실시간 교통은 반영하지 않는다. 지도 attribution을 유지한다.",
     provider: "OpenFreeMap / OpenMapTiles / OpenStreetMap contributors",
     sourceName: "OpenFreeMap 벡터 타일과 OpenStreetMap 기반 지도 데이터",
     sourceUrl: "https://openfreemap.org/",
-    usage: "OSM 지도 배경과 지명/도로/건물 레이어",
+    usage: "OSM 지도 배경과 지명/도로/건물 레이어, 자체 도로 경로 계산",
+  },
+  {
+    id: "kakao-mobility-directions",
+    license: "카카오모빌리티 API 이용약관 및 쿼터 정책 준수",
+    notes:
+      "KAKAO_MOBILITY_REST_API_KEY는 서버 환경변수로만 보관한다. 응답 경로와 ETA는 요청 시점 교통·도로 정보에 따라 달라질 수 있다.",
+    provider: "카카오모빌리티",
+    sourceName: "Kakao Mobility 길찾기 API",
+    sourceUrl: "https://developers.kakaomobility.com/docs/navi-api/directions/",
+    usage: "실제 도로 이동시간 기반 응급기관 추천과 이송 경로 표시",
   },
   {
     id: "kakao-local-geocoding",
@@ -125,7 +135,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "emergency-medical-institutions",
     license: "이용허락범위 제한 없음",
     notes:
-      "기관 목록, 기관 기본정보, 실시간 가용병상, 중증질환 수용 가능 정보를 기관 ID로 병합한다. 실시간 값은 조회 시점 이후 변할 수 있다.",
+      "기관 목록, 기관 기본정보, 실시간 가용병상, 중증질환 수용 가능 정보를 기관 ID로 병합한다. 전용 API가 403이면 병의원 FullData의 응급실 운영기관을 파생 후보로 사용하며 이 경우 실시간 병상은 제공하지 않는다.",
     provider: "국립중앙의료원 / 공공데이터포털",
     sourceName: "전국 응급의료기관 정보 조회 서비스",
     sourceUrl: "https://www.data.go.kr/data/15000563/openapi.do",
