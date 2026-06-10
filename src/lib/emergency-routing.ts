@@ -26,9 +26,95 @@ type RoadGraph = {
   nodes: Map<number, Coordinate>;
 };
 
+type QueueItem = {
+  nodeId: number;
+  score: number;
+};
+
 const OVERPASS_DEFAULT_URL = "https://overpass-api.de/api/interpreter";
 const MAX_ASTAR_DISTANCE_METERS = 70_000;
 const graphCache = new Map<string, { expiresAt: number; graph: RoadGraph }>();
+
+class MinPriorityQueue {
+  private items: QueueItem[] = [];
+
+  get size() {
+    return this.items.length;
+  }
+
+  push(item: QueueItem) {
+    this.items.push(item);
+    this.bubbleUp(this.items.length - 1);
+  }
+
+  pop() {
+    if (this.items.length === 0) {
+      return null;
+    }
+
+    const first = this.items[0];
+    const last = this.items.pop() as QueueItem;
+
+    if (this.items.length > 0) {
+      this.items[0] = last;
+      this.bubbleDown(0);
+    }
+
+    return first;
+  }
+
+  private bubbleUp(index: number) {
+    let current = index;
+
+    while (current > 0) {
+      const parent = Math.floor((current - 1) / 2);
+
+      if (this.items[parent].score <= this.items[current].score) {
+        break;
+      }
+
+      [this.items[parent], this.items[current]] = [
+        this.items[current],
+        this.items[parent],
+      ];
+      current = parent;
+    }
+  }
+
+  private bubbleDown(index: number) {
+    let current = index;
+
+    while (true) {
+      const left = current * 2 + 1;
+      const right = left + 1;
+      let smallest = current;
+
+      if (
+        left < this.items.length &&
+        this.items[left].score < this.items[smallest].score
+      ) {
+        smallest = left;
+      }
+
+      if (
+        right < this.items.length &&
+        this.items[right].score < this.items[smallest].score
+      ) {
+        smallest = right;
+      }
+
+      if (smallest === current) {
+        break;
+      }
+
+      [this.items[current], this.items[smallest]] = [
+        this.items[smallest],
+        this.items[current],
+      ];
+      current = smallest;
+    }
+  }
+}
 
 function overpassEndpoint() {
   const configured = process.env.OVERPASS_API_URL?.trim();
@@ -268,7 +354,7 @@ async function routeWithAstar(
   const graph = await fetchRoadGraph(origin, destination);
   const startId = nearestNode(graph.nodes, origin);
   const goalId = nearestNode(graph.nodes, destination);
-  const open = new Set([startId]);
+  const open = new MinPriorityQueue();
   const cameFrom = new Map<number, number>();
   const gScore = new Map<number, number>([[startId, 0]]);
   const fScore = new Map<number, number>([
@@ -277,17 +363,20 @@ async function routeWithAstar(
       haversineMeters(graph.nodes.get(startId) as Coordinate, destination) / 25,
     ],
   ]);
+  open.push({ nodeId: startId, score: fScore.get(startId) as number });
 
   while (open.size > 0) {
-    let current = -1;
-    let currentScore = Number.POSITIVE_INFINITY;
+    const next = open.pop();
 
-    for (const nodeId of open) {
-      const score = fScore.get(nodeId) ?? Number.POSITIVE_INFINITY;
-      if (score < currentScore) {
-        current = nodeId;
-        currentScore = score;
-      }
+    if (!next) {
+      break;
+    }
+
+    const current = next.nodeId;
+    const knownScore = fScore.get(current) ?? Number.POSITIVE_INFINITY;
+
+    if (next.score > knownScore) {
+      continue;
     }
 
     if (current === goalId) {
@@ -317,8 +406,6 @@ async function routeWithAstar(
       };
     }
 
-    open.delete(current);
-
     for (const edge of graph.adjacency.get(current) ?? []) {
       const tentative =
         (gScore.get(current) ?? Number.POSITIVE_INFINITY) + edge.seconds;
@@ -334,7 +421,10 @@ async function routeWithAstar(
         edge.nodeId,
         tentative + haversineMeters(node, destination) / 40,
       );
-      open.add(edge.nodeId);
+      open.push({
+        nodeId: edge.nodeId,
+        score: fScore.get(edge.nodeId) ?? Number.POSITIVE_INFINITY,
+      });
     }
   }
 
