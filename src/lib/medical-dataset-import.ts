@@ -39,6 +39,16 @@ const EMERGENCY_BASE_URL =
   "https://apis.data.go.kr/B552657/ErmctInfoInqireService";
 const HIRA_PHARMACY_URL =
   "https://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList";
+const MOIS_PHARMACY_URL = "https://apis.data.go.kr/1741000/pharmacies/info";
+const EPSG_5174 = {
+  axis: 6377397.155,
+  falseEasting: 200000,
+  falseNorthing: 500000,
+  inverseFlattening: 299.1528128,
+  latitudeOrigin: 38,
+  longitudeOrigin: 127.002890277778,
+  scale: 1,
+};
 
 function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -52,6 +62,123 @@ function nullableText(value: unknown) {
 function toNumber(value: unknown) {
   const number = Number(text(value));
   return Number.isFinite(number) ? number : null;
+}
+
+function radians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function degrees(value: number) {
+  return (value * 180) / Math.PI;
+}
+
+function meridionalArc(latitude: number, eccentricitySquared: number) {
+  const e4 = eccentricitySquared ** 2;
+  const e6 = eccentricitySquared ** 3;
+
+  return (
+    EPSG_5174.axis *
+    ((1 - eccentricitySquared / 4 - (3 * e4) / 64 - (5 * e6) / 256) * latitude -
+      ((3 * eccentricitySquared) / 8 + (3 * e4) / 32 + (45 * e6) / 1024) *
+        Math.sin(2 * latitude) +
+      ((15 * e4) / 256 + (45 * e6) / 1024) * Math.sin(4 * latitude) -
+      ((35 * e6) / 3072) * Math.sin(6 * latitude))
+  );
+}
+
+function epsg5174ToWgs84Like(xValue: unknown, yValue: unknown) {
+  const easting = toNumber(xValue);
+  const northing = toNumber(yValue);
+
+  if (easting === null || northing === null) {
+    return null;
+  }
+
+  // LocalData labels the coordinates as X/Y even though EPSG:5174 formally
+  // names the axes northing/easting. In the source files, X is the easting.
+  if (easting < -50_000 || easting > 650_000 || northing < -100_000) {
+    return null;
+  }
+
+  const flattening = 1 / EPSG_5174.inverseFlattening;
+  const eccentricitySquared = 2 * flattening - flattening ** 2;
+  const secondEccentricitySquared =
+    eccentricitySquared / (1 - eccentricitySquared);
+  const originLatitude = radians(EPSG_5174.latitudeOrigin);
+  const originLongitude = radians(EPSG_5174.longitudeOrigin);
+  const meridianOrigin = meridionalArc(originLatitude, eccentricitySquared);
+  const meridian =
+    meridianOrigin + (northing - EPSG_5174.falseNorthing) / EPSG_5174.scale;
+  const mu =
+    meridian /
+    (EPSG_5174.axis *
+      (1 -
+        eccentricitySquared / 4 -
+        (3 * eccentricitySquared ** 2) / 64 -
+        (5 * eccentricitySquared ** 3) / 256));
+  const e1 =
+    (1 - Math.sqrt(1 - eccentricitySquared)) /
+    (1 + Math.sqrt(1 - eccentricitySquared));
+  const footprintLatitude =
+    mu +
+    ((3 * e1) / 2 - (27 * e1 ** 3) / 32) * Math.sin(2 * mu) +
+    ((21 * e1 ** 2) / 16 - (55 * e1 ** 4) / 32) * Math.sin(4 * mu) +
+    ((151 * e1 ** 3) / 96) * Math.sin(6 * mu) +
+    ((1097 * e1 ** 4) / 512) * Math.sin(8 * mu);
+  const sinFootprint = Math.sin(footprintLatitude);
+  const cosFootprint = Math.cos(footprintLatitude);
+  const tanFootprint = Math.tan(footprintLatitude);
+  const n1 =
+    EPSG_5174.axis / Math.sqrt(1 - eccentricitySquared * sinFootprint ** 2);
+  const r1 =
+    (EPSG_5174.axis * (1 - eccentricitySquared)) /
+    (1 - eccentricitySquared * sinFootprint ** 2) ** 1.5;
+  const t1 = tanFootprint ** 2;
+  const c1 = secondEccentricitySquared * cosFootprint ** 2;
+  const d = (easting - EPSG_5174.falseEasting) / (n1 * EPSG_5174.scale);
+  const latitude =
+    footprintLatitude -
+    ((n1 * tanFootprint) / r1) *
+      (d ** 2 / 2 -
+        ((5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * secondEccentricitySquared) *
+          d ** 4) /
+          24 +
+        ((61 +
+          90 * t1 +
+          298 * c1 +
+          45 * t1 ** 2 -
+          252 * secondEccentricitySquared -
+          3 * c1 ** 2) *
+          d ** 6) /
+          720);
+  const longitude =
+    originLongitude +
+    (d -
+      ((1 + 2 * t1 + c1) * d ** 3) / 6 +
+      ((5 -
+        2 * c1 +
+        28 * t1 -
+        3 * c1 ** 2 +
+        8 * secondEccentricitySquared +
+        24 * t1 ** 2) *
+        d ** 5) /
+        120) /
+      cosFootprint;
+  const result = {
+    latitude: degrees(latitude),
+    longitude: degrees(longitude),
+  };
+
+  if (
+    result.latitude < 32 ||
+    result.latitude > 39 ||
+    result.longitude < 124 ||
+    result.longitude > 132
+  ) {
+    return null;
+  }
+
+  return result;
 }
 
 function compactRecord(record: SourceRecord) {
@@ -196,6 +323,97 @@ async function fetchAllPublicData(params: {
   return pages.flat();
 }
 
+async function fetchMoisPharmacyPage(pageNo: number) {
+  const serviceKey = getPublicDataApiKey();
+
+  if (!serviceKey) {
+    throw new Error(
+      "PUBLIC_DATA_API_KEY, DATA_GO_KR_API_KEY, or DATA_GO_KR_SERVICE_KEY is required.",
+    );
+  }
+
+  const url = new URL(MOIS_PHARMACY_URL);
+  url.searchParams.set("serviceKey", serviceKey);
+  url.searchParams.set("pageNo", String(pageNo));
+  url.searchParams.set("numOfRows", String(PUBLIC_DATA_ROWS_PER_PAGE));
+  url.searchParams.set("type", "json");
+
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json,*/*",
+      "User-Agent": "platelets/0.1",
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  await recordApiLog({
+    action: "dataset-download",
+    category: "dataset",
+    level: response.ok ? "info" : "error",
+    message: response.ok
+      ? `MOIS pharmacies page ${pageNo} downloaded.`
+      : `MOIS pharmacies failed with HTTP ${response.status}.`,
+    metadata: {
+      operation: "moisPharmaciesInfo",
+      pageNo,
+      statusCode: response.status,
+    },
+    requestCount: 1,
+    source: "pharmacies",
+    status: response.ok ? "success" : "failure",
+  });
+
+  if (!response.ok) {
+    throw new Error(`moisPharmaciesInfo request failed (${response.status})`);
+  }
+
+  const payload = (await response.json()) as {
+    response?: {
+      body?: {
+        items?: { item?: SourceRecord | SourceRecord[] };
+        totalCount?: number | string;
+      };
+      header?: {
+        resultCode?: number | string;
+        resultMsg?: string;
+      };
+    };
+  };
+  const resultCode = text(payload.response?.header?.resultCode);
+
+  if (resultCode && !["0", "00", "03"].includes(resultCode)) {
+    throw new Error(
+      `moisPharmaciesInfo returned ${resultCode}: ${
+        payload.response?.header?.resultMsg ?? "unknown error"
+      }`,
+    );
+  }
+
+  const rawItems = payload.response?.body?.items?.item;
+  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+
+  return {
+    items,
+    totalCount: Number(payload.response?.body?.totalCount ?? items.length),
+  };
+}
+
+async function fetchAllMoisPharmacies() {
+  const firstPage = await fetchMoisPharmacyPage(1);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(firstPage.totalCount / PUBLIC_DATA_ROWS_PER_PAGE),
+  );
+  const pages = [firstPage.items];
+
+  for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
+    pages.push((await fetchMoisPharmacyPage(pageNo)).items);
+  }
+
+  return pages.flat();
+}
+
 function mapChildcareRecord(record: SourceRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.시설코드);
   const name = text(record.시설명);
@@ -265,6 +483,43 @@ function mapHiraPharmacyRecord(
     source: "pharmacies",
     sourceRecordId,
     sourceUpdatedAt: null,
+  };
+}
+
+function mapMoisPharmacyRecord(
+  record: SourceRecord,
+): EmergencyPointInput | null {
+  const name = text(record.BPLC_NM);
+  const address = text(record.ROAD_NM_ADDR) || text(record.LOTNO_ADDR);
+  const sourceRecordId = text(record.MNG_NO) || `${name}|${address}`;
+  const status = `${text(record.SALS_STTS_NM)} ${text(
+    record.DTL_SALS_STTS_NM,
+  )}`;
+
+  if (
+    !sourceRecordId ||
+    !name ||
+    !address ||
+    /폐업|취소|말소|휴업/.test(status)
+  ) {
+    return null;
+  }
+
+  const coordinate = epsg5174ToWgs84Like(record.CRD_INFO_X, record.CRD_INFO_Y);
+
+  return {
+    address,
+    category: "약국",
+    latitude: coordinate?.latitude ?? null,
+    longitude: coordinate?.longitude ?? null,
+    name,
+    parentName: "행정안전부 건강_약국 조회서비스",
+    phone: nullableText(record.TELNO),
+    raw: compactRecord(record),
+    source: "pharmacies",
+    sourceRecordId,
+    sourceUpdatedAt:
+      nullableText(record.DAT_UPDT_PNT) ?? nullableText(record.LAST_MDFCN_PNT),
   };
 }
 
@@ -445,13 +700,26 @@ export async function importPharmacies(report: DatasetProgressReporter) {
       });
       mapper = mapHiraPharmacyRecord;
     } catch (hiraError) {
-      throw new Error(
-        `약국 데이터 조회가 실패했습니다. NMC(getParmacyFullDown): ${
-          nmcError instanceof Error ? nmcError.message : String(nmcError)
-        }; HIRA(getParmacyBasisList): ${
-          hiraError instanceof Error ? hiraError.message : String(hiraError)
-        }. 두 서비스의 공공데이터포털 활용신청/승인 상태를 확인하세요.`,
+      await report(
+        "requesting",
+        32,
+        "HIRA 약국정보서비스도 차단되어 행정안전부 건강_약국 조회서비스를 시도합니다.",
       );
+
+      try {
+        rows = await fetchAllMoisPharmacies();
+        mapper = mapMoisPharmacyRecord;
+      } catch (moisError) {
+        throw new Error(
+          `약국 데이터 조회가 실패했습니다. NMC(getParmacyFullDown): ${
+            nmcError instanceof Error ? nmcError.message : String(nmcError)
+          }; HIRA(getParmacyBasisList): ${
+            hiraError instanceof Error ? hiraError.message : String(hiraError)
+          }; MOIS(pharmacies/info): ${
+            moisError instanceof Error ? moisError.message : String(moisError)
+          }. 세 서비스의 공공데이터포털 활용신청/승인 상태를 확인하세요.`,
+        );
+      }
     }
   }
 

@@ -124,11 +124,13 @@ export const DATA_LICENSE_ENTRIES = [
   {
     id: "pharmacies",
     license:
-      "NMC: 이용허락범위 제한 없음, HIRA: 공공데이터포털 개별 이용조건 준수",
+      "NMC: 이용허락범위 제한 없음, HIRA: 공공데이터포털 개별 이용조건 준수, MOIS: 이용허락범위 제한 없음",
     notes:
-      "NMC FullData를 우선 사용한다. NMC가 403이면 HIRA 약국정보서비스를 시도한다. 두 서비스 모두 PUBLIC_DATA_API_KEY를 서버 환경변수로만 보관하며, 활용신청이 승인되지 않으면 403이 발생할 수 있다.",
-    provider: "국립중앙의료원 / 건강보험심사평가원 / 공공데이터포털",
-    sourceName: "전국 약국 정보 조회 서비스, 건강보험심사평가원_약국정보서비스",
+      "NMC FullData를 우선 사용한다. NMC가 403이면 HIRA 약국정보서비스를 시도하고, HIRA도 차단되면 행정안전부 건강_약국 조회서비스를 시도한다. 행정안전부 좌표는 EPSG:5174 중부원점TM을 WGS84 근사 좌표로 변환한다. 모든 서비스의 PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관하며, 활용신청이 승인되지 않으면 403이 발생할 수 있다.",
+    provider:
+      "국립중앙의료원 / 건강보험심사평가원 / 행정안전부 / 공공데이터포털",
+    sourceName:
+      "전국 약국 정보 조회 서비스, 건강보험심사평가원_약국정보서비스, 행정안전부_건강_약국 조회서비스",
     sourceUrl: "https://www.data.go.kr/data/15000576/openapi.do",
     usage: "약국 위치, 연락처, 운영시간 지도 포인트",
   },
