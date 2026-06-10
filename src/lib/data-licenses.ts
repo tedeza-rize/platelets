@@ -52,6 +52,16 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "실제 도로 이동시간 기반 응급기관 추천과 이송 경로 표시",
   },
   {
+    id: "openai-responses",
+    license: "OpenAI 서비스 약관·API 데이터 정책 또는 호환 제공자의 약관 준수",
+    notes:
+      "OPENAI_API_KEY는 서버 환경변수로만 보관한다. AI에는 원시 레코드 대신 시설 검색 결과, 데이터셋 집계, 최근 재난의 요약값만 전송하며 응답은 참고 정보다.",
+    provider: "OpenAI 또는 관리자가 지정한 OpenAI 호환 제공자",
+    sourceName: "OpenAI Responses API",
+    sourceUrl: "https://developers.openai.com/api/docs/guides/text",
+    usage: "시설·재난·갱신상태 요약 데이터를 근거로 한 AI 질의응답",
+  },
+  {
     id: "kakao-local-geocoding",
     license: "카카오 Developers 이용약관 및 Local API 정책 준수",
     notes:

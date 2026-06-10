@@ -15,6 +15,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
   UserCog,
 } from "lucide-react";
 import type {
@@ -2376,6 +2377,9 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           <a className={styles.desktopLink} href="/licenses">
             라이선스
           </a>
+          <a className={styles.desktopLink} href="/ai">
+            AI 분석
+          </a>
           <a className={styles.desktopLink} href="/admin">
             관리자
           </a>
@@ -2623,6 +2627,10 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         <a href="/licenses">
           <ShieldCheck aria-hidden="true" size={20} strokeWidth={2.5} />
           <span>라이선스</span>
+        </a>
+        <a href="/ai">
+          <Sparkles aria-hidden="true" size={20} strokeWidth={2.5} />
+          <span>AI</span>
         </a>
         <a href="/admin">
           <UserCog aria-hidden="true" size={20} strokeWidth={2.5} />

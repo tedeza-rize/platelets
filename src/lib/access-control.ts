@@ -78,7 +78,12 @@ export function canAccessRole(
 }
 
 export function requireAccessRole(request: Request, requiredRole: AccessRole) {
-  if (!configuredToken(requiredRole)) {
+  const hasRequiredToken =
+    requiredRole === "sudo"
+      ? Boolean(configuredToken("sudo"))
+      : Boolean(configuredToken("admin") || configuredToken("sudo"));
+
+  if (!hasRequiredToken) {
     return noStoreJson(
       { error: `${requiredRole} access token is not configured.` },
       { status: 503 },

@@ -850,6 +850,44 @@ export async function listPointSummaries(options: PointSearchOptions = {}) {
   return rows.map(mapPointSummaryRow);
 }
 
+export async function searchPointSummaries(query: string, limit = 20) {
+  const db = await getDatabase();
+  const normalized = query.trim().slice(0, 120);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const pattern = `%${normalized.replace(/[\\%_]/g, "\\$&")}%`;
+  const rows = await all<PointRow>(
+    db,
+    `SELECT
+        p.id,
+        p.source,
+        p.source_record_id,
+        p.name,
+        p.category,
+        p.address,
+        p.phone,
+        p.parent_name,
+        p.latitude,
+        p.longitude,
+        p.source_updated_at,
+        '' AS raw_json,
+        u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source
+      WHERE p.name LIKE ? ESCAPE '\\'
+        OR p.category LIKE ? ESCAPE '\\'
+        OR p.address LIKE ? ESCAPE '\\'
+      ORDER BY p.name
+      LIMIT ?`,
+    [pattern, pattern, pattern, Math.min(Math.max(limit, 1), 50)],
+  );
+
+  return rows.map(mapPointSummaryRow);
+}
+
 export async function listPointMarkers(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);

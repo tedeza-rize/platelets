@@ -323,6 +323,33 @@ async function listPointSummaries(options: PointSearchOptions = {}) {
   });
 }
 
+async function searchPointSummaries(query: string, limit = 20) {
+  const normalized = query.trim().slice(0, 120);
+
+  if (!normalized) {
+    return [];
+  }
+
+  const pattern = `%${normalized.replace(/[\\%_]/g, "\\$&")}%`;
+
+  return withDatabase(async (db) => {
+    const rows = await all<PointRow>(
+      db,
+      `SELECT ${POINT_COLUMNS}
+        FROM points p
+        LEFT JOIN dataset_updates u ON u.source = p.source
+        WHERE p.name LIKE ? ESCAPE '\\'
+          OR p.category LIKE ? ESCAPE '\\'
+          OR p.address LIKE ? ESCAPE '\\'
+        ORDER BY p.name
+        LIMIT ?`,
+      [pattern, pattern, pattern, clamp(limit, 1, 50)],
+    );
+
+    return rows.map(pointFromRow);
+  });
+}
+
 async function datasetStatuses() {
   return withDatabase(async (db) => {
     const rows = await all<DatasetStatusRow>(
@@ -581,6 +608,57 @@ server.registerTool(
     title: "Dataset Status",
   },
   async () => asToolResult({ datasets: await datasetStatuses() }),
+);
+
+server.registerTool(
+  "search_points",
+  {
+    description:
+      "Search bounded facility summaries by name, category, or address. Raw source records are never returned.",
+    inputSchema: {
+      limit: z.number().int().min(1).max(50).optional().default(20),
+      query: z.string().min(1).max(120),
+    },
+    title: "Search Points",
+  },
+  async (args) =>
+    asToolResult({
+      points: await searchPointSummaries(args.query, args.limit),
+      query: args.query,
+    }),
+);
+
+server.registerTool(
+  "grounding_snapshot",
+  {
+    description:
+      "Return compact dataset status, text matches, and optional nearby facilities for LLM grounding.",
+    inputSchema: {
+      latitude: z.number().min(32).max(39).optional(),
+      longitude: z.number().min(124).max(132).optional(),
+      query: z.string().max(120).optional().default(""),
+    },
+    title: "Grounding Snapshot",
+  },
+  async (args) => {
+    const hasCoordinate =
+      args.latitude !== undefined && args.longitude !== undefined;
+
+    return asToolResult({
+      datasets: await datasetStatuses(),
+      matchingFacilities: args.query
+        ? await searchPointSummaries(args.query, 20)
+        : [],
+      nearbyFacilities: hasCoordinate
+        ? await nearestPoints({
+            latitude: args.latitude as number,
+            limit: 20,
+            longitude: args.longitude as number,
+            radiusMeters: 30_000,
+          })
+        : [],
+    });
+  },
 );
 
 server.registerTool(
