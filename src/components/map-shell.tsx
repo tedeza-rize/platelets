@@ -144,21 +144,33 @@ const VWORLD_POI_SOURCE_ID = "vworld-poi";
 const OPENFREEMAP_SOURCE_ID = "openmaptiles";
 const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
+  "childcare-centers": "#db2777",
+  "emergency-medical-institutions": "#e11d48",
   "fire-stations": "#dc2626",
+  hospitals: "#0f766e",
+  pharmacies: "#16a34a",
   "police-stations": "#1d4ed8",
   schools: "#ca8a04",
   universities: "#7c3aed",
 };
 const SOURCE_HALO_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#10b981",
+  "childcare-centers": "#f472b6",
+  "emergency-medical-institutions": "#fb7185",
   "fire-stations": "#f97316",
+  hospitals: "#2dd4bf",
+  pharmacies: "#4ade80",
   "police-stations": "#2563eb",
   schools: "#facc15",
   universities: "#8b5cf6",
 };
 const SOURCE_ICON_IDS: Record<DatasetSourceId, string> = {
   aeds: "point-icon-aed",
+  "childcare-centers": "point-icon-childcare",
+  "emergency-medical-institutions": "point-icon-emergency-medical",
   "fire-stations": "point-icon-fire",
+  hospitals: "point-icon-hospital",
+  pharmacies: "point-icon-pharmacy",
   "police-stations": "point-icon-police",
   schools: "point-icon-school",
   universities: "point-icon-university",
@@ -1163,6 +1175,46 @@ function createPointIconImage(source: DatasetSourceId) {
     context.lineTo(-2, -1);
     context.closePath();
     context.fill();
+  } else if (source === "childcare-centers") {
+    context.beginPath();
+    context.arc(0, 0, 11, 0, Math.PI * 2);
+    context.stroke();
+    context.fillStyle = SOURCE_COLORS[source];
+    context.beginPath();
+    context.arc(-4, -2, 1.8, 0, Math.PI * 2);
+    context.arc(4, -2, 1.8, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.arc(0, 1, 6, 0.15 * Math.PI, 0.85 * Math.PI);
+    context.strokeStyle = SOURCE_COLORS[source];
+    context.lineWidth = 2.4;
+    context.stroke();
+  } else if (source === "pharmacies") {
+    context.fillRect(-4, -12, 8, 24);
+    context.fillRect(-12, -4, 24, 8);
+  } else if (source === "hospitals") {
+    context.strokeRect(-11, -11, 22, 23);
+    context.fillRect(-3, -8, 6, 14);
+    context.fillRect(-7, -4, 14, 6);
+    context.strokeRect(-3, 7, 6, 5);
+  } else if (source === "emergency-medical-institutions") {
+    context.beginPath();
+    context.moveTo(0, -13);
+    context.lineTo(4, -5);
+    context.lineTo(12, -7);
+    context.lineTo(7, 0);
+    context.lineTo(12, 7);
+    context.lineTo(4, 5);
+    context.lineTo(0, 13);
+    context.lineTo(-4, 5);
+    context.lineTo(-12, 7);
+    context.lineTo(-7, 0);
+    context.lineTo(-12, -7);
+    context.lineTo(-4, -5);
+    context.closePath();
+    context.stroke();
+    context.fillRect(-2, -8, 4, 16);
+    context.fillRect(-8, -2, 16, 4);
   } else if (source === "schools") {
     context.beginPath();
     context.moveTo(-12, -8);
@@ -1250,6 +1302,14 @@ function syncPointLayer(map: MapLibreMap, points: EmergencyPointMarker[]) {
           SOURCE_HALO_COLORS["police-stations"],
           "aeds",
           SOURCE_HALO_COLORS.aeds,
+          "childcare-centers",
+          SOURCE_HALO_COLORS["childcare-centers"],
+          "pharmacies",
+          SOURCE_HALO_COLORS.pharmacies,
+          "hospitals",
+          SOURCE_HALO_COLORS.hospitals,
+          "emergency-medical-institutions",
+          SOURCE_HALO_COLORS["emergency-medical-institutions"],
           "schools",
           SOURCE_HALO_COLORS.schools,
           "universities",

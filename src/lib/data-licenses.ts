@@ -92,6 +92,47 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "자동심장충격기 지도 포인트",
   },
   {
+    id: "childcare-centers",
+    license: "공공누리 제1유형: 출처표시, 상업적 이용 및 변경 가능",
+    notes:
+      "CSV 다운로드 엔드포인트에 데이터 ID 10054와 공개 열 목록을 POST한다. MS949 CSV를 UTF-8로 변환해 시설 좌표와 유형을 저장한다.",
+    provider: "서울특별시 / 서울 열린데이터광장",
+    sourceName: "어린이집유치원좌표정보",
+    sourceUrl: "https://data.seoul.go.kr/bsp/wgs/dataView/data300View/10054.do",
+    usage: "전국 어린이집 및 유치원 지도 포인트",
+  },
+  {
+    id: "pharmacies",
+    license: "이용허락범위 제한 없음",
+    notes:
+      "전국 약국 FullData API를 최대 페이지 크기로 순회한다. PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관한다.",
+    provider: "국립중앙의료원 / 공공데이터포털",
+    sourceName: "전국 약국 정보 조회 서비스",
+    sourceUrl: "https://www.data.go.kr/data/15000576/openapi.do",
+    usage: "약국 위치, 연락처, 운영시간 지도 포인트",
+  },
+  {
+    id: "hospitals",
+    license: "이용허락범위 제한 없음",
+    notes:
+      "병의원 FullData와 달빛어린이병원 목록을 기관 ID로 병합한다. PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관한다.",
+    provider: "국립중앙의료원 / 공공데이터포털",
+    sourceName: "전국 병·의원 찾기 서비스",
+    sourceUrl: "https://www.data.go.kr/data/15000736/openapi.do",
+    usage: "병의원 위치, 연락처, 진료시간, 달빛어린이병원 여부",
+  },
+  {
+    id: "emergency-medical-institutions",
+    license: "이용허락범위 제한 없음",
+    notes:
+      "기관 목록, 기관 기본정보, 실시간 가용병상, 중증질환 수용 가능 정보를 기관 ID로 병합한다. 실시간 값은 조회 시점 이후 변할 수 있다.",
+    provider: "국립중앙의료원 / 공공데이터포털",
+    sourceName: "전국 응급의료기관 정보 조회 서비스",
+    sourceUrl: "https://www.data.go.kr/data/15000563/openapi.do",
+    usage:
+      "응급의료기관 지도 포인트, 병상·진료역량 기반 병원 추천과 이송 경로 계산",
+  },
+  {
     id: "kma-earthquake",
     license: "공공데이터포털 개별 데이터셋 이용허락조건 확인 필요",
     notes:

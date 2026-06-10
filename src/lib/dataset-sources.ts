@@ -2,13 +2,26 @@ export type DatasetSourceId =
   | "fire-stations"
   | "police-stations"
   | "aeds"
+  | "childcare-centers"
+  | "pharmacies"
+  | "hospitals"
+  | "emergency-medical-institutions"
   | "schools"
   | "universities";
 
 export type DatasetSource = {
   id: DatasetSourceId;
   label: string;
-  type: "aed" | "fire" | "police" | "school" | "university";
+  type:
+    | "aed"
+    | "childcare"
+    | "emergency-medical"
+    | "fire"
+    | "hospital"
+    | "pharmacy"
+    | "police"
+    | "school"
+    | "university";
   url: string;
 };
 
@@ -30,6 +43,30 @@ export const DATASET_SOURCES = {
     label: "AED",
     type: "aed",
     url: "https://apis.data.go.kr/B552657/AEDInfoInqireService/getAedFullDown",
+  },
+  "childcare-centers": {
+    id: "childcare-centers",
+    label: "어린이집/유치원",
+    type: "childcare",
+    url: "https://data.seoul.go.kr/bsp/wgs/dataView/data300View/10054.do",
+  },
+  pharmacies: {
+    id: "pharmacies",
+    label: "약국",
+    type: "pharmacy",
+    url: "https://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyFullDown",
+  },
+  hospitals: {
+    id: "hospitals",
+    label: "병의원",
+    type: "hospital",
+    url: "https://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncFullDown",
+  },
+  "emergency-medical-institutions": {
+    id: "emergency-medical-institutions",
+    label: "응급의료기관",
+    type: "emergency-medical",
+    url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire",
   },
   schools: {
     id: "schools",

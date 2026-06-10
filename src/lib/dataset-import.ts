@@ -3,6 +3,12 @@ import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
+  importChildcareCenters,
+  importEmergencyMedicalInstitutions,
+  importHospitals,
+  importPharmacies,
+} from "@/lib/medical-dataset-import";
+import {
   clearDatasetImportProgress,
   consumeKakaoLocalQuota,
   type DatasetImportCheckpoint,
@@ -871,6 +877,14 @@ async function importDataset(source: DatasetSourceId, mode: DatasetImportMode) {
       return importPoliceStations(mode);
     case "aeds":
       return importAeds();
+    case "childcare-centers":
+      return importChildcareCenters();
+    case "pharmacies":
+      return importPharmacies();
+    case "hospitals":
+      return importHospitals();
+    case "emergency-medical-institutions":
+      return importEmergencyMedicalInstitutions();
     case "schools":
       return importSchools();
     case "universities":

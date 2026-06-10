@@ -10,9 +10,24 @@ const DATASET_SOURCE_IDS = [
   "fire-stations",
   "police-stations",
   "aeds",
+  "childcare-centers",
+  "pharmacies",
+  "hospitals",
+  "emergency-medical-institutions",
+  "schools",
+  "universities",
 ] as const;
 type DatasetSourceId = (typeof DATASET_SOURCE_IDS)[number];
-type DatasetSourceType = "aed" | "fire" | "police";
+type DatasetSourceType =
+  | "aed"
+  | "childcare"
+  | "emergency-medical"
+  | "fire"
+  | "hospital"
+  | "pharmacy"
+  | "police"
+  | "school"
+  | "university";
 
 const DATASET_SOURCES = {
   aeds: {
@@ -26,6 +41,30 @@ const DATASET_SOURCES = {
   "police-stations": {
     label: "경찰서/지구대/파출소",
     type: "police",
+  },
+  "childcare-centers": {
+    label: "어린이집/유치원",
+    type: "childcare",
+  },
+  pharmacies: {
+    label: "약국",
+    type: "pharmacy",
+  },
+  hospitals: {
+    label: "병의원",
+    type: "hospital",
+  },
+  "emergency-medical-institutions": {
+    label: "응급의료기관",
+    type: "emergency-medical",
+  },
+  schools: {
+    label: "초중고등학교",
+    type: "school",
+  },
+  universities: {
+    label: "대학교",
+    type: "university",
   },
 } satisfies Record<
   DatasetSourceId,

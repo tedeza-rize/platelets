@@ -3,6 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import styles from "./management-console.module.css";
 
 type ApiLogEntry = {
@@ -166,8 +167,11 @@ export function LogConsole() {
               value={source}
             >
               <option value="">전체 데이터셋</option>
-              <option value="fire-stations">소방</option>
-              <option value="police-stations">경찰</option>
+              {Object.values(DATASET_SOURCES).map((dataset) => (
+                <option key={dataset.id} value={dataset.id}>
+                  {dataset.label}
+                </option>
+              ))}
             </select>
             <button
               className={styles.actionButton}
