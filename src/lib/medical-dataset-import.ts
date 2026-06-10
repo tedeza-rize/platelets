@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
+import type { DatasetProgressReporter } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import { type EmergencyPointInput, recordApiLog } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
@@ -332,7 +333,12 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function importChildcareCenters() {
+export async function importChildcareCenters(report: DatasetProgressReporter) {
+  await report(
+    "requesting",
+    10,
+    "어린이집/유치원 좌표 CSV를 요청하고 있습니다.",
+  );
   const body = new URLSearchParams(CHILDCARE_FORM);
   const response = await fetch(CHILDCARE_DOWNLOAD_URL, {
     body,
@@ -349,6 +355,7 @@ export async function importChildcareCenters() {
     throw new Error(`Childcare CSV download failed (${response.status})`);
   }
 
+  await report("receiving", 38, "원본 CSV 응답을 받았습니다.");
   const csv = new TextDecoder("euc-kr").decode(await response.arrayBuffer());
   const rows = parse(csv, {
     bom: true,
@@ -368,20 +375,35 @@ export async function importChildcareCenters() {
     status: "success",
   });
 
+  await report(
+    "processing",
+    68,
+    `${rows.length.toLocaleString("ko-KR")}건의 시설 좌표를 정규화했습니다.`,
+  );
+
   return pointResult(rows, mapChildcareRecord);
 }
 
-export async function importPharmacies() {
+export async function importPharmacies(report: DatasetProgressReporter) {
+  await report("requesting", 10, "전국 약국 FullData를 요청하고 있습니다.");
   const rows = await fetchAllPublicData({
     operation: "getParmacyFullDown",
     source: "pharmacies",
     url: DATASET_SOURCES.pharmacies.url,
   });
 
+  await report("receiving", 50, "전국 약국 API 응답을 모두 받았습니다.");
+  await report("processing", 68, "약국 위치와 운영정보를 정규화했습니다.");
+
   return pointResult(rows, mapPharmacyRecord);
 }
 
-export async function importHospitals() {
+export async function importHospitals(report: DatasetProgressReporter) {
+  await report(
+    "requesting",
+    10,
+    "전국 병의원과 달빛어린이병원 데이터를 요청하고 있습니다.",
+  );
   const [hospitalRows, moonlightRows] = await Promise.all([
     fetchAllPublicData({
       operation: "getHsptlMdcncFullDown",
@@ -394,6 +416,7 @@ export async function importHospitals() {
       url: `${HOSPITAL_BASE_URL}/getBabyListInfoInqire`,
     }),
   ]);
+  await report("receiving", 50, "병의원 API 응답을 모두 받았습니다.");
   const moonlightIds = new Set(
     moonlightRows.map((record) => text(record.hpid)),
   );
@@ -402,15 +425,25 @@ export async function importHospitals() {
     isMoonlightChildHospital: moonlightIds.has(text(record.hpid)) ? "Y" : "N",
   }));
 
+  await report(
+    "processing",
+    68,
+    "병의원 정보와 달빛어린이병원 여부를 병합했습니다.",
+  );
+
   return pointResult(rows, mapHospitalRecord);
 }
 
-export async function importEmergencyMedicalInstitutions() {
+export async function importEmergencyMedicalInstitutions(
+  report: DatasetProgressReporter,
+) {
+  await report("requesting", 10, "전국 응급의료기관 목록을 요청하고 있습니다.");
   const rows = await fetchAllPublicData({
     operation: "getEgytListInfoInqire",
     source: "emergency-medical-institutions",
     url: DATASET_SOURCES["emergency-medical-institutions"].url,
   });
+  await report("receiving", 28, "응급의료기관 목록을 받았습니다.");
   const areas = Array.from(
     new Map(
       rows
@@ -454,9 +487,21 @@ export async function importEmergencyMedicalInstitutions() {
     ),
   ]);
 
+  await report(
+    "receiving",
+    58,
+    "기관 기본정보, 실시간 병상, 중증 수용정보를 받았습니다.",
+  );
+
   mergeByHpid(rows, basicPages.flat(), "basic");
   mergeByHpid(rows, bedPages.flat(), "realtimeBed");
   mergeByHpid(rows, capabilityPages.flat(), "severeCapability");
+
+  await report(
+    "processing",
+    70,
+    "응급의료기관별 실시간 정보와 진료역량을 병합했습니다.",
+  );
 
   return pointResult(rows, mapEmergencyRecord);
 }

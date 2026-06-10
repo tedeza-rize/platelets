@@ -31,6 +31,7 @@ function formatDateTime(value: string) {
 
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
+    timeZone: "Asia/Seoul",
     timeStyle: "medium",
   }).format(date);
 }

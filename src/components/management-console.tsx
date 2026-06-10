@@ -30,6 +30,23 @@ type DatasetStatus = {
   recordCount: number;
   skippedCount: number;
   updatedAt: string | null;
+  updateProgress: DatasetUpdateProgress | null;
+};
+
+type DatasetUpdateProgress = {
+  message: string;
+  percent: number;
+  source: DatasetSourceId;
+  stage:
+    | "preparing"
+    | "requesting"
+    | "receiving"
+    | "processing"
+    | "saving"
+    | "completed"
+    | "failed";
+  status: "completed" | "failed" | "running";
+  updatedAt: string;
 };
 
 type DatasetImportProgress = {
@@ -104,6 +121,11 @@ type ProgressState = {
   title: string;
 };
 
+type DatasetScheduleSettings = Record<
+  DatasetSourceId,
+  { enabled: boolean; intervalDays: number }
+>;
+
 const SUDO_TOKEN_STORAGE_KEY = "platelets:sudo-token";
 const ACCESS_TOKEN_HEADER = "x-platelets-admin-token";
 
@@ -120,6 +142,7 @@ function formatDateTime(value: string | null) {
 
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
+    timeZone: "Asia/Seoul",
     timeStyle: "short",
   }).format(date);
 }
@@ -200,8 +223,14 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [timeStatus, setTimeStatus] = useState<TimeStatus | null>(null);
   const [ntpServersDraft, setNtpServersDraft] = useState("");
   const [activeUpdate, setActiveUpdate] = useState<DatasetSourceId | "all">();
+  const [activeDatasetSource, setActiveDatasetSource] =
+    useState<DatasetSourceId>();
   const [notice, setNotice] = useState<string>("");
   const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [schedules, setSchedules] = useState<DatasetScheduleSettings | null>(
+    null,
+  );
+  const [savingSchedules, setSavingSchedules] = useState(false);
   const [savingNtpServers, setSavingNtpServers] = useState(false);
   const [clockTick, setClockTick] = useState(0);
   const [sudoAccessToken, setSudoAccessToken] = useState("");
@@ -238,6 +267,37 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     [cooldowns],
   );
   const isUpdating = Boolean(activeUpdate) || Boolean(progress);
+  const datasetProgress = useMemo<ProgressState | null>(() => {
+    if (!activeUpdate) {
+      return null;
+    }
+
+    const current =
+      datasets.find((dataset) => dataset.id === activeDatasetSource) ??
+      datasets.find(
+        (dataset) => dataset.updateProgress?.status === "running",
+      ) ??
+      (activeUpdate === "all"
+        ? null
+        : datasets.find((dataset) => dataset.id === activeUpdate));
+    const updateProgress = current?.updateProgress;
+
+    if (!updateProgress) {
+      return {
+        currentStep: "업데이트 요청을 서버에 전달하고 있습니다.",
+        percent: 1,
+        title: activeUpdate === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
+      };
+    }
+
+    return {
+      currentStep: `${current.label}: ${updateProgress.message}`,
+      percent: updateProgress.percent,
+      title:
+        activeUpdate === "all" ? "전체 데이터 갱신" : `${current.label} 갱신`,
+    };
+  }, [activeDatasetSource, activeUpdate, datasets]);
+  const visibleProgress = progress ?? datasetProgress;
 
   function getCooldown(action: string) {
     const cooldown = cooldownByAction.get(action);
@@ -287,16 +347,19 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   const refresh = useCallback(async () => {
-    const [datasetsResponse, timeResponse] = await Promise.all([
-      fetch("/api/datasets", { cache: "no-store" }),
-      fetch("/api/server-time", { cache: "no-store" }),
-    ]);
+    const [datasetsResponse, timeResponse, schedulesResponse] =
+      await Promise.all([
+        fetch("/api/datasets", { cache: "no-store" }),
+        fetch("/api/server-time", { cache: "no-store" }),
+        fetch("/api/admin/dataset-schedules", { cache: "no-store" }),
+      ]);
 
-    if (!datasetsResponse.ok || !timeResponse.ok) {
+    if (!datasetsResponse.ok || !timeResponse.ok || !schedulesResponse.ok) {
       throw new Error("관리 데이터를 불러오지 못했습니다.");
     }
 
     setDatasets((await datasetsResponse.json()).datasets);
+    setSchedules((await schedulesResponse.json()).schedules);
     const nextTimeStatus = (await timeResponse.json()) as TimeStatus;
     setTimeStatus(nextTimeStatus);
     setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
@@ -395,24 +458,13 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     setActiveUpdate(source);
     setNotice("업데이트 중");
-    setProgress({
-      currentStep: "업데이트 준비 중",
-      percent: 5,
-      title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
-    });
 
     try {
       let pausedMessage: string | null = null;
 
       if (source === "all") {
-        for (const [index, dataset] of datasets.entries()) {
-          setProgress({
-            currentStep: `${dataset.label} 갱신 중`,
-            percent:
-              Math.round((index / Math.max(datasets.length, 1)) * 85) + 5,
-            title: "전체 데이터 갱신",
-          });
-
+        for (const dataset of datasets) {
+          setActiveDatasetSource(dataset.id);
           pausedMessage = await requestDatasetUpdate(dataset.id, "restart");
 
           if (pausedMessage) {
@@ -420,33 +472,48 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           }
         }
       } else {
-        const dataset = datasets.find((current) => current.id === source);
-        setProgress({
-          currentStep: `${dataset?.label ?? source} 갱신 중`,
-          percent: 40,
-          title: "데이터셋 갱신",
-        });
-
+        setActiveDatasetSource(source);
         pausedMessage = await requestDatasetUpdate(source, updateMode);
       }
 
-      setProgress({
-        currentStep: "갱신 결과 불러오는 중",
-        percent: 94,
-        title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
-      });
       await refresh();
       setNotice(pausedMessage ?? "업데이트 완료");
-      setProgress({
-        currentStep: pausedMessage ? "일시중단" : "완료",
-        percent: 100,
-        title: source === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
-      });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
       setActiveUpdate(undefined);
-      window.setTimeout(() => setProgress(null), 500);
+      setActiveDatasetSource(undefined);
+    }
+  }
+
+  async function saveSchedules() {
+    if (mode !== "sudo" || !hasSudoToken || !schedules) {
+      setNotice("개발자 토큰이 필요합니다.");
+      return;
+    }
+
+    setSavingSchedules(true);
+
+    try {
+      const response = await fetch("/api/admin/dataset-schedules", {
+        body: JSON.stringify({ schedules }),
+        headers: { "Content-Type": "application/json", ...sudoHeaders },
+        method: "PUT",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "갱신 주기 저장 실패");
+      }
+
+      setSchedules((await response.json()).schedules);
+      setNotice("데이터셋 갱신 주기를 저장했습니다.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingSchedules(false);
     }
   }
 
@@ -737,6 +804,79 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           </section>
         ) : null}
 
+        {mode === "sudo" && schedules ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>
+                <Clock3 aria-hidden="true" size={18} strokeWidth={2.4} />
+                자동 갱신 주기
+              </span>
+              <button
+                className={styles.actionButton}
+                disabled={savingSchedules}
+                onClick={saveSchedules}
+                type="button"
+              >
+                <Save aria-hidden="true" size={16} strokeWidth={2.4} />
+                주기 저장
+              </button>
+            </div>
+            <div className={styles.scheduleGrid}>
+              {datasets.map((dataset) => {
+                const schedule = schedules[dataset.id];
+
+                return (
+                  <div className={styles.scheduleRow} key={dataset.id}>
+                    <label className={styles.scheduleEnabled}>
+                      <input
+                        checked={schedule.enabled}
+                        onChange={(event) =>
+                          setSchedules((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  [dataset.id]: {
+                                    ...current[dataset.id],
+                                    enabled: event.target.checked,
+                                  },
+                                }
+                              : current,
+                          )
+                        }
+                        type="checkbox"
+                      />
+                      <span>{dataset.label}</span>
+                    </label>
+                    <label className={styles.scheduleInterval}>
+                      <input
+                        className={`${styles.textInput} ${styles.scheduleInput}`}
+                        max={365}
+                        min={1}
+                        onChange={(event) =>
+                          setSchedules((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  [dataset.id]: {
+                                    ...current[dataset.id],
+                                    intervalDays: Number(event.target.value),
+                                  },
+                                }
+                              : current,
+                          )
+                        }
+                        type="number"
+                        value={schedule.intervalDays}
+                      />
+                      <span>일마다</span>
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
         {mode === "sudo" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
@@ -1006,7 +1146,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
           </section>
         ) : null}
       </main>
-      {progress ? (
+      {visibleProgress ? (
         <div className={styles.progressBackdrop} role="presentation">
           <section
             aria-labelledby="progress-title"
@@ -1015,20 +1155,20 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             role="dialog"
           >
             <div className={styles.progressHeader}>
-              <h2 id="progress-title">{progress.title}</h2>
-              <span>{progress.percent}%</span>
+              <h2 id="progress-title">{visibleProgress.title}</h2>
+              <span>{visibleProgress.percent}%</span>
             </div>
             <div
               aria-label="갱신 진행률"
               aria-valuemax={100}
               aria-valuemin={0}
-              aria-valuenow={progress.percent}
+              aria-valuenow={visibleProgress.percent}
               className={styles.progressTrack}
               role="progressbar"
             >
-              <span style={{ width: `${progress.percent}%` }} />
+              <span style={{ width: `${visibleProgress.percent}%` }} />
             </div>
-            <p>{progress.currentStep}</p>
+            <p>{visibleProgress.currentStep}</p>
           </section>
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import sqlite3 from "sqlite3";
+import type { DatasetUpdateProgress } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 
 export type EmergencyPointInput = {
@@ -66,6 +67,7 @@ export type DatasetStatus = {
   skippedCount: number;
   sourceUrl: string;
   updatedAt: string | null;
+  updateProgress: DatasetUpdateProgress | null;
 };
 
 export type DatasetUpdateResult = DatasetStatus & {
@@ -585,6 +587,7 @@ function emptyStatus(source: DatasetSourceId): DatasetStatus {
     skippedCount: 0,
     sourceUrl: definition.url,
     updatedAt: null,
+    updateProgress: null,
   };
 }
 
@@ -601,6 +604,7 @@ function mapStatusRow(row: StatusRow): DatasetStatus {
     skippedCount: row.skipped_count,
     sourceUrl: row.source_url,
     updatedAt: row.updated_at,
+    updateProgress: null,
   };
 }
 
@@ -653,6 +657,13 @@ function withImportProgress(
     ...status,
     importProgress: progress,
   };
+}
+
+function withUpdateProgress(
+  status: DatasetStatus,
+  updateProgress: DatasetUpdateProgress | null,
+) {
+  return { ...status, updateProgress };
 }
 
 function mapApiLogRow(row: ApiLogRow): ApiLogEntry {
@@ -1193,6 +1204,32 @@ export async function setAppSetting(key: string, value: unknown) {
   );
 }
 
+const DATASET_PROGRESS_SETTING_PREFIX = "dataset-update-progress:";
+
+export async function setDatasetUpdateProgress(
+  progress: Omit<DatasetUpdateProgress, "updatedAt">,
+) {
+  const value: DatasetUpdateProgress = {
+    ...progress,
+    percent: Math.min(100, Math.max(0, Math.round(progress.percent))),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await setAppSetting(
+    `${DATASET_PROGRESS_SETTING_PREFIX}${progress.source}`,
+    value,
+  );
+
+  return value;
+}
+
+export async function getDatasetUpdateProgress(source: DatasetSourceId) {
+  return getAppSetting<DatasetUpdateProgress | null>(
+    `${DATASET_PROGRESS_SETTING_PREFIX}${source}`,
+    null,
+  );
+}
+
 export async function upsertHazardEvents(params: {
   events: HazardEventInput[];
   fetchedAt: string;
@@ -1392,10 +1429,18 @@ export async function listDatasetStatuses() {
     ]),
   );
 
-  return (Object.keys(DATASET_SOURCES) as DatasetSourceId[]).map((source) =>
-    withImportProgress(
-      bySource.get(source) ?? emptyStatus(source),
-      progressBySource.get(source) ?? null,
+  const sources = Object.keys(DATASET_SOURCES) as DatasetSourceId[];
+  const updateProgresses = await Promise.all(
+    sources.map((source) => getDatasetUpdateProgress(source)),
+  );
+
+  return sources.map((source, index) =>
+    withUpdateProgress(
+      withImportProgress(
+        bySource.get(source) ?? emptyStatus(source),
+        progressBySource.get(source) ?? null,
+      ),
+      updateProgresses[index] ?? null,
     ),
   );
 }
@@ -1409,9 +1454,9 @@ export async function getDatasetStatus(source: DatasetSourceId) {
   );
   const progress = await getDatasetImportProgress(source);
 
-  return withImportProgress(
-    row ? mapStatusRow(row) : emptyStatus(source),
-    progress,
+  return withUpdateProgress(
+    withImportProgress(row ? mapStatusRow(row) : emptyStatus(source), progress),
+    await getDatasetUpdateProgress(source),
   );
 }
 
@@ -1513,7 +1558,38 @@ export async function replaceDataset(params: {
       params.source,
     ]);
 
-    for (const point of params.points) {
+    const insertColumns = 11;
+    const insertBatchSize = 80;
+
+    for (
+      let startIndex = 0;
+      startIndex < params.points.length;
+      startIndex += insertBatchSize
+    ) {
+      const batch = params.points.slice(
+        startIndex,
+        startIndex + insertBatchSize,
+      );
+      const placeholders = batch
+        .map(
+          () =>
+            `(${Array.from({ length: insertColumns }, () => "?").join(", ")})`,
+        )
+        .join(", ");
+      const values = batch.flatMap((point) => [
+        point.source,
+        point.sourceRecordId,
+        point.name,
+        point.category,
+        point.address,
+        point.phone,
+        point.parentName,
+        point.latitude,
+        point.longitude,
+        point.sourceUpdatedAt,
+        JSON.stringify(point.raw),
+      ]);
+
       await run(
         db,
         `INSERT INTO points (
@@ -1528,20 +1604,8 @@ export async function replaceDataset(params: {
           longitude,
           source_updated_at,
           raw_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          point.source,
-          point.sourceRecordId,
-          point.name,
-          point.category,
-          point.address,
-          point.phone,
-          point.parentName,
-          point.latitude,
-          point.longitude,
-          point.sourceUpdatedAt,
-          JSON.stringify(point.raw),
-        ],
+        ) VALUES ${placeholders}`,
+        values,
       );
     }
 

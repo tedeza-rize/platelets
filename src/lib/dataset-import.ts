@@ -1,6 +1,7 @@
 import https from "node:https";
 import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
+import type { DatasetProgressReporter } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
   importChildcareCenters,
@@ -16,10 +17,12 @@ import {
   type DatasetUpdateResult,
   type EmergencyPointInput,
   getDatasetImportCheckpoint,
+  getDatasetStatus,
   recordApiLog,
   recordDatasetError,
   replaceDataset,
   saveDatasetImportProgress,
+  setDatasetUpdateProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
 import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
@@ -676,14 +679,19 @@ async function savePoliceProgress(params: {
   return saveDatasetImportProgress(buildImportCheckpoint(params));
 }
 
-async function importFireStations(): Promise<ImportResult> {
+async function importFireStations(
+  report: DatasetProgressReporter,
+): Promise<ImportResult> {
+  await report("requesting", 10, "소방 좌표 CSV를 요청하고 있습니다.");
   const csv = await downloadCsv("fire-stations");
+  await report("receiving", 38, "원본 CSV 응답을 받았습니다.");
   const fetchedAt = new Date().toISOString();
   const rows = parseCsv(csv);
   const points = rows
     .map(mapFireRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
   const skippedCount = rows.length - points.length;
+  await report("processing", 68, "소방 좌표를 정규화했습니다.");
 
   return {
     failedCount: points.filter(
@@ -700,8 +708,11 @@ async function importFireStations(): Promise<ImportResult> {
 
 async function importPoliceStations(
   mode: DatasetImportMode,
+  report: DatasetProgressReporter,
 ): Promise<ImportResult> {
+  await report("requesting", 10, "경찰관서 CSV를 요청하고 있습니다.");
   const csv = await downloadCsv("police-stations");
+  await report("receiving", 30, "원본 CSV 응답을 받았습니다.");
   const rows = parseCsv(csv);
   const existing =
     mode === "resume"
@@ -763,6 +774,11 @@ async function importPoliceStations(
     }
 
     if ((index + 1) % 25 === 0 || index + 1 === rows.length) {
+      await report(
+        "processing",
+        35 + Math.round(((index + 1) / Math.max(rows.length, 1)) * 33),
+        `주소 좌표 변환 ${index + 1}/${rows.length}`,
+      );
       await savePoliceProgress({
         fetchedAt,
         mode,
@@ -788,7 +804,10 @@ async function importPoliceStations(
   };
 }
 
-async function importAeds(): Promise<ImportResult> {
+async function importAeds(
+  report: DatasetProgressReporter,
+): Promise<ImportResult> {
+  await report("requesting", 10, "AED API 첫 페이지를 요청하고 있습니다.");
   const firstPage = await fetchAedPage(1);
   const totalCount = Number.isFinite(firstPage.totalCount)
     ? firstPage.totalCount
@@ -798,6 +817,11 @@ async function importAeds(): Promise<ImportResult> {
 
   for (let pageNo = 2; pageNo <= pageCount; pageNo += 1) {
     pages.push(await fetchAedPage(pageNo));
+    await report(
+      "receiving",
+      15 + Math.round((pageNo / pageCount) * 35),
+      `AED 응답 ${pageNo}/${pageCount} 페이지 수신`,
+    );
   }
 
   const fetchedAt = new Date().toISOString();
@@ -806,6 +830,7 @@ async function importAeds(): Promise<ImportResult> {
     .map(mapAedRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
   const skippedCount = rows.length - points.length;
+  await report("processing", 68, "AED 위치와 연락처를 정규화했습니다.");
 
   return {
     failedCount: points.filter(
@@ -820,12 +845,21 @@ async function importAeds(): Promise<ImportResult> {
   };
 }
 
-async function importSchools(): Promise<ImportResult> {
+async function importSchools(
+  report: DatasetProgressReporter,
+): Promise<ImportResult> {
   const pages: SchoolRecord[][] = [];
+
+  await report("requesting", 10, "학교 표준데이터를 요청하고 있습니다.");
 
   for (let page = 1; page <= 20; page += 1) {
     const rows = await fetchSchoolPage(page);
     pages.push(rows);
+    await report(
+      "receiving",
+      Math.min(50, 12 + page * 4),
+      `학교 데이터 ${page} 페이지 수신`,
+    );
 
     if (rows.length < SCHOOL_NUM_OF_ROWS) {
       break;
@@ -838,6 +872,7 @@ async function importSchools(): Promise<ImportResult> {
     .map(mapSchoolRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
   const geocodedCount = countGeocoded(points);
+  await report("processing", 68, "학교 좌표를 정규화했습니다.");
 
   return {
     failedCount: points.length - geocodedCount,
@@ -848,17 +883,22 @@ async function importSchools(): Promise<ImportResult> {
   };
 }
 
-async function importUniversities(): Promise<ImportResult> {
+async function importUniversities(
+  report: DatasetProgressReporter,
+): Promise<ImportResult> {
+  await report("requesting", 10, "대학교 좌표 XLSX를 요청하고 있습니다.");
   const buffer = await downloadBufferFromUrl(
     DATASET_SOURCES.universities.url,
     "universities",
   );
+  await report("receiving", 40, "대학교 XLSX 응답을 받았습니다.");
   const fetchedAt = new Date().toISOString();
   const rows = worksheetRowsToRecords(parseFirstWorksheetRows(buffer));
   const points = rows
     .map(mapUniversityRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
   const geocodedCount = countGeocoded(points);
+  await report("processing", 68, "대학교 워크시트를 정규화했습니다.");
 
   return {
     failedCount: points.length - geocodedCount,
@@ -869,26 +909,30 @@ async function importUniversities(): Promise<ImportResult> {
   };
 }
 
-async function importDataset(source: DatasetSourceId, mode: DatasetImportMode) {
+async function importDataset(
+  source: DatasetSourceId,
+  mode: DatasetImportMode,
+  report: DatasetProgressReporter,
+) {
   switch (source) {
     case "fire-stations":
-      return importFireStations();
+      return importFireStations(report);
     case "police-stations":
-      return importPoliceStations(mode);
+      return importPoliceStations(mode, report);
     case "aeds":
-      return importAeds();
+      return importAeds(report);
     case "childcare-centers":
-      return importChildcareCenters();
+      return importChildcareCenters(report);
     case "pharmacies":
-      return importPharmacies();
+      return importPharmacies(report);
     case "hospitals":
-      return importHospitals();
+      return importHospitals(report);
     case "emergency-medical-institutions":
-      return importEmergencyMedicalInstitutions();
+      return importEmergencyMedicalInstitutions(report);
     case "schools":
-      return importSchools();
+      return importSchools(report);
     case "universities":
-      return importUniversities();
+      return importUniversities(report);
   }
 }
 
@@ -897,8 +941,23 @@ export async function updateDataset(
   options: DatasetUpdateOptions = {},
 ) {
   const mode = options.mode ?? "restart";
+  const report: DatasetProgressReporter = async (stage, percent, message) => {
+    await setDatasetUpdateProgress({
+      message,
+      percent,
+      source,
+      stage,
+      status:
+        stage === "failed"
+          ? "failed"
+          : stage === "completed"
+            ? "completed"
+            : "running",
+    });
+  };
 
   try {
+    await report("preparing", 2, "업데이트 작업을 준비하고 있습니다.");
     await recordApiLog({
       action: "dataset-update",
       category: "dataset",
@@ -909,12 +968,18 @@ export async function updateDataset(
       status: "success",
     });
 
-    const result = await importDataset(source, mode);
+    const result = await importDataset(source, mode, report);
 
+    await report(
+      "saving",
+      76,
+      `${result.points.length.toLocaleString("ko-KR")}건을 DB에 저장하고 있습니다.`,
+    );
     const dataset = await replaceDataset({
       ...result,
       source,
     });
+    await report("saving", 97, "저장 결과를 검증하고 있습니다.");
 
     await recordApiLog({
       action: "dataset-update",
@@ -931,8 +996,18 @@ export async function updateDataset(
       status: "success",
     });
 
-    return dataset;
+    await report("completed", 100, "데이터 저장이 완료되었습니다.");
+
+    return {
+      ...(await getDatasetStatus(source)),
+      importedCount: dataset.importedCount,
+    };
   } catch (error) {
+    await report(
+      "failed",
+      100,
+      error instanceof Error ? error.message : String(error),
+    );
     await recordDatasetError(source, error);
     await recordApiLog({
       action: "dataset-update",

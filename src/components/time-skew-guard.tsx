@@ -38,6 +38,7 @@ type WarningState = {
 function formatDateTime(value: string | number) {
   return new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
+    timeZone: "Asia/Seoul",
     timeStyle: "medium",
   }).format(new Date(value));
 }

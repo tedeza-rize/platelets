@@ -4,5 +4,7 @@ export async function register() {
   }
 
   const { startHazardEventScheduler } = await import("@/lib/hazard-scheduler");
+  const { startDatasetScheduler } = await import("@/lib/dataset-scheduler");
   startHazardEventScheduler();
+  startDatasetScheduler();
 }
