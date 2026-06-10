@@ -6,12 +6,15 @@ import {
   ChevronDown,
   Database,
   Globe2,
-  Home,
+  HeartPulse,
   Layers,
   ListFilter,
+  Map as MapIcon,
   MapPin,
   Search,
   Settings,
+  ShieldCheck,
+  UserCog,
 } from "lucide-react";
 import type {
   GeoJSONSource,
@@ -1555,7 +1558,9 @@ function runWhenStyleReady(map: MapLibreMap, callback: () => void) {
 export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const providerMenuRef = useRef<HTMLDivElement>(null);
+  const mobileProviderMenuRef = useRef<HTMLDivElement>(null);
   const sourceMenuRef = useRef<HTMLDivElement>(null);
+  const sourceSearchInputRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const pointsRef = useRef<EmergencyPointMarker[]>([]);
@@ -1633,6 +1638,48 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     isSourceVisible(visibleSources, dataset.id),
   ).length;
   const activeHazardImageUrl = safeKmaImageUrl(activeHazard?.imageUrl ?? null);
+
+  function openSourceSearch() {
+    setIsSourceMenuOpen(true);
+    window.setTimeout(() => sourceSearchInputRef.current?.focus(), 0);
+  }
+
+  function renderProviderDropdown(className: string) {
+    if (!isMenuOpen) {
+      return null;
+    }
+
+    return (
+      <div className={className} role="menu">
+        {(Object.keys(PROVIDERS) as MapProvider[]).map((providerKey) => {
+          const providerConfig = PROVIDERS[providerKey];
+          const Icon = providerConfig.icon;
+          const providerLabel =
+            dictionary.map.providers[providerConfig.labelKey];
+
+          return (
+            <button
+              aria-checked={provider === providerKey}
+              className={styles.providerItem}
+              key={providerKey}
+              onClick={() => {
+                setProvider(providerKey);
+                setIsMenuOpen(false);
+              }}
+              role="menuitemradio"
+              type="button"
+            >
+              <Icon aria-hidden="true" size={16} strokeWidth={2.4} />
+              <span>{providerLabel}</span>
+              {provider === providerKey ? (
+                <Check aria-hidden="true" size={15} strokeWidth={2.6} />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   const refreshData = useCallback(async () => {
     const [datasetsResponse, hazardsResponse, seoulResponse] =
@@ -2153,7 +2200,8 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     function closeMenu(event: PointerEvent) {
       if (
         event.target instanceof Node &&
-        providerMenuRef.current?.contains(event.target)
+        (providerMenuRef.current?.contains(event.target) ||
+          mobileProviderMenuRef.current?.contains(event.target))
       ) {
         return;
       }
@@ -2194,21 +2242,32 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   return (
     <div className={styles.page}>
       <nav className={styles.navbar} aria-label={dictionary.navigation.label}>
-        <a
-          aria-label={dictionary.navigation.homeLabel}
-          className={styles.homeLink}
-          href="/"
-          title={dictionary.navigation.homeLabel}
-        >
-          <Home aria-hidden="true" size={22} strokeWidth={2.6} />
+        <a className={styles.brandLink} href="/">
+          <span className={styles.brandMark}>
+            <HeartPulse aria-hidden="true" size={20} strokeWidth={2.7} />
+          </span>
+          <span>Platelets</span>
         </a>
-
-        <h1 className={styles.navTitle}>{dictionary.navigation.title}</h1>
-
-        <div className={styles.navActions}>
-          <a className={styles.licenseLink} href="/licenses">
+        <div className={styles.desktopLinks}>
+          <a className={styles.desktopLinkActive} href="/">
+            지도
+          </a>
+          <a className={styles.desktopLink} href="/licenses">
             라이선스
           </a>
+          <a className={styles.desktopLink} href="/admin">
+            관리자
+          </a>
+        </div>
+        <div className={styles.navActions}>
+          <button
+            className={styles.navSearchButton}
+            onClick={openSourceSearch}
+            type="button"
+          >
+            <Search aria-hidden="true" size={18} strokeWidth={2.2} />
+            <span>시설 검색</span>
+          </button>
           <div className={styles.providerMenu} ref={providerMenuRef}>
             <button
               aria-expanded={isMenuOpen}
@@ -2229,42 +2288,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
               />
               <ChevronDown aria-hidden="true" size={14} strokeWidth={2.5} />
             </button>
-            {isMenuOpen ? (
-              <div className={styles.providerDropdown} role="menu">
-                {(Object.keys(PROVIDERS) as MapProvider[]).map(
-                  (providerKey) => {
-                    const providerConfig = PROVIDERS[providerKey];
-                    const Icon = providerConfig.icon;
-                    const providerLabel =
-                      dictionary.map.providers[providerConfig.labelKey];
-
-                    return (
-                      <button
-                        className={styles.providerItem}
-                        key={providerKey}
-                        onClick={() => {
-                          setProvider(providerKey);
-                          setIsMenuOpen(false);
-                        }}
-                        aria-checked={provider === providerKey}
-                        role="menuitemradio"
-                        type="button"
-                      >
-                        <Icon aria-hidden="true" size={16} strokeWidth={2.4} />
-                        <span>{providerLabel}</span>
-                        {provider === providerKey ? (
-                          <Check
-                            aria-hidden="true"
-                            size={15}
-                            strokeWidth={2.6}
-                          />
-                        ) : null}
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-            ) : null}
+            {renderProviderDropdown(styles.providerDropdown)}
           </div>
         </div>
       </nav>
@@ -2303,6 +2327,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
                 <input
                   onChange={(event) => setSourceQuery(event.target.value)}
                   placeholder="검색"
+                  ref={sourceSearchInputRef}
                   type="search"
                   value={sourceQuery}
                 />
@@ -2450,6 +2475,43 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
           </div>
         ) : null}
       </main>
+      <nav className={styles.mobileNav} aria-label="모바일 주요 탐색">
+        <a className={styles.mobileNavActive} href="/">
+          <MapIcon aria-hidden="true" size={20} strokeWidth={2.5} />
+          <span>지도</span>
+        </a>
+        <button onClick={openSourceSearch} type="button">
+          <Search aria-hidden="true" size={20} strokeWidth={2.5} />
+          <span>시설</span>
+        </button>
+        <a href="/licenses">
+          <ShieldCheck aria-hidden="true" size={20} strokeWidth={2.5} />
+          <span>라이선스</span>
+        </a>
+        <a href="/admin">
+          <UserCog aria-hidden="true" size={20} strokeWidth={2.5} />
+          <span>관리</span>
+        </a>
+        <div className={styles.mobileProviderMenu} ref={mobileProviderMenuRef}>
+          <button
+            aria-expanded={isMenuOpen}
+            aria-label={dictionary.map.providerMenuLabel.replace(
+              "{provider}",
+              selectedProviderLabel,
+            )}
+            onClick={() => setIsMenuOpen((current) => !current)}
+            type="button"
+          >
+            <SelectedProviderIcon
+              aria-hidden="true"
+              size={20}
+              strokeWidth={2.5}
+            />
+            <span>지도층</span>
+          </button>
+          {renderProviderDropdown(styles.mobileProviderDropdown)}
+        </div>
+      </nav>
     </div>
   );
 }
