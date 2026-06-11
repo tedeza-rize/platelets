@@ -4,6 +4,9 @@ title: "[type]: "
 labels:
   - triage
 body:
+  - type: markdown
+    attributes:
+      value: Assign at least one issue label/tag such as `enhancement`, `bug`, or `documentation` before starting implementation.
   - type: dropdown
     id: work_type
     attributes:

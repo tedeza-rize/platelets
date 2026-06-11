@@ -12,7 +12,9 @@ Use these branch names:
 
 Open or link a GitHub issue before starting work when the change is more than a
 small local cleanup. The issue should describe the user impact, expected
-verification, and any data or license changes.
+verification, and any data or license changes. Always assign at least one
+GitHub label/tag when creating the issue, for example `enhancement`, `bug`, or
+`documentation`.
 
 Before starting work, always confirm the remote repository state:
 
@@ -32,7 +34,7 @@ Recommended GitHub CLI flow:
 
 ```bash
 gh auth login
-gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
+gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
 git switch -c feature/작업명
 ```
 
