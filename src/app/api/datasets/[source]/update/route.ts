@@ -24,7 +24,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ source: string }> },
 ) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
 
   if (forbidden) {
     return forbidden;
