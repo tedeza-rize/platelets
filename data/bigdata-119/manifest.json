@@ -1,0 +1,150 @@
+{
+  "downloadedAt": "2026-06-11T07:47:07.683Z",
+  "fullCsvDownloadNote": "The platform exposes full CSV files through its login/free-purchase flow. This script downloads public sample_info XLSX files and converts them to local CSV files for MVP/demo use.",
+  "products": [
+    {
+      "fileCount": 3,
+      "files": [
+        {
+          "byteSize": "40.89 MB",
+          "filename": "특정소방대상물_2024.csv",
+          "goodsSerial": 6363,
+          "issued": "2025-07-21"
+        },
+        {
+          "byteSize": "46.04 MB",
+          "filename": "특정소방대상물_2023.csv",
+          "goodsSerial": 5883,
+          "issued": "2023-06-17"
+        },
+        {
+          "byteSize": "46.14 MB",
+          "filename": "특정소방대상물_2022.csv",
+          "goodsSerial": 5882,
+          "issued": "2022-06-17"
+        }
+      ],
+      "goodsId": "C1440102",
+      "goodsManagementSerial": "378",
+      "goodsName": "서울소방재난본부_특정소방대상물 현황",
+      "outputFileName": "seoul-fire-safety-targets.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1440102&goods_nm=%EC%84%9C%EC%9A%B8%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%ED%8A%B9%EC%A0%95%EC%86%8C%EB%B0%A9%EB%8C%80%EC%83%81%EB%AC%BC+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=378"
+    },
+    {
+      "fileCount": 3,
+      "files": [
+        {
+          "byteSize": "13.60 MB",
+          "filename": "소방용수_2024.csv",
+          "goodsSerial": 6365,
+          "issued": "2025-07-21"
+        },
+        {
+          "byteSize": "13.02 MB",
+          "filename": "소방용수_2023.csv",
+          "goodsSerial": 5890,
+          "issued": "2023-06-17"
+        },
+        {
+          "byteSize": "12.96 MB",
+          "filename": "소방용수_2022.csv",
+          "goodsSerial": 5889,
+          "issued": "2022-06-17"
+        }
+      ],
+      "goodsId": "C1440302",
+      "goodsManagementSerial": "380",
+      "goodsName": "서울소방재난본부_소방용수 현황",
+      "outputFileName": "seoul-fire-water-sources.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1440302&goods_nm=%EC%84%9C%EC%9A%B8%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%EC%86%8C%EB%B0%A9%EC%9A%A9%EC%88%98+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=380"
+    },
+    {
+      "fileCount": 4,
+      "files": [
+        {
+          "byteSize": "14.15 MB",
+          "filename": "부산소방재난본부_특정소방대상물 현황_2025_부산.csv",
+          "goodsSerial": 7172,
+          "issued": "2025-12-15"
+        },
+        {
+          "byteSize": "14.21 MB",
+          "filename": "특정소방대상물_2023.csv",
+          "goodsSerial": 5897,
+          "issued": "2023-06-24"
+        },
+        {
+          "byteSize": "14.30 MB",
+          "filename": "특정소방대상물_2022.csv",
+          "goodsSerial": 5896,
+          "issued": "2022-06-24"
+        },
+        {
+          "byteSize": "14.51 MB",
+          "filename": "특정소방대상물_2021.csv",
+          "goodsSerial": 5895,
+          "issued": "2022-06-24"
+        }
+      ],
+      "goodsId": "C1540101",
+      "goodsManagementSerial": "404",
+      "goodsName": "부산소방재난본부_특정소방대상물 현황",
+      "outputFileName": "busan-fire-safety-targets.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1540101&goods_nm=%EB%B6%80%EC%82%B0%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%ED%8A%B9%EC%A0%95%EC%86%8C%EB%B0%A9%EB%8C%80%EC%83%81%EB%AC%BC+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=404"
+    },
+    {
+      "fileCount": 3,
+      "files": [
+        {
+          "byteSize": "2.19 MB",
+          "filename": "부산소방재난본부_소방용수 현황_2025_부산.csv",
+          "goodsSerial": 7171,
+          "issued": "2025-12-15"
+        },
+        {
+          "byteSize": "2.17 MB",
+          "filename": "소방용수_2023.csv",
+          "goodsSerial": 5893,
+          "issued": "2023-06-24"
+        },
+        {
+          "byteSize": "2.19 MB",
+          "filename": "소방용수_2022.csv",
+          "goodsSerial": 5892,
+          "issued": "2022-06-24"
+        }
+      ],
+      "goodsId": "C1530202",
+      "goodsManagementSerial": "403",
+      "goodsName": "부산소방재난본부_소방용수 현황",
+      "outputFileName": "busan-fire-water-sources.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1530202&goods_nm=%EB%B6%80%EC%82%B0%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%EC%86%8C%EB%B0%A9%EC%9A%A9%EC%88%98+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=403"
+    },
+    {
+      "fileCount": 1,
+      "files": [
+        {
+          "byteSize": "35.00 KB",
+          "filename": "화재_소방력_2021_전국.csv",
+          "goodsSerial": 2249,
+          "issued": "2022-04-26"
+        }
+      ],
+      "goodsId": "C0000008",
+      "goodsManagementSerial": "9",
+      "goodsName": "전국 시군구별 화재현황 및 소방력 정보",
+      "outputFileName": "national-fire-force.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C0000008&goods_nm=%EC%A0%84%EA%B5%AD+%EC%8B%9C%EA%B5%B0%EA%B5%AC%EB%B3%84+%ED%99%94%EC%9E%AC%ED%98%84%ED%99%A9+%EB%B0%8F+%EC%86%8C%EB%B0%A9%EB%A0%A5+%EC%A0%95%EB%B3%B4",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9"
+    }
+  ]
+}

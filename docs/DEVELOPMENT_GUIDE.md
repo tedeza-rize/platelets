@@ -17,8 +17,6 @@
 - Use `Asia/Seoul` for user-visible dates and retain UTC for durable storage.
 - Add abstractions only when they remove meaningful duplication.
 - Prefer existing CSS modules and flat responsive layouts.
-- Use LF line endings for all text files for cross-OS compatibility. The
-  repository enforces this with `.editorconfig` and `.gitattributes`.
 
 ## External Data Checklist
 
@@ -36,65 +34,18 @@ or derived artifact:
 
 ## Feature Workflow
 
-Before editing, always synchronize with the remote repository and inspect branch
-state:
-
-```bash
-git fetch --all --prune
-git pull --ff-only
-git branch --all --verbose
-gh pr list --state open
-gh run list --limit 5
-```
-
-Use `git` for branch synchronization and GitHub CLI for GitHub state such as
-issues, pull requests, workflow runs, and merge readiness.
-
 Use this order for each coherent feature or fix:
 
-1. 코드 수정.
-2. linting: run `npm run lint` and address logic or lint findings.
-3. 테스트: run focused checks and test affected UI/API behavior in the browser.
-4. formatting: run `npm run format`.
-5. 테스트: run `npm run lint`, `npm run test`, `npm run build`, focused
-   integration checks, and `git diff --check` again.
-6. 깃 커밋: commit only that feature, bug fix, or documentation/process update
-   with a descriptive message.
-7. 깃 푸쉬: always run `git push` after committing so the remote branch,
-   GitHub Actions, and pull request state reflect the completed work.
+1. Make the scoped code change.
+2. Run `npm run lint` and address logic or lint findings.
+3. Test affected UI and API behavior in the browser.
+4. Run `npm run format`.
+5. Run `npm run lint` and `npm run build` again.
+6. Run focused integration checks and `git diff --check`.
+7. Commit only that feature or fix with a descriptive message.
 
 Do not combine unrelated UI, data, security, and documentation work into one
 commit merely because they were requested together.
-
-## Branch And Pull Request Workflow
-
-This repository uses GitHub Flow:
-
-1. Start from an up-to-date `main`.
-2. Create a short-lived branch named `feature/작업명`, `fix/버그명`, or
-   `hotfix/긴급수정명`.
-3. Open or link a GitHub issue before implementation when the work has product,
-   operational, or user-visible impact, and assign at least one label/tag.
-4. Keep commits scoped to one feature, fix, or documentation/process change.
-5. Push the branch after every completed commit set.
-6. Open a pull request into `main` and wait for GitHub Actions to finish.
-7. Merge only after the CI checks pass and required review or branch protection
-   rules are satisfied.
-
-The CI workflow runs on `main`, `feature/**`, `fix/**`, `hotfix/**`, and pull
-requests to `main`. Treat a passing CI run as the baseline signal that the
-branch can be merged, subject to review and repository protection settings.
-
-When GitHub CLI is available, use it for the issue, pull request, and Actions
-checks:
-
-```bash
-gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
-gh pr create --base main --head feature/작업명 --fill
-gh run watch
-gh pr checks
-gh pr merge --merge --delete-branch
-```
 
 ## Browser Verification
 
@@ -108,21 +59,6 @@ For map or responsive UI changes, verify at minimum:
 
 Use DOM state for interaction correctness and a screenshot when visual layout
 is the question. Reset temporary viewport overrides after testing.
-
-When Playwright browser binaries are installed, run `npm run test:e2e`; it tests
-both Chromium and Firefox. If local Playwright browsers are missing, choose a
-reasonable fallback:
-
-1. Use system Chrome with
-   `$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e`.
-2. Use system Edge with
-   `$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e`.
-3. Use the in-app browser when neither Playwright browsers nor system
-   Chrome/Edge are available.
-
-If Chromium or a Chromium-based system browser passes and the change is not
-Firefox-specific, treat that as acceptable local browser evidence. GitHub
-Actions still runs the full Chromium and Firefox Playwright suite before merge.
 
 ## Database And Imports
 

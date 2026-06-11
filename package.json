@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "download:bigdata119": "node scripts/download-bigdata119-samples.ts",
     "start": "next start",
     "mcp:points": "node scripts/points-mcp.ts",
     "lint": "biome check && node scripts/check-encoding.ts",
@@ -25,7 +26,6 @@
     "openai": "^6.42.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "read-excel-file": "^9.2.0",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
