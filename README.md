@@ -51,6 +51,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Before changing Next.js code, read the relevant local guide under
 `node_modules/next/dist/docs/`; this project uses Next.js 16.2.7 conventions.
+Use LF line endings for text files; `.editorconfig` and `.gitattributes`
+enforce this for cross-OS compatibility.
 
 ## Verification
 
