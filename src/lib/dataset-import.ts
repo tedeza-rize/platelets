@@ -1,4 +1,6 @@
+import fs from "node:fs";
 import https from "node:https";
+import path from "node:path";
 import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import type { DatasetProgressReporter } from "@/lib/dataset-progress";
@@ -25,7 +27,7 @@ import {
   setDatasetUpdateProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
-import { parseFirstWorksheetRows } from "@/lib/xlsx-reader";
+import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
 
 type CsvRecord = Record<string, unknown>;
 type AedRecord = Record<string, unknown>;
@@ -43,6 +45,16 @@ type ImportResult = {
 type DatasetUpdateOptions = {
   mode?: DatasetImportMode;
 };
+
+type BigData119FireSafetyTargetSource =
+  | "fire-safety-targets"
+  | "busan-fire-safety-targets";
+type BigData119FireWaterSource =
+  | "fire-water-sources"
+  | "busan-fire-water-sources";
+type BigData119PointSource =
+  | BigData119FireSafetyTargetSource
+  | BigData119FireWaterSource;
 
 type KakaoAddressSearchResponse = {
   documents?: Array<{
@@ -71,6 +83,69 @@ const DOWNLOAD_RETRY_COUNT = 3;
 const SCHOOL_NUM_OF_ROWS = 10_000;
 const SCHOOL_TOTAL_COUNT_HINT = 12_011;
 const UNIVERSITY_SOURCE_UPDATED_AT = "2025-11-26";
+const BIGDATA119_DATA_DIR = path.join(
+  /*turbopackIgnore: true*/ process.cwd(),
+  "data",
+  "bigdata-119",
+);
+const BIGDATA119_TARGET_FILE_CANDIDATES = [
+  "seoul-fire-safety-targets.csv",
+  "서울소방재난본부_특정소방대상물 현황.csv",
+  "특정소방대상물_2024.csv",
+  "특정소방대상물 현황.csv",
+];
+const BIGDATA119_WATER_FILE_CANDIDATES = [
+  "seoul-fire-water-sources.csv",
+  "서울소방재난본부_소방용수 현황.csv",
+  "소방용수_2024.csv",
+  "소방용수 현황.csv",
+];
+const BIGDATA119_BUSAN_TARGET_FILE_CANDIDATES = [
+  "busan-fire-safety-targets.csv",
+  "부산소방재난본부_특정소방대상물 현황_2025_부산.csv",
+  "부산소방재난본부_특정소방대상물 현황.csv",
+  "부산_특정소방대상물_2025.csv",
+  "특정소방대상물_2023.csv",
+];
+const BIGDATA119_BUSAN_WATER_FILE_CANDIDATES = [
+  "busan-fire-water-sources.csv",
+  "부산소방재난본부_소방용수 현황_2025_부산.csv",
+  "부산소방재난본부_소방용수 현황.csv",
+  "부산_소방용수_2025.csv",
+  "소방용수_2023.csv",
+];
+const LATITUDE_FIELDS = [
+  "위도",
+  "위도좌표",
+  "WGS84위도",
+  "latitude",
+  "Latitude",
+  "LATITUDE",
+  "lat",
+  "LAT",
+  "y",
+  "Y",
+  "Y좌표",
+  "wgs84_lat",
+  "wgs84Lat",
+];
+const LONGITUDE_FIELDS = [
+  "경도",
+  "경도좌표",
+  "WGS84경도",
+  "longitude",
+  "Longitude",
+  "LONGITUDE",
+  "lon",
+  "lng",
+  "LON",
+  "LNG",
+  "x",
+  "X",
+  "X좌표",
+  "wgs84_lon",
+  "wgs84Lon",
+];
 const SCHOOL_COLUMN_NAMES = [
   "SCHOOL_ID",
   "SCHOOL_NM",
@@ -91,6 +166,216 @@ const SCHOOL_COLUMN_NAMES = [
   "LONGITUDE",
   "REFERENCE_DATE",
 ] as const;
+
+const BIGDATA119_TARGET_FALLBACK_ROWS: CsvRecord[] = [
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-fst-001",
+    bdst_usg_nm: "업무시설",
+    bldg_nm: "서울시청 본관",
+    cntr_nm: "현장대응단",
+    conm_addr: "서울특별시 중구 세종대로 110",
+    frstn_nm: "중부소방서",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    latitude: "37.5665",
+    longitude: "126.9780",
+    trgtobj_nm: "서울시청 본관",
+    trgtobj_se_nm: "일반대상물",
+  },
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-fst-002",
+    bdst_usg_nm: "문화재",
+    bldg_nm: "숭례문",
+    cntr_nm: "회현119안전센터",
+    conm_addr: "서울특별시 중구 세종대로 40",
+    frstn_nm: "중부소방서",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    latitude: "37.55998",
+    longitude: "126.97531",
+    trgtobj_nm: "숭례문",
+    trgtobj_se_nm: "2급대상",
+  },
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-fst-003",
+    bdst_usg_nm: "복합건축물",
+    bldg_nm: "동대문디자인플라자",
+    cntr_nm: "을지로119안전센터",
+    conm_addr: "서울특별시 중구 을지로 281",
+    frstn_nm: "중부소방서",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    latitude: "37.56648",
+    longitude: "127.00954",
+    trgtobj_nm: "동대문디자인플라자",
+    trgtobj_se_nm: "일반대상물",
+  },
+];
+
+const BIGDATA119_WATER_FALLBACK_ROWS: CsvRecord[] = [
+  {
+    _platelets_sample: "true",
+    cntr_nm: "회현119안전센터",
+    frstn_nm: "중부소방서",
+    fruswtr_se_nm: "소화전",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    hnum_nm: "110",
+    latitude: "37.56583",
+    longitude: "126.97722",
+    nghb_bldg_nm: "서울시청 인근",
+    pipe_calbr_vl: "100",
+    road_nm: "세종대로",
+    road_nm_addr: "서울특별시 중구 세종대로 110",
+    sn: "sample-fws-001",
+    stts_se_nm: "양호",
+    wtrprsr_vl: "3.2",
+  },
+  {
+    _platelets_sample: "true",
+    cntr_nm: "회현119안전센터",
+    frstn_nm: "중부소방서",
+    fruswtr_se_nm: "소화전",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    hnum_nm: "40",
+    latitude: "37.56027",
+    longitude: "126.97507",
+    nghb_bldg_nm: "숭례문 인근",
+    pipe_calbr_vl: "100",
+    road_nm: "세종대로",
+    road_nm_addr: "서울특별시 중구 세종대로 40",
+    sn: "sample-fws-002",
+    stts_se_nm: "양호",
+    wtrprsr_vl: "2.8",
+  },
+  {
+    _platelets_sample: "true",
+    cntr_nm: "을지로119안전센터",
+    frstn_nm: "중부소방서",
+    fruswtr_se_nm: "저수조",
+    grnds_ctpv_nm: "서울특별시",
+    grnds_sgg_nm: "중구",
+    hnum_nm: "281",
+    latitude: "37.56602",
+    longitude: "127.00889",
+    nghb_bldg_nm: "동대문디자인플라자",
+    pipe_calbr_vl: "150",
+    road_nm: "을지로",
+    road_nm_addr: "서울특별시 중구 을지로 281",
+    sn: "sample-fws-003",
+    stts_se_nm: "양호",
+    wtrprsr_vl: "3.5",
+  },
+];
+
+const BIGDATA119_BUSAN_TARGET_FALLBACK_ROWS: CsvRecord[] = [
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-busan-fst-001",
+    bdst_usg_nm: "업무시설",
+    bldg_nm: "부산광역시청",
+    cntr_nm: "연산119안전센터",
+    conm_addr: "부산광역시 연제구 중앙대로 1001",
+    frstn_nm: "동래소방서",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "연제구",
+    latitude: "35.17982",
+    longitude: "129.07508",
+    trgtobj_nm: "부산광역시청",
+    trgtobj_se_nm: "공공업무시설",
+  },
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-busan-fst-002",
+    bdst_usg_nm: "운수시설",
+    bldg_nm: "부산역",
+    cntr_nm: "초량119안전센터",
+    conm_addr: "부산광역시 동구 중앙대로 206",
+    frstn_nm: "부산진소방서",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "동구",
+    latitude: "35.11518",
+    longitude: "129.04109",
+    trgtobj_nm: "부산역",
+    trgtobj_se_nm: "다중이용시설",
+  },
+  {
+    _platelets_sample: "true",
+    bdst_sn: "sample-busan-fst-003",
+    bdst_usg_nm: "문화및집회시설",
+    bldg_nm: "벡스코",
+    cntr_nm: "우동119안전센터",
+    conm_addr: "부산광역시 해운대구 APEC로 55",
+    frstn_nm: "해운대소방서",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "해운대구",
+    latitude: "35.16949",
+    longitude: "129.13661",
+    trgtobj_nm: "벡스코",
+    trgtobj_se_nm: "다중이용시설",
+  },
+];
+
+const BIGDATA119_BUSAN_WATER_FALLBACK_ROWS: CsvRecord[] = [
+  {
+    _platelets_sample: "true",
+    cntr_nm: "연산119안전센터",
+    frstn_nm: "동래소방서",
+    fruswtr_se_nm: "소화전",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "연제구",
+    hnum_nm: "1001",
+    latitude: "35.18022",
+    longitude: "129.07464",
+    nghb_bldg_nm: "부산광역시청 인근",
+    pipe_calbr_vl: "100",
+    road_nm: "중앙대로",
+    road_nm_addr: "부산광역시 연제구 중앙대로 1001",
+    sn: "sample-busan-fws-001",
+    stts_se_nm: "사용가",
+    wtrprsr_vl: "3.1",
+  },
+  {
+    _platelets_sample: "true",
+    cntr_nm: "초량119안전센터",
+    frstn_nm: "부산진소방서",
+    fruswtr_se_nm: "소화전",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "동구",
+    hnum_nm: "206",
+    latitude: "35.11555",
+    longitude: "129.04149",
+    nghb_bldg_nm: "부산역 광장",
+    pipe_calbr_vl: "100",
+    road_nm: "중앙대로",
+    road_nm_addr: "부산광역시 동구 중앙대로 206",
+    sn: "sample-busan-fws-002",
+    stts_se_nm: "사용가",
+    wtrprsr_vl: "2.9",
+  },
+  {
+    _platelets_sample: "true",
+    cntr_nm: "우동119안전센터",
+    frstn_nm: "해운대소방서",
+    fruswtr_se_nm: "저수조",
+    grnds_ctpv_nm: "부산광역시",
+    grnds_sgg_nm: "해운대구",
+    hnum_nm: "55",
+    latitude: "35.16902",
+    longitude: "129.13618",
+    nghb_bldg_nm: "벡스코",
+    pipe_calbr_vl: "150",
+    road_nm: "APEC로",
+    road_nm_addr: "부산광역시 해운대구 APEC로 55",
+    sn: "sample-busan-fws-003",
+    stts_se_nm: "사용가",
+    wtrprsr_vl: "3.4",
+  },
+];
 
 function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
@@ -240,6 +525,137 @@ function parseCsv(csv: string) {
     skip_empty_lines: true,
     trim: true,
   }) as CsvRecord[];
+}
+
+function decodeLocalCsvBuffer(buffer: Buffer) {
+  const utf8 = new TextDecoder("utf-8").decode(buffer);
+  const utf8ReplacementCount = (utf8.match(/\uFFFD/g) ?? []).length;
+
+  if (utf8ReplacementCount === 0) {
+    return utf8;
+  }
+
+  const eucKr = new TextDecoder(CSV_ENCODING).decode(buffer);
+  const eucKrReplacementCount = (eucKr.match(/\uFFFD/g) ?? []).length;
+
+  return eucKrReplacementCount < utf8ReplacementCount ? eucKr : utf8;
+}
+
+function findBigData119CsvFile(candidates: readonly string[]) {
+  if (!fs.existsSync(/* turbopackIgnore: true */ BIGDATA119_DATA_DIR)) {
+    return null;
+  }
+
+  for (const fileName of candidates) {
+    const filePath = path.join(
+      /* turbopackIgnore: true */ BIGDATA119_DATA_DIR,
+      fileName,
+    );
+
+    if (fs.existsSync(/* turbopackIgnore: true */ filePath)) {
+      return { fileName, filePath };
+    }
+  }
+
+  const keywords = candidates
+    .map((candidate) => candidate.replace(/\.csv$/i, ""))
+    .filter((candidate) => candidate.length > 0);
+  const files = fs
+    .readdirSync(/* turbopackIgnore: true */ BIGDATA119_DATA_DIR)
+    .filter((fileName) => fileName.toLowerCase().endsWith(".csv"));
+  const matchedFileName = files.find((fileName) =>
+    keywords.some((keyword) => fileName.includes(keyword)),
+  );
+
+  return matchedFileName
+    ? {
+        fileName: matchedFileName,
+        filePath: path.join(
+          /* turbopackIgnore: true */ BIGDATA119_DATA_DIR,
+          matchedFileName,
+        ),
+      }
+    : null;
+}
+
+function readBigData119Csv(candidates: readonly string[]) {
+  const file = findBigData119CsvFile(candidates);
+
+  if (!file) {
+    return null;
+  }
+
+  return {
+    csv: decodeLocalCsvBuffer(
+      fs.readFileSync(/* turbopackIgnore: true */ file.filePath),
+    ),
+    fileName: file.fileName,
+  };
+}
+
+function field(record: CsvRecord, candidates: readonly string[]) {
+  for (const candidate of candidates) {
+    const direct = nullableText(record[candidate]);
+
+    if (direct) {
+      return direct;
+    }
+
+    const matchingKey = Object.keys(record).find(
+      (key) => key.toLowerCase() === candidate.toLowerCase(),
+    );
+    const matched = matchingKey ? nullableText(record[matchingKey]) : null;
+
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return "";
+}
+
+function coordinateFromFields(
+  record: CsvRecord,
+  candidates: readonly string[],
+) {
+  const value = field(record, candidates);
+
+  return value ? toNumber(value) : null;
+}
+
+function wgs84Coordinates(record: CsvRecord) {
+  let latitude = coordinateFromFields(record, LATITUDE_FIELDS);
+  let longitude = coordinateFromFields(record, LONGITUDE_FIELDS);
+
+  if (
+    latitude !== null &&
+    longitude !== null &&
+    Math.abs(latitude) > 90 &&
+    Math.abs(longitude) <= 90
+  ) {
+    [latitude, longitude] = [longitude, latitude];
+  }
+
+  return { latitude, longitude };
+}
+
+function joinAddressParts(record: CsvRecord, candidates: readonly string[]) {
+  return Array.from(
+    new Set(
+      candidates
+        .map((candidate) => field(record, [candidate]))
+        .filter((value) => value.length > 0),
+    ),
+  ).join(" ");
+}
+
+function sourceRecordIdFromRecord(
+  record: CsvRecord,
+  index: number,
+  candidates: readonly string[],
+  fallbackPrefix: string,
+) {
+  return field(record, candidates) || `${fallbackPrefix}-${index + 1}`;
 }
 
 async function fetchAedPage(pageNo: number) {
@@ -508,6 +924,173 @@ function mapUniversityRecord(
     source: "universities",
     sourceRecordId,
     sourceUpdatedAt: UNIVERSITY_SOURCE_UPDATED_AT,
+  };
+}
+
+function mapFireSafetyTargetRecord(
+  record: CsvRecord,
+  index: number,
+  source: BigData119FireSafetyTargetSource = "fire-safety-targets",
+): EmergencyPointInput | null {
+  const coordinates = wgs84Coordinates(record);
+  const address =
+    field(record, [
+      "conm_addr",
+      "상호주소",
+      "주소",
+      "도로명주소",
+      "소재지도로명주소",
+      "road_nm_addr",
+    ]) || joinAddressParts(record, ["grnds_ctpv_nm", "grnds_sgg_nm"]);
+  const category =
+    field(record, [
+      "bdst_usg_nm",
+      "건축물용도명",
+      "용도",
+      "주용도",
+      "trgtobj_se_nm",
+      "대상물구분명",
+    ]) || "특정소방대상물";
+  const targetName = field(record, [
+    "trgtobj_nm",
+    "대상물명",
+    "bldg_nm",
+    "건물명",
+    "시설명",
+    "명칭",
+  ]);
+  const sourceRecordId = sourceRecordIdFromRecord(
+    record,
+    index,
+    ["bdst_sn", "건축물일련번호", "관리번호", "일련번호", "sn"],
+    "fire-safety-target",
+  );
+  const name = targetName || `${category} ${sourceRecordId}`;
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    address,
+    category,
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
+    name,
+    parentName:
+      nullableText(
+        [
+          field(record, ["frstn_nm", "소방서명", "관할소방서"]),
+          field(record, ["cntr_nm", "센터명", "안전센터명"]),
+        ]
+          .filter(Boolean)
+          .join(" / "),
+      ) ?? null,
+    phone: null,
+    raw: compactRecord({
+      ...record,
+      데이터상품: DATASET_SOURCES[source].label,
+      데이터상품URL: DATASET_SOURCES[source].url,
+      데이터출처: "소방안전 빅데이터 플랫폼",
+    }),
+    source,
+    sourceRecordId,
+    sourceUpdatedAt: nullableText(
+      field(record, [
+        "기준일자",
+        "등록일자",
+        "수정일자",
+        "data_crtr_ymd",
+        "std_ymd",
+      ]),
+    ),
+  };
+}
+
+function mapFireWaterSourceRecord(
+  record: CsvRecord,
+  index: number,
+  source: BigData119FireWaterSource = "fire-water-sources",
+): EmergencyPointInput | null {
+  const coordinates = wgs84Coordinates(record);
+  const address =
+    field(record, [
+      "road_nm_addr",
+      "도로명주소",
+      "주소",
+      "소재지도로명주소",
+      "conm_addr",
+    ]) ||
+    joinAddressParts(record, [
+      "grnds_ctpv_nm",
+      "grnds_sgg_nm",
+      "emd_nm",
+      "road_nm",
+      "hnum_nm",
+    ]);
+  const category =
+    field(record, [
+      "fruswtr_se_nm",
+      "소방용수구분명",
+      "구분",
+      "시설구분",
+      "용수구분",
+      "종류",
+    ]) || "소방용수";
+  const sourceRecordId = sourceRecordIdFromRecord(
+    record,
+    index,
+    ["sn", "일련번호", "관리번호", "용수번호"],
+    "fire-water-source",
+  );
+  const nearbyBuilding = field(record, [
+    "nghb_bldg_nm",
+    "인근건물명",
+    "시설명",
+    "소방용수명",
+    "명칭",
+  ]);
+  const name = nearbyBuilding
+    ? `${category} - ${nearbyBuilding}`
+    : `${category} ${sourceRecordId}`;
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    address,
+    category,
+    latitude: coordinates.latitude,
+    longitude: coordinates.longitude,
+    name,
+    parentName:
+      nullableText(
+        [
+          field(record, ["frstn_nm", "소방서명", "관할소방서"]),
+          field(record, ["cntr_nm", "센터명", "안전센터명"]),
+        ]
+          .filter(Boolean)
+          .join(" / "),
+      ) ?? null,
+    phone: null,
+    raw: compactRecord({
+      ...record,
+      데이터상품: DATASET_SOURCES[source].label,
+      데이터상품URL: DATASET_SOURCES[source].url,
+      데이터출처: "소방안전 빅데이터 플랫폼",
+    }),
+    source,
+    sourceRecordId,
+    sourceUpdatedAt: nullableText(
+      field(record, [
+        "기준일자",
+        "등록일자",
+        "수정일자",
+        "data_crtr_ymd",
+        "std_ymd",
+      ]),
+    ),
   };
 }
 
@@ -893,12 +1476,67 @@ async function importUniversities(
   );
   await report("receiving", 40, "대학교 XLSX 응답을 받았습니다.");
   const fetchedAt = new Date().toISOString();
-  const rows = worksheetRowsToRecords(await parseFirstWorksheetRows(buffer));
+  const rows = worksheetRowsToRecords(parseFirstWorksheetRows(buffer));
   const points = rows
     .map(mapUniversityRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
   const geocodedCount = countGeocoded(points);
   await report("processing", 68, "대학교 워크시트를 정규화했습니다.");
+
+  return {
+    failedCount: points.length - geocodedCount,
+    fetchedAt,
+    geocodedCount,
+    points,
+    skippedCount: rows.length - points.length,
+  };
+}
+
+async function importBigData119LocalCsv(
+  source: BigData119PointSource,
+  candidates: readonly string[],
+  fallbackRows: CsvRecord[],
+  mapper: (record: CsvRecord, index: number) => EmergencyPointInput | null,
+  report: DatasetProgressReporter,
+): Promise<ImportResult> {
+  await report(
+    "requesting",
+    10,
+    "소방안전 빅데이터 플랫폼 CSV 파일을 확인하고 있습니다.",
+  );
+
+  const localCsv = readBigData119Csv(candidates);
+  const fetchedAt = new Date().toISOString();
+  const rows = localCsv ? parseCsv(localCsv.csv) : fallbackRows;
+  const sourceFile = localCsv?.fileName ?? "presentation-sample";
+
+  await report(
+    "receiving",
+    42,
+    localCsv
+      ? `${sourceFile} 파일을 읽었습니다.`
+      : "승인 CSV가 없어 발표용 샘플 데이터를 사용합니다.",
+  );
+
+  const points = rows
+    .map((row, index) =>
+      mapper(
+        {
+          ...row,
+          _platelets_source_file: sourceFile,
+          _platelets_source_url: DATASET_SOURCES[source].url,
+        },
+        index,
+      ),
+    )
+    .filter((point): point is EmergencyPointInput => point !== null);
+  const geocodedCount = countGeocoded(points);
+
+  await report(
+    "processing",
+    68,
+    "소방안전 빅데이터 플랫폼 레코드를 지도 포인트로 정규화했습니다.",
+  );
 
   return {
     failedCount: points.length - geocodedCount,
@@ -933,6 +1571,38 @@ async function importDataset(
       return importSchools(report);
     case "universities":
       return importUniversities(report);
+    case "fire-safety-targets":
+      return importBigData119LocalCsv(
+        source,
+        BIGDATA119_TARGET_FILE_CANDIDATES,
+        BIGDATA119_TARGET_FALLBACK_ROWS,
+        mapFireSafetyTargetRecord,
+        report,
+      );
+    case "fire-water-sources":
+      return importBigData119LocalCsv(
+        source,
+        BIGDATA119_WATER_FILE_CANDIDATES,
+        BIGDATA119_WATER_FALLBACK_ROWS,
+        mapFireWaterSourceRecord,
+        report,
+      );
+    case "busan-fire-safety-targets":
+      return importBigData119LocalCsv(
+        source,
+        BIGDATA119_BUSAN_TARGET_FILE_CANDIDATES,
+        BIGDATA119_BUSAN_TARGET_FALLBACK_ROWS,
+        (record, index) => mapFireSafetyTargetRecord(record, index, source),
+        report,
+      );
+    case "busan-fire-water-sources":
+      return importBigData119LocalCsv(
+        source,
+        BIGDATA119_BUSAN_WATER_FILE_CANDIDATES,
+        BIGDATA119_BUSAN_WATER_FALLBACK_ROWS,
+        (record, index) => mapFireWaterSourceRecord(record, index, source),
+        report,
+      );
   }
 }
 

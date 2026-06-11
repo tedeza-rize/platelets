@@ -7,7 +7,11 @@ export type DatasetSourceId =
   | "hospitals"
   | "emergency-medical-institutions"
   | "schools"
-  | "universities";
+  | "universities"
+  | "fire-safety-targets"
+  | "fire-water-sources"
+  | "busan-fire-safety-targets"
+  | "busan-fire-water-sources";
 
 export type DatasetSource = {
   id: DatasetSourceId;
@@ -21,7 +25,9 @@ export type DatasetSource = {
     | "pharmacy"
     | "police"
     | "school"
-    | "university";
+    | "university"
+    | "fire-safety-target"
+    | "fire-water";
   url: string;
 };
 
@@ -79,6 +85,30 @@ export const DATASET_SOURCES = {
     label: "대학교",
     type: "university",
     url: "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003547770&fileDetailSn=1&dataNm=%EA%B5%90%EC%9C%A1%EB%B6%80_%EB%8C%80%ED%95%99%EA%B5%90%20%EC%A3%BC%EC%86%8C%EA%B8%B0%EB%B0%98%20%EC%A2%8C%ED%91%9C%EC%A0%95%EB%B3%B4_20251126",
+  },
+  "fire-safety-targets": {
+    id: "fire-safety-targets",
+    label: "소방안전 빅데이터: 특정소방대상물",
+    type: "fire-safety-target",
+    url: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=378",
+  },
+  "fire-water-sources": {
+    id: "fire-water-sources",
+    label: "소방안전 빅데이터: 소방용수",
+    type: "fire-water",
+    url: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=380",
+  },
+  "busan-fire-safety-targets": {
+    id: "busan-fire-safety-targets",
+    label: "소방안전 빅데이터: 부산 특정소방대상물",
+    type: "fire-safety-target",
+    url: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=404",
+  },
+  "busan-fire-water-sources": {
+    id: "busan-fire-water-sources",
+    label: "소방안전 빅데이터: 부산 소방용수",
+    type: "fire-water",
+    url: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=403",
   },
 } satisfies Record<DatasetSourceId, DatasetSource>;
 
