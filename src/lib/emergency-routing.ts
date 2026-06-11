@@ -1,3 +1,5 @@
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
+
 type Coordinate = {
   latitude: number;
   longitude: number;
@@ -435,9 +437,9 @@ async function routeWithKakao(
   origin: Coordinate,
   destination: Coordinate,
 ): Promise<EmergencyRoute> {
-  const apiKey =
-    process.env.KAKAO_MOBILITY_REST_API_KEY?.trim() ||
-    process.env.KAKAO_REST_API_KEY?.trim();
+  const { kakaoMobilityRestApiKey, kakaoRestApiKey } =
+    await getRuntimeApiKeys();
+  const apiKey = kakaoMobilityRestApiKey || kakaoRestApiKey;
 
   if (!apiKey) {
     throw new Error("KAKAO_MOBILITY_REST_API_KEY is required.");
@@ -513,9 +515,8 @@ export async function calculateEmergencyRoute(params: {
     : routeWithAstar(params.origin, params.destination);
 }
 
-export function hasKakaoMobilityKey() {
-  return Boolean(
-    process.env.KAKAO_MOBILITY_REST_API_KEY?.trim() ||
-      process.env.KAKAO_REST_API_KEY?.trim(),
-  );
+export async function hasKakaoMobilityKey() {
+  const { kakaoMobilityRestApiKey, kakaoRestApiKey } =
+    await getRuntimeApiKeys();
+  return Boolean(kakaoMobilityRestApiKey || kakaoRestApiKey);
 }

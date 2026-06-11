@@ -41,6 +41,7 @@ type MapProvider = "vworld" | "osm";
 type MapShellProps = {
   dictionary: AppDictionary;
   initialProvider: MapProvider;
+  vworldApiKey: string;
 };
 
 type EmergencyPointMarker = {
@@ -148,7 +149,6 @@ const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
   16,
   1.62,
 ];
-const VWORLD_API_KEY = process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ?? "";
 const VWORLD_BASE_SOURCE_ID = "vworld-base";
 const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
 const OPENFREEMAP_SOURCE_ID = "openmaptiles";
@@ -371,19 +371,19 @@ function localizedNameExpression() {
   return ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name_en"]];
 }
 
-function createVworldTileUrl(path: string) {
+function createVworldTileUrl(path: string, vworldApiKey: string) {
   return `https://api.vworld.kr/req/wmts/vector/${path.replace(
     "{key}",
-    VWORLD_API_KEY,
+    vworldApiKey,
   )}`;
 }
 
-function createVworldVectorTileUrl(layer: "traffic") {
-  return `https://api.vworld.kr/req/wmts/vector/getTile/${VWORLD_API_KEY}/${layer}/{z}/{x}/{y}.pbf`;
+function createVworldVectorTileUrl(layer: "traffic", vworldApiKey: string) {
+  return `https://api.vworld.kr/req/wmts/vector/getTile/${vworldApiKey}/${layer}/{z}/{x}/{y}.pbf`;
 }
 
-function createVworldStyle(): StyleSpecification {
-  if (!vworldApiKeyExists()) {
+function createVworldStyle(vworldApiKey: string): StyleSpecification {
+  if (!vworldApiKeyExists(vworldApiKey)) {
     return {
       glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
       layers: [
@@ -440,13 +440,15 @@ function createVworldStyle(): StyleSpecification {
         maxzoom: 19,
         minzoom: 6,
         tileSize: 256,
-        tiles: [createVworldTileUrl("{key}/Base/{z}/{x}/{y}.png")],
+        tiles: [
+          createVworldTileUrl("{key}/Base/{z}/{x}/{y}.png", vworldApiKey),
+        ],
         type: "raster",
       },
       [VWORLD_TRAFFIC_SOURCE_ID]: {
         maxzoom: 19,
         minzoom: 6,
-        tiles: [createVworldVectorTileUrl("traffic")],
+        tiles: [createVworldVectorTileUrl("traffic", vworldApiKey)],
         type: "vector",
       },
     },
@@ -454,8 +456,8 @@ function createVworldStyle(): StyleSpecification {
   } as StyleSpecification;
 }
 
-function vworldApiKeyExists() {
-  return VWORLD_API_KEY.length > 0;
+function vworldApiKeyExists(vworldApiKey: string) {
+  return vworldApiKey.length > 0;
 }
 
 function createOsmStyle(): StyleSpecification {
@@ -655,8 +657,13 @@ function createOsmStyle(): StyleSpecification {
   } as StyleSpecification;
 }
 
-function createMapStyle(provider: MapProvider): StyleSpecification {
-  return provider === "vworld" ? createVworldStyle() : createOsmStyle();
+function createMapStyle(
+  provider: MapProvider,
+  vworldApiKey: string,
+): StyleSpecification {
+  return provider === "vworld"
+    ? createVworldStyle(vworldApiKey)
+    : createOsmStyle();
 }
 
 function isSourceVisible(
@@ -1614,7 +1621,11 @@ function runWhenStyleReady(map: MapLibreMap, callback: () => void) {
   run();
 }
 
-export function MapShell({ dictionary, initialProvider }: MapShellProps) {
+export function MapShell({
+  dictionary,
+  initialProvider,
+  vworldApiKey,
+}: MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const providerMenuRef = useRef<HTMLDivElement>(null);
   const mobileProviderMenuRef = useRef<HTMLDivElement>(null);
@@ -1629,7 +1640,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
-    createMapStyle(initialProvider),
+    createMapStyle(initialProvider, vworldApiKey),
   );
   const [provider, setProvider] = useState<MapProvider>(initialProvider);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -2263,7 +2274,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
     let timeoutId: number | undefined;
 
     async function updateStyle() {
-      const style = createMapStyle(activeProvider);
+      const style = createMapStyle(activeProvider, vworldApiKey);
       const syncOverlays = () => {
         map.resize();
         syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
@@ -2298,7 +2309,7 @@ export function MapShell({ dictionary, initialProvider }: MapShellProps) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [activeProvider]);
+  }, [activeProvider, vworldApiKey]);
 
   useEffect(() => {
     if (!isMenuOpen) {
