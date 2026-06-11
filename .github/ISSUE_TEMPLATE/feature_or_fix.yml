@@ -1,0 +1,36 @@
+name: Feature or fix
+description: Plan a feature, fix, or hotfix before opening a branch.
+title: "[type]: "
+labels:
+  - triage
+body:
+  - type: dropdown
+    id: work_type
+    attributes:
+      label: Work type
+      options:
+        - feature
+        - fix
+        - hotfix
+    validations:
+      required: true
+  - type: input
+    id: branch
+    attributes:
+      label: Suggested branch
+      description: Use feature/작업명, fix/버그명, or hotfix/긴급수정명.
+      placeholder: feature/example-work
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or goal
+      description: Describe the user, operational, or developer impact.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: Include lint, tests, browser checks, and any data/license review.
+    validations:
+      required: true
