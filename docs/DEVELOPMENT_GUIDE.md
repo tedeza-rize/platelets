@@ -74,7 +74,7 @@ This repository uses GitHub Flow:
 2. Create a short-lived branch named `feature/작업명`, `fix/버그명`, or
    `hotfix/긴급수정명`.
 3. Open or link a GitHub issue before implementation when the work has product,
-   operational, or user-visible impact.
+   operational, or user-visible impact, and assign at least one label/tag.
 4. Keep commits scoped to one feature, fix, or documentation/process change.
 5. Push the branch after every completed commit set.
 6. Open a pull request into `main` and wait for GitHub Actions to finish.
@@ -89,7 +89,7 @@ When GitHub CLI is available, use it for the issue, pull request, and Actions
 checks:
 
 ```bash
-gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
+gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
 gh pr create --base main --head feature/작업명 --fill
 gh run watch
 gh pr checks
