@@ -8,6 +8,7 @@ Closes #
 
 ## Verification
 
+- [ ] 코드 수정
 - [ ] `npm run lint`
 - [ ] `npm run test`
 - [ ] Browser verification for affected flow

@@ -18,7 +18,7 @@ body:
     id: branch
     attributes:
       label: Suggested branch
-      description: Use feature/<work-name>, fix/<bug-name>, or hotfix/<urgent-fix-name>.
+      description: Use feature/작업명, fix/버그명, or hotfix/긴급수정명.
       placeholder: feature/example-work
   - type: textarea
     id: problem

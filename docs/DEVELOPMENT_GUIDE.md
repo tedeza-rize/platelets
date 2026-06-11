@@ -36,13 +36,14 @@ or derived artifact:
 
 Use this order for each coherent feature or fix:
 
-1. Make the scoped code change.
-2. Run `npm run lint` and address logic or lint findings.
-3. Test affected UI and API behavior in the browser.
-4. Run `npm run format`.
-5. Run `npm run lint` and `npm run build` again.
-6. Run focused integration checks and `git diff --check`.
-7. Commit only that feature or fix with a descriptive message.
+1. 코드 수정.
+2. linting: run `npm run lint` and address logic or lint findings.
+3. 테스트: run focused checks and test affected UI/API behavior in the browser.
+4. formatting: run `npm run format`.
+5. 테스트: run `npm run lint`, `npm run test`, `npm run build`, focused
+   integration checks, and `git diff --check` again.
+6. 깃 커밋: commit only that feature, bug fix, or documentation/process update
+   with a descriptive message.
 
 Do not combine unrelated UI, data, security, and documentation work into one
 commit merely because they were requested together.
@@ -52,8 +53,8 @@ commit merely because they were requested together.
 This repository uses GitHub Flow:
 
 1. Start from an up-to-date `main`.
-2. Create a short-lived branch named `feature/<work-name>`, `fix/<bug-name>`,
-   or `hotfix/<urgent-fix-name>`.
+2. Create a short-lived branch named `feature/작업명`, `fix/버그명`, or
+   `hotfix/긴급수정명`.
 3. Open or link a GitHub issue before implementation when the work has product,
    operational, or user-visible impact.
 4. Keep commits scoped to one feature, fix, or documentation/process change.
@@ -64,6 +65,16 @@ This repository uses GitHub Flow:
 The CI workflow runs on `main`, `feature/**`, `fix/**`, `hotfix/**`, and pull
 requests to `main`. Treat a passing CI run as the baseline signal that the
 branch can be merged, subject to review and repository protection settings.
+
+When GitHub CLI is available, use it for the issue, pull request, and Actions
+checks:
+
+```bash
+gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
+gh pr create --base main --head feature/작업명 --fill
+gh run watch
+gh pr checks
+```
 
 ## Browser Verification
 

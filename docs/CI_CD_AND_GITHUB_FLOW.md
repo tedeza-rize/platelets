@@ -6,17 +6,37 @@ Platelets uses GitHub Flow with short-lived branches from `main`.
 
 Use these branch names:
 
-- `feature/<work-name>` for new functionality and durable improvements
-- `fix/<bug-name>` for ordinary bug fixes
-- `hotfix/<urgent-fix-name>` for urgent production fixes
+- `feature/작업명` for new functionality and durable improvements
+- `fix/버그명` for ordinary bug fixes
+- `hotfix/긴급수정명` for urgent production fixes
 
 Open or link a GitHub issue before starting work when the change is more than a
 small local cleanup. The issue should describe the user impact, expected
 verification, and any data or license changes.
 
-## Pull Request Readiness
+Recommended GitHub CLI flow:
 
-Before requesting review:
+```bash
+gh auth login
+gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
+git switch -c feature/작업명
+```
+
+## Required Work Order
+
+Use this order for every scoped code or documentation change:
+
+1. 코드 수정
+2. linting
+3. 테스트, including browser verification when UI or routing can be affected
+4. formatting
+5. 테스트 again
+6. 깃 커밋
+
+Do not put all work into one commit by default. Commit by coherent feature,
+code change, bug fix, or documentation/process update.
+
+Before committing or requesting review, map that order to these commands:
 
 1. Run `npm run lint`.
 2. Run `npm run test`.
@@ -26,8 +46,9 @@ Before requesting review:
 6. Run `npm run test:e2e` after Playwright browsers are installed.
 7. Confirm `git diff --check` has no whitespace errors.
 
-Keep commits scoped. Do not combine unrelated UI, data, security, CI, and
-documentation work into one commit.
+For browser verification, use `npm run test:e2e` when Playwright browsers are
+installed. If local browser binaries are unavailable, verify the same flow in
+the in-app browser and rely on GitHub Actions to run `npm run test:e2e`.
 
 ## GitHub Actions
 
@@ -45,3 +66,16 @@ The workflow performs:
 
 A pull request is merge-ready only after the CI workflow passes and any required
 review or branch-protection checks are satisfied.
+
+After pushing a branch, confirm merge readiness through GitHub Actions:
+
+```bash
+git push -u origin feature/작업명
+gh pr create --base main --head feature/작업명 --fill
+gh run watch
+gh pr checks
+gh pr view --json mergeStateStatus,mergeable,statusCheckRollup
+```
+
+If `gh pr checks` is passing and the pull request is not blocked by review or
+branch protection, the branch can be merged through the GitHub Flow process.
