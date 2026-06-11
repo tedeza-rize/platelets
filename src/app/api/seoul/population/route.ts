@@ -4,6 +4,7 @@ import {
   SEOUL_CITYDATA_AREA_BY_NAME,
 } from "@/data/seoul-citydata-areas";
 import { noStoreJson } from "@/lib/http";
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,12 +48,9 @@ type CacheEntry = {
 const SEOUL_CITYDATA_CACHE_MS = 60_000;
 const seoulPopulationCache = new Map<string, CacheEntry>();
 
-function getSeoulOpenApiKey() {
-  return (
-    process.env.SEOUL_OPEN_API_KEY?.trim() ??
-    process.env.SEOUL_CITYDATA_API_KEY?.trim() ??
-    null
-  );
+async function getSeoulOpenApiKey() {
+  const { seoulOpenApiKey } = await getRuntimeApiKeys();
+  return seoulOpenApiKey || null;
 }
 
 function toNumber(value: string | number | undefined) {
@@ -160,7 +158,7 @@ export async function GET(request: NextRequest) {
     return noStoreJson({ population: cached.payload });
   }
 
-  const apiKey = getSeoulOpenApiKey();
+  const apiKey = await getSeoulOpenApiKey();
 
   if (!apiKey) {
     return noStoreJson(

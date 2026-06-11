@@ -25,10 +25,6 @@ function intervalMs() {
 }
 
 export function startHazardEventScheduler() {
-  if (!getPublicDataApiKey()) {
-    return;
-  }
-
   if (!schedulerGlobal.__plateletsHazardScheduler) {
     schedulerGlobal.__plateletsHazardScheduler = {
       isRunning: false,
@@ -49,6 +45,10 @@ export function startHazardEventScheduler() {
     state.isRunning = true;
 
     try {
+      if (!(await getPublicDataApiKey())) {
+        return;
+      }
+
       await updateHazardEvents("background");
     } catch (error) {
       await recordApiLog({

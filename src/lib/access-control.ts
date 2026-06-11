@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { noStoreJson } from "@/lib/http";
+import { getStoredAccessRole } from "@/lib/setup-state";
 
 export type AccessRole = "admin" | "sudo";
 
@@ -45,7 +46,9 @@ function safeEqual(left: string, right: string) {
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-export function getRequestAccessRole(request: Request): AccessRole | null {
+export async function getRequestAccessRole(
+  request: Request,
+): Promise<AccessRole | null> {
   const token = requestToken(request);
 
   if (!token) {
@@ -64,7 +67,7 @@ export function getRequestAccessRole(request: Request): AccessRole | null {
     return "admin";
   }
 
-  return null;
+  return getStoredAccessRole(token);
 }
 
 export function canAccessRole(
@@ -77,20 +80,11 @@ export function canAccessRole(
   );
 }
 
-export function requireAccessRole(request: Request, requiredRole: AccessRole) {
-  const hasRequiredToken =
-    requiredRole === "sudo"
-      ? Boolean(configuredToken("sudo"))
-      : Boolean(configuredToken("admin") || configuredToken("sudo"));
-
-  if (!hasRequiredToken) {
-    return noStoreJson(
-      { error: `${requiredRole} access token is not configured.` },
-      { status: 503 },
-    );
-  }
-
-  const actualRole = getRequestAccessRole(request);
+export async function requireAccessRole(
+  request: Request,
+  requiredRole: AccessRole,
+) {
+  const actualRole = await getRequestAccessRole(request);
 
   if (!actualRole) {
     return noStoreJson(
