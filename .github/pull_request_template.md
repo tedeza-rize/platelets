@@ -18,6 +18,8 @@ Closes #
 - [ ] `npm run build`
 - [ ] `npm run test:e2e`
 - [ ] `git diff --check`
+- [ ] Branch pushed after final commit
+- [ ] GitHub Actions checks reviewed before merge
 
 ## Data And License Review
 

@@ -34,6 +34,20 @@ or derived artifact:
 
 ## Feature Workflow
 
+Before editing, always synchronize with the remote repository and inspect branch
+state:
+
+```bash
+git fetch --all --prune
+git pull --ff-only
+git branch --all --verbose
+gh pr list --state open
+gh run list --limit 5
+```
+
+Use `git` for branch synchronization and GitHub CLI for GitHub state such as
+issues, pull requests, workflow runs, and merge readiness.
+
 Use this order for each coherent feature or fix:
 
 1. 코드 수정.
@@ -44,6 +58,8 @@ Use this order for each coherent feature or fix:
    integration checks, and `git diff --check` again.
 6. 깃 커밋: commit only that feature, bug fix, or documentation/process update
    with a descriptive message.
+7. 깃 푸쉬: always run `git push` after committing so the remote branch,
+   GitHub Actions, and pull request state reflect the completed work.
 
 Do not combine unrelated UI, data, security, and documentation work into one
 commit merely because they were requested together.
@@ -58,8 +74,9 @@ This repository uses GitHub Flow:
 3. Open or link a GitHub issue before implementation when the work has product,
    operational, or user-visible impact.
 4. Keep commits scoped to one feature, fix, or documentation/process change.
-5. Open a pull request into `main` and wait for GitHub Actions to finish.
-6. Merge only after the CI checks pass and required review or branch protection
+5. Push the branch after every completed commit set.
+6. Open a pull request into `main` and wait for GitHub Actions to finish.
+7. Merge only after the CI checks pass and required review or branch protection
    rules are satisfied.
 
 The CI workflow runs on `main`, `feature/**`, `fix/**`, `hotfix/**`, and pull
@@ -74,6 +91,7 @@ gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
 gh pr create --base main --head feature/작업명 --fill
 gh run watch
 gh pr checks
+gh pr merge --merge --delete-branch
 ```
 
 ## Browser Verification

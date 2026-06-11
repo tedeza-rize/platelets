@@ -14,6 +14,20 @@ Open or link a GitHub issue before starting work when the change is more than a
 small local cleanup. The issue should describe the user impact, expected
 verification, and any data or license changes.
 
+Before starting work, always confirm the remote repository state:
+
+```bash
+git fetch --all --prune
+git pull --ff-only
+git branch --all --verbose
+gh pr list --state open
+gh run list --limit 5
+```
+
+Use `git` for local and remote branch synchronization. Use GitHub CLI for
+GitHub-specific state such as open pull requests, workflow runs, issue state,
+and merge readiness.
+
 Recommended GitHub CLI flow:
 
 ```bash
@@ -35,6 +49,16 @@ Use this order for every scoped code or documentation change:
 
 Do not put all work into one commit by default. Commit by coherent feature,
 code change, bug fix, or documentation/process update.
+
+After committing, always push the branch:
+
+```bash
+git push -u origin feature/작업명
+```
+
+Do not leave completed work only in local commits. A task is not ready for
+review or merge until the branch has been pushed and GitHub Actions has run on
+the pushed commit.
 
 Before committing or requesting review, map that order to these commands:
 
@@ -70,7 +94,6 @@ review or branch-protection checks are satisfied.
 After pushing a branch, confirm merge readiness through GitHub Actions:
 
 ```bash
-git push -u origin feature/작업명
 gh pr create --base main --head feature/작업명 --fill
 gh run watch
 gh pr checks
@@ -79,3 +102,10 @@ gh pr view --json mergeStateStatus,mergeable,statusCheckRollup
 
 If `gh pr checks` is passing and the pull request is not blocked by review or
 branch protection, the branch can be merged through the GitHub Flow process.
+
+Prefer merging with a regular merge commit when preserving scoped commits
+matters:
+
+```bash
+gh pr merge --merge --delete-branch
+```
