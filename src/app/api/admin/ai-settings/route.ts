@@ -6,14 +6,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
   if (forbidden) return forbidden;
 
   return noStoreJson({ settings: await getAiSettings() });
 }
 
 export async function PUT(request: Request) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
   if (forbidden) return forbidden;
 
   const payload = (await request.json().catch(() => null)) as Record<

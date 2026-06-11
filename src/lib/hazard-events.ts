@@ -106,7 +106,7 @@ async function fetchKmaRecords(
   eventType: HazardEventType,
   operation: "getEqkMsg" | "getTsunamiMsg",
 ) {
-  const serviceKey = getPublicDataApiKey();
+  const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
     throw new Error(

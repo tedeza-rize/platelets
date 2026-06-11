@@ -3,12 +3,13 @@ import { requireAccessRole } from "@/lib/access-control";
 import { buildAiGrounding } from "@/lib/ai-grounding";
 import { assertAiBaseUrlSafe, getAiSettings } from "@/lib/ai-settings";
 import { noStoreJson } from "@/lib/http";
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const forbidden = requireAccessRole(request, "admin");
+  const forbidden = await requireAccessRole(request, "admin");
   if (forbidden) return forbidden;
 
   const payload = (await request.json().catch(() => null)) as {
@@ -24,7 +25,8 @@ export async function POST(request: Request) {
     return noStoreJson({ error: "질문을 입력하세요." }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const { openaiApiKey } = await getRuntimeApiKeys();
+  const apiKey = openaiApiKey;
   if (!apiKey) {
     return noStoreJson(
       { error: "OPENAI_API_KEY가 설정되지 않았습니다." },

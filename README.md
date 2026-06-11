@@ -34,11 +34,18 @@ PLATELETS_ADMIN_TOKEN=
 PLATELETS_SUDO_TOKEN=
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
+PLATELETS_DATA_DIR=data
 ```
 
 `PLATELETS_ADMIN_TOKEN` grants AI-query access. A sudo token also satisfies
 admin access. `PLATELETS_SUDO_TOKEN` protects dataset refreshes, logs, quota
 details, schedules, NTP settings, and AI configuration.
+
+When `data/points.sqlite` or a completed setup state is missing, Platelets
+redirects `/` to `/setup`. The setup assistant stores hashed sudo/admin
+credentials and API key configuration in SQLite, then sends the operator to the
+home map. `PLATELETS_DATA_DIR` can point deployments or tests at a different
+data directory.
 
 ## Development
 
@@ -69,13 +76,13 @@ gh run list --limit 5
 
 Required local order:
 
-1. 코드 수정
+1. code changes
 2. linting
-3. 테스트, including browser verification when relevant
+3. tests, including browser verification when relevant
 4. formatting
-5. 테스트 again
-6. 깃 커밋
-7. 깃 푸쉬
+5. tests again
+6. git commit
+7. git push
 
 ```bash
 npm run lint
@@ -108,9 +115,9 @@ on GitHub Actions for the full Chromium and Firefox run.
 Use short-lived branches from `main` and open a pull request back to `main`.
 Recommended branch names:
 
-- `feature/작업명` for new functionality and durable improvements
-- `fix/버그명` for ordinary bug fixes
-- `hotfix/긴급수정명` for urgent production fixes
+- `feature/work-name` for new functionality and durable improvements
+- `fix/bug-name` for ordinary bug fixes
+- `hotfix/urgent-fix-name` for urgent production fixes
 
 Create or link a GitHub issue before starting work whenever the scope is more
 than a trivial local cleanup, and always assign at least one GitHub label such
@@ -122,8 +129,8 @@ satisfied.
 Useful GitHub CLI commands:
 
 ```bash
-gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
-gh pr create --base main --head feature/작업명 --fill
+gh issue create --title "Work title" --label enhancement --body "Scope and verification plan"
+gh pr create --base main --head feature/work-name --fill
 gh run watch
 gh pr checks
 gh pr merge --merge --delete-branch
