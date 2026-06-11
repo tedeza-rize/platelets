@@ -9,7 +9,11 @@
     "start": "next start",
     "mcp:points": "node scripts/points-mcp.ts",
     "lint": "biome check && node scripts/check-encoding.ts",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
+    "test:e2e": "playwright test",
+    "test:ci": "npm run lint && npm run test && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -25,6 +29,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
+    "@playwright/test": "^1.51.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
