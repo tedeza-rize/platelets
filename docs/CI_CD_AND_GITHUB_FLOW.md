@@ -71,8 +71,24 @@ Before committing or requesting review, map that order to these commands:
 7. Confirm `git diff --check` has no whitespace errors.
 
 For browser verification, use `npm run test:e2e` when Playwright browsers are
-installed. If local browser binaries are unavailable, verify the same flow in
-the in-app browser and rely on GitHub Actions to run `npm run test:e2e`.
+installed. The default Playwright run covers Chromium and Firefox. If local
+Playwright browser binaries are unavailable, choose the best available browser
+evidence:
+
+1. Use a system Chrome or Edge browser through Playwright when available.
+2. If no system browser is available, verify the same flow in the in-app
+   browser.
+3. Rely on GitHub Actions to run the full Chromium and Firefox browser suite.
+
+System browser fallback examples:
+
+```powershell
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e
+```
+
+When the Chromium path passes and the change is not Firefox-specific, that is
+usually enough local evidence; CI remains the source of truth for Firefox.
 
 ## GitHub Actions
 
@@ -82,7 +98,7 @@ The `CI` workflow runs on pushes to `main`, `feature/**`, `fix/**`, and
 The workflow performs:
 
 - `npm ci`
-- `npx playwright install --with-deps chromium`
+- `npx playwright install --with-deps chromium firefox`
 - `npm run lint`
 - `npm run test`
 - `npm run build`

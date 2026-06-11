@@ -107,6 +107,21 @@ For map or responsive UI changes, verify at minimum:
 Use DOM state for interaction correctness and a screenshot when visual layout
 is the question. Reset temporary viewport overrides after testing.
 
+When Playwright browser binaries are installed, run `npm run test:e2e`; it tests
+both Chromium and Firefox. If local Playwright browsers are missing, choose a
+reasonable fallback:
+
+1. Use system Chrome with
+   `$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e`.
+2. Use system Edge with
+   `$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e`.
+3. Use the in-app browser when neither Playwright browsers nor system
+   Chrome/Edge are available.
+
+If Chromium or a Chromium-based system browser passes and the change is not
+Firefox-specific, treat that as acceptable local browser evidence. GitHub
+Actions still runs the full Chromium and Firefox Playwright suite before merge.
+
 ## Database And Imports
 
 The database is generated state and is not committed. Imports should be
