@@ -60,6 +60,9 @@ Do not leave completed work only in local commits. A task is not ready for
 review or merge until the branch has been pushed and GitHub Actions has run on
 the pushed commit.
 
+Keep text files on LF line endings for cross-OS compatibility. `.editorconfig`
+sets `end_of_line = lf`, and `.gitattributes` sets text files to `eol=lf`.
+
 Before committing or requesting review, map that order to these commands:
 
 1. Run `npm run lint`.
