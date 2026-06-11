@@ -25,7 +25,7 @@ import {
   setDatasetUpdateProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
-import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
+import { parseFirstWorksheetRows } from "@/lib/xlsx-reader";
 
 type CsvRecord = Record<string, unknown>;
 type AedRecord = Record<string, unknown>;
@@ -893,7 +893,7 @@ async function importUniversities(
   );
   await report("receiving", 40, "대학교 XLSX 응답을 받았습니다.");
   const fetchedAt = new Date().toISOString();
-  const rows = worksheetRowsToRecords(parseFirstWorksheetRows(buffer));
+  const rows = worksheetRowsToRecords(await parseFirstWorksheetRows(buffer));
   const points = rows
     .map(mapUniversityRecord)
     .filter((point): point is EmergencyPointInput => point !== null);
