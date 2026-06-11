@@ -93,6 +93,66 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "소방서 및 119안전센터 지도 포인트",
   },
   {
+    id: "bigdata119-fire-safety-targets",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 서울특별시소방재난본부",
+    sourceName: "서울소방재난본부_특정소방대상물 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=378",
+    usage: "특정소방대상물 지도 포인트와 위험도/출동 의사결정 지원",
+  },
+  {
+    id: "bigdata119-fire-water-sources",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 서울특별시소방재난본부",
+    sourceName: "서울소방재난본부_소방용수 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=380",
+    usage: "소방용수 위치 지도 포인트와 현장 대응 자원 확인",
+  },
+  {
+    id: "bigdata119-busan-fire-safety-targets",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
+    sourceName: "부산소방재난본부_특정소방대상물 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=404",
+    usage: "부산 특정소방대상물 지도 포인트와 지역 위험도 산정",
+  },
+  {
+    id: "bigdata119-busan-fire-water-sources",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
+    sourceName: "부산소방재난본부_소방용수 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=403",
+    usage: "부산 소방용수 위치 지도 포인트와 현장 대응 자원 확인",
+  },
+  {
+    id: "bigdata119-national-fire-force",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "승인받은 CSV는 data/bigdata-119/national-fire-force.csv 또는 화재_소방력_2021_전국.csv로 배치한다. 파일이 없으면 발표용 샘플 통계를 사용한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 한국소방안전원",
+    sourceName: "전국 시군구별 화재현황 및 소방력 정보",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9",
+    usage: "지역별 위험도 산정과 소방 자원 배치 권고의 규칙 기반 통계 입력",
+  },
+  {
+    id: "building-safety-profiles",
+    license: "원 제공기관 이용조건 및 보안등급 확인 필요",
+    notes:
+      "현재 /api/building-safety는 발표용 샘플만 제공한다. 실제 운영 전 검증된 도면/비상구 데이터로 교체해야 한다.",
+    provider: "향후 시설 관리자 / 공공기관",
+    sourceName: "시설 관리 도면, 방재실 자료, 현장 점검 데이터",
+    sourceUrl: "/api/building-safety",
+    usage: "건물 단면도, 층별 위험 공간, 비상구, 대피 장소 안내",
+  },
+  {
     id: "police-stations",
     license: "공공데이터포털 개별 데이터셋 이용허락조건 확인 필요",
     notes:

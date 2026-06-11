@@ -9,10 +9,14 @@ and exposes summarized data to OpenAI-compatible models and a local MCP server.
 
 - Responsive desktop navigation and mobile bottom navigation
 - Fire stations, police stations, AEDs, childcare, pharmacies, hospitals,
-  emergency institutions, schools, and universities
+  emergency institutions, schools, universities, and Fire Safety Big Data
+  Platform fire-safety targets/fire-water sources
 - Seoul real-time population/congestion popups and domestic earthquake display
 - Staged dataset import progress and configurable automatic schedules
 - Emergency dispatch and hospital ranking with Kakao ETA or directed OSM A*
+- MVP disaster-response dashboard with SQLite-backed incidents, status
+  transitions, imported facility fallback data, rule-based regional risk, and
+  resource placement recommendations
 - OpenAI Responses API and Chat Completions-compatible proxy configuration
 - Read-only MCP tools for bounded facility summaries and grounding snapshots
 - Public, admin, and sudo access boundaries
@@ -51,83 +55,18 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Before changing Next.js code, read the relevant local guide under
 `node_modules/next/dist/docs/`; this project uses Next.js 16.2.7 conventions.
-Use LF line endings for text files; `.editorconfig` and `.gitattributes`
-enforce this for cross-OS compatibility.
 
 ## Verification
 
-Before starting a branch or continuing existing work, synchronize and inspect
-remote state:
-
-```bash
-git fetch --all --prune
-git pull --ff-only
-git branch --all --verbose
-gh pr list --state open
-gh run list --limit 5
-```
-
-Required local order:
-
-1. 코드 수정
-2. linting
-3. 테스트, including browser verification when relevant
-4. formatting
-5. 테스트 again
-6. 깃 커밋
-7. 깃 푸쉬
-
 ```bash
 npm run lint
-npm run test
 npm run format
 npm run build
-npm run test:e2e
 npm audit
 ```
 
 For UI work, also verify the affected flow in the in-app browser at desktop
-and mobile breakpoints. Commit each coherent feature, bug fix, or
-documentation/process update separately. Always push after committing; completed
-work should not remain only in local commits.
-
-`npm run test:e2e` runs Playwright against Chromium and Firefox when Playwright
-browser binaries are installed. If local Playwright browsers are unavailable,
-use a system Chrome or Edge channel when present:
-
-```powershell
-$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e
-$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e
-```
-
-If neither is available, use the in-app browser for local verification and rely
-on GitHub Actions for the full Chromium and Firefox run.
-
-## GitHub Flow
-
-Use short-lived branches from `main` and open a pull request back to `main`.
-Recommended branch names:
-
-- `feature/작업명` for new functionality and durable improvements
-- `fix/버그명` for ordinary bug fixes
-- `hotfix/긴급수정명` for urgent production fixes
-
-Create or link a GitHub issue before starting work whenever the scope is more
-than a trivial local cleanup, and always assign at least one GitHub label such
-as `enhancement`, `bug`, or `documentation`. A pull request is merge-ready only
-after the CI workflow passes linting, type tests, production build, and the
-browser smoke test, and any required review or branch-protection checks are
-satisfied.
-
-Useful GitHub CLI commands:
-
-```bash
-gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
-gh pr create --base main --head feature/작업명 --fill
-gh run watch
-gh pr checks
-gh pr merge --merge --delete-branch
-```
+and mobile breakpoints. Commit each coherent feature or fix separately.
 
 ## AI And MCP
 
@@ -138,10 +77,64 @@ gh pr merge --merge --delete-branch
 The AI and MCP payloads intentionally contain bounded summaries rather than
 raw provider records.
 
+## Disaster Response MVP
+
+- Dashboard: `/dashboard`
+- Incident list: `/incidents`
+- Incident create: `/incidents/new`
+- Risk map: `/risk`
+- Resource recommendations: `/resources`
+
+The MVP uses `src/lib/disaster-response/` service classes. Incidents are stored
+in SQLite at `data/points.sqlite` in the `disaster_incidents` table; the app
+seeds two presentation incidents when the table is empty and persists incident
+status transitions from reported to dispatched or closed. Fire stations and
+hospitals are read from imported point data when available, with local sample
+fallbacks for demos. Base risk areas use rule-based scoring with Fire Safety
+Big Data Platform point data and regional fire/force statistics when local CSV
+files are present.
+
+## Fire Safety Big Data Platform
+
+The app includes import sources for the Fire Safety Big Data Platform datasets
+`서울소방재난본부_특정소방대상물 현황`, `서울소방재난본부_소방용수 현황`,
+`부산소방재난본부_특정소방대상물 현황`, and `부산소방재난본부_소방용수 현황`.
+The current MVP uses the following platform products:
+
+| Local use | Platform product | Product URL | Local file |
+| --- | --- | --- | --- |
+| Seoul fire-safety target map points and risk scoring | 서울소방재난본부_특정소방대상물 현황 | https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=378 | `data/bigdata-119/seoul-fire-safety-targets.csv` |
+| Seoul fire-water source map points and response-resource context | 서울소방재난본부_소방용수 현황 | https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=380 | `data/bigdata-119/seoul-fire-water-sources.csv` |
+| Busan fire-safety target map points and risk scoring | 부산소방재난본부_특정소방대상물 현황 | https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=404 | `data/bigdata-119/busan-fire-safety-targets.csv` |
+| Busan fire-water source map points and response-resource context | 부산소방재난본부_소방용수 현황 | https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=403 | `data/bigdata-119/busan-fire-water-sources.csv` |
+| Regional rule-based risk and resource recommendation inputs | 전국 시군구별 화재현황 및 소방력 정보 | https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9 | `data/bigdata-119/national-fire-force.csv` |
+
+`npm run download:bigdata119` downloads the platform's public sample XLSX files
+for these products, converts them to the local CSV files above, and records
+product/file metadata in `data/bigdata-119/manifest.json`. Full CSV files still
+require the platform login/free-purchase download flow and should be checked
+against the platform usage terms before public release.
+
+Place approved CSV downloads in `data/bigdata-119/` using one of these names:
+
+- `seoul-fire-safety-targets.csv` or `특정소방대상물_2024.csv`
+- `seoul-fire-water-sources.csv` or `소방용수_2024.csv`
+- `busan-fire-safety-targets.csv` or `부산소방재난본부_특정소방대상물 현황_2025_부산.csv`
+- `busan-fire-water-sources.csv` or `부산소방재난본부_소방용수 현황_2025_부산.csv`
+- `national-fire-force.csv` or `화재_소방력_2021_전국.csv`
+
+When no approved CSV is present, the importer uses a clearly marked
+presentation sample so the dashboard and map layers still run locally.
+
+Building floor plans and evacuation exits are isolated behind
+`/api/building-safety`. The current profiles are presentation samples; replace
+them with verified facility-management or fire-inspection data before using the
+building safety panel operationally.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
-- [CI/CD And GitHub Flow](docs/CI_CD_AND_GITHUB_FLOW.md)
 - [Data Sources And Licenses](docs/DATA_SOURCES_AND_LICENSES.md)
 - [AI Forecast And Response Plan](docs/AI_FORECAST_AND_RESPONSE.md)
+- [Building Safety Data](docs/BUILDING_SAFETY_DATA.md)

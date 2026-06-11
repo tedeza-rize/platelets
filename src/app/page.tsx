@@ -1,11 +1,5 @@
-import { headers } from "next/headers";
-import { MapShell } from "@/components/map-shell";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { DisasterDashboard } from "@/components/disaster-dashboard";
 
-export default async function Home() {
-  const headerList = await headers();
-  const locale = resolveLocale(headerList.get("accept-language"));
-  const dictionary = getDictionary(locale);
-
-  return <MapShell dictionary={dictionary} initialProvider="vworld" />;
+export default function Home() {
+  return <DisasterDashboard initialView="dashboard" />;
 }
