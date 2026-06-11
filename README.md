@@ -89,6 +89,18 @@ and mobile breakpoints. Commit each coherent feature, bug fix, or
 documentation/process update separately. Always push after committing; completed
 work should not remain only in local commits.
 
+`npm run test:e2e` runs Playwright against Chromium and Firefox when Playwright
+browser binaries are installed. If local Playwright browsers are unavailable,
+use a system Chrome or Edge channel when present:
+
+```powershell
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e
+```
+
+If neither is available, use the in-app browser for local verification and rely
+on GitHub Actions for the full Chromium and Firefox run.
+
 ## GitHub Flow
 
 Use short-lived branches from `main` and open a pull request back to `main`.
