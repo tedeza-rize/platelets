@@ -113,14 +113,16 @@ Recommended branch names:
 - `hotfix/긴급수정명` for urgent production fixes
 
 Create or link a GitHub issue before starting work whenever the scope is more
-than a trivial local cleanup. A pull request is merge-ready only after the CI
-workflow passes linting, type tests, production build, and the browser smoke
-test, and any required review or branch-protection checks are satisfied.
+than a trivial local cleanup, and always assign at least one GitHub label such
+as `enhancement`, `bug`, or `documentation`. A pull request is merge-ready only
+after the CI workflow passes linting, type tests, production build, and the
+browser smoke test, and any required review or branch-protection checks are
+satisfied.
 
 Useful GitHub CLI commands:
 
 ```bash
-gh issue create --title "작업 제목" --body "작업 범위와 검증 계획"
+gh issue create --title "작업 제목" --label enhancement --body "작업 범위와 검증 계획"
 gh pr create --base main --head feature/작업명 --fill
 gh run watch
 gh pr checks
