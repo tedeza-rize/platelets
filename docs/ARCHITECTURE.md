@@ -22,6 +22,8 @@ before changing framework code. Do not assume older Next.js behavior.
 | `src/lib/medical-dataset-import.ts` | Childcare and NMC medical imports |
 | `src/lib/emergency-recommendation.ts` | Scenario weights and hospital scoring |
 | `src/lib/emergency-routing.ts` | Directed OSM A* and Kakao route adapters |
+| `src/lib/disaster-response/` | MVP disaster-response domain models, SQLite incident repository, mock facility data, rule-based risk, dispatch, hospital, and resource recommendation services |
+| `src/lib/building-safety/` | Building safety profile models and the current presentation-sample adapter for floor, exit, and refuge data |
 | `src/lib/ai-*.ts` | AI settings, provider validation, and summarized grounding |
 | `scripts/points-mcp.ts` | Read-only local MCP server |
 | `docs/` | Architecture, operational rules, sources, and design plans |
@@ -36,6 +38,19 @@ before changing framework code. Do not assume older Next.js behavior.
 5. Public map APIs return marker or summary fields only. Raw source JSON remains
    internal to server-side scoring, sudo/debug, or controlled import logic.
 6. Map viewport queries bound the number of points sent to the browser.
+
+Fire Safety Big Data Platform CSV products are imported through the same
+pipeline from `data/bigdata-119/`. Current point imports cover Seoul and Busan
+fire-safety targets and fire-water sources. When the approved CSV is absent,
+the importer stores a small presentation sample marked in raw metadata instead
+of attempting unauthenticated platform scraping.
+
+The national fire/force CSV is consumed by
+`src/lib/disaster-response/bigdata119-risk-data.ts` rather than the point import
+pipeline. It feeds rule-based regional risk scoring and resource placement
+recommendations. Building floor and exit data is separated behind
+`/api/building-safety`; the current records are samples and must be replaced by
+verified facility data before operational use.
 
 Every new external source must be added to both
 `docs/DATA_SOURCES_AND_LICENSES.md` and `src/lib/data-licenses.ts`.
@@ -66,6 +81,27 @@ The self-hosted route option downloads an OSM road graph through Overpass and
 runs A*. Edges honor `oneway`, roundabouts, motorway direction, private access,
 road class, and speed. It is bounded to South Korea and 70 km. It does not model
 live traffic. Kakao routing is the live-road alternative.
+
+## Disaster Response MVP
+
+The `/dashboard`, `/incidents`, `/incidents/new`, `/risk`, and `/resources`
+pages provide a presentation-ready MVP for real-time disaster response. Incident
+creation, lookup, and status transitions use the SQLite `disaster_incidents`
+table in `data/points.sqlite`, seeded with two presentation records when empty.
+Fire stations and hospitals are read from imported point data when available
+and fall back to local sample records for demos. Base risk areas are still
+rule-based local sample regions. Fire Safety Big Data Platform fire-safety
+target and fire-water datasets now share the generic point import model, so
+risk and dispatch services can consume Seoul and Busan point data without
+changing the public map API.
+
+The service classes intentionally isolate incident persistence, distance-based
+dispatch, incident-type hospital scoring, rule-based regional risk scoring, and
+resource placement recommendations. The incident repository is the SQLite
+adapter boundary that can later be replaced by PostgreSQL while keeping route
+handlers and UI flows stable. Facility, route, and risk services can likewise
+be connected to public-safety big-data pipelines, Kakao/OSM route adapters, or
+ML model adapters.
 
 ## AI And MCP
 
