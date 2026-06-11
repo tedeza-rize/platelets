@@ -47,6 +47,24 @@ Use this order for each coherent feature or fix:
 Do not combine unrelated UI, data, security, and documentation work into one
 commit merely because they were requested together.
 
+## Branch And Pull Request Workflow
+
+This repository uses GitHub Flow:
+
+1. Start from an up-to-date `main`.
+2. Create a short-lived branch named `feature/<work-name>`, `fix/<bug-name>`,
+   or `hotfix/<urgent-fix-name>`.
+3. Open or link a GitHub issue before implementation when the work has product,
+   operational, or user-visible impact.
+4. Keep commits scoped to one feature, fix, or documentation/process change.
+5. Open a pull request into `main` and wait for GitHub Actions to finish.
+6. Merge only after the CI checks pass and required review or branch protection
+   rules are satisfied.
+
+The CI workflow runs on `main`, `feature/**`, `fix/**`, `hotfix/**`, and pull
+requests to `main`. Treat a passing CI run as the baseline signal that the
+branch can be merged, subject to review and repository protection settings.
+
 ## Browser Verification
 
 For map or responsive UI changes, verify at minimum:

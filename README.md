@@ -56,13 +56,29 @@ Before changing Next.js code, read the relevant local guide under
 
 ```bash
 npm run lint
+npm run test
 npm run format
 npm run build
+npm run test:e2e
 npm audit
 ```
 
 For UI work, also verify the affected flow in the in-app browser at desktop
 and mobile breakpoints. Commit each coherent feature or fix separately.
+
+## GitHub Flow
+
+Use short-lived branches from `main` and open a pull request back to `main`.
+Recommended branch names:
+
+- `feature/<work-name>` for new functionality and durable improvements
+- `fix/<bug-name>` for ordinary bug fixes
+- `hotfix/<urgent-fix-name>` for urgent production fixes
+
+Create or link a GitHub issue before starting work whenever the scope is more
+than a trivial local cleanup. A pull request is merge-ready only after the CI
+workflow passes linting, type tests, production build, and the browser smoke
+test, and any required review or branch-protection checks are satisfied.
 
 ## AI And MCP
 
@@ -77,5 +93,6 @@ raw provider records.
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
+- [CI/CD And GitHub Flow](docs/CI_CD_AND_GITHUB_FLOW.md)
 - [Data Sources And Licenses](docs/DATA_SOURCES_AND_LICENSES.md)
 - [AI Forecast And Response Plan](docs/AI_FORECAST_AND_RESPONSE.md)
