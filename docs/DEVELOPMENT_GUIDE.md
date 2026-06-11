@@ -17,6 +17,8 @@
 - Use `Asia/Seoul` for user-visible dates and retain UTC for durable storage.
 - Add abstractions only when they remove meaningful duplication.
 - Prefer existing CSS modules and flat responsive layouts.
+- Use LF line endings for all text files for cross-OS compatibility. The
+  repository enforces this with `.editorconfig` and `.gitattributes`.
 
 ## External Data Checklist
 
