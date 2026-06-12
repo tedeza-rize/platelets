@@ -3,6 +3,7 @@ import {
   DATASET_SOURCE_IDS,
   type DatasetSourceId,
 } from "@/lib/dataset-sources";
+import { getOperationalSettings } from "@/lib/operational-settings";
 import {
   getAppSetting,
   listDatasetStatuses,
@@ -101,10 +102,16 @@ function lastAttemptAt(
 }
 
 export async function runDueDatasetUpdates() {
-  const [settings, statuses] = await Promise.all([
+  const [operationalSettings, settings, statuses] = await Promise.all([
+    getOperationalSettings(),
     getDatasetScheduleSettings(),
     listDatasetStatuses(),
   ]);
+
+  if (!operationalSettings.datasetAutoUpdateEnabled) {
+    return;
+  }
+
   const now = Date.now();
 
   for (const status of statuses) {
@@ -136,15 +143,6 @@ export async function runDueDatasetUpdates() {
 }
 
 export function startDatasetScheduler() {
-  const enabled = process.env.DATASET_AUTO_UPDATE_ENABLED?.trim();
-
-  if (
-    enabled === "false" ||
-    (process.env.NODE_ENV !== "production" && enabled !== "true")
-  ) {
-    return;
-  }
-
   if (!schedulerGlobal.__plateletsDatasetScheduler) {
     schedulerGlobal.__plateletsDatasetScheduler = { isRunning: false };
   }
