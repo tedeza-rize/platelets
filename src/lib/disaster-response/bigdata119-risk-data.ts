@@ -130,12 +130,42 @@ const FALLBACK_REGIONAL_STATS: FireSafetyRegionalStat[] = [
     stationCount: 4,
     town: "해운대구",
   },
+  {
+    ambulanceCount: 20,
+    casualtyCount: 33,
+    city: "전북특별자치도",
+    dataYear: "2021",
+    fireCount: 214,
+    fireEngineCount: 27,
+    rescueCount: 430,
+    sourceLabel: `${NATIONAL_FIRE_FORCE_SOURCE.label} 샘플`,
+    sourceUrl: NATIONAL_FIRE_FORCE_SOURCE.url,
+    stationCount: 3,
+    town: "전주시덕진구",
+  },
+  {
+    ambulanceCount: 18,
+    casualtyCount: 29,
+    city: "전북특별자치도",
+    dataYear: "2021",
+    fireCount: 188,
+    fireEngineCount: 24,
+    rescueCount: 390,
+    sourceLabel: `${NATIONAL_FIRE_FORCE_SOURCE.label} 샘플`,
+    sourceUrl: NATIONAL_FIRE_FORCE_SOURCE.url,
+    stationCount: 3,
+    town: "전주시완산구",
+  },
 ];
 
 const REGIONAL_STAT_ALIASES: Record<string, Array<[string, string]>> = {
   "risk-busan-central": [["부산광역시", "중구"]],
   "risk-busan-haeundae": [["부산광역시", "해운대구"]],
   "risk-gangnam": [["서울특별시", "강남구"]],
+  "risk-jeonju": [
+    ["전북특별자치도", "전주시덕진구"],
+    ["전북특별자치도", "전주시완산구"],
+  ],
   "risk-jongno-jung": [
     ["서울특별시", "중구"],
     ["서울특별시", "종로구"],

@@ -2,9 +2,11 @@ import { assertKoreaCoordinate } from "@/lib/disaster-response/geo";
 import { incidentRepository } from "@/lib/disaster-response/incident-repository";
 import type {
   CreateIncidentInput,
+  Incident,
   IncidentStatus,
   IncidentType,
   RiskLevel,
+  UpdateIncidentInput,
 } from "@/lib/disaster-response/types";
 
 const INCIDENT_TYPES = new Set<IncidentType>([
@@ -36,6 +38,29 @@ function validDateOrNow(value: string | undefined, now: string) {
   return Number.isNaN(parsed.getTime()) ? now : parsed.toISOString();
 }
 
+function validDateOrFallback(value: string | undefined, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = new Date(value);
+
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed.toISOString();
+}
+
+function editableIncidentFields(incident: Incident) {
+  return {
+    address: incident.address,
+    description: incident.description,
+    latitude: incident.latitude,
+    longitude: incident.longitude,
+    occurredAt: incident.occurredAt,
+    riskLevel: incident.riskLevel,
+    title: incident.title,
+    type: incident.type,
+  };
+}
+
 export class IncidentService {
   listIncidents() {
     return incidentRepository.listIncidents();
@@ -43,6 +68,10 @@ export class IncidentService {
 
   getIncident(id: string) {
     return incidentRepository.getIncident(id);
+  }
+
+  listIncidentEvents(id: string) {
+    return incidentRepository.listIncidentEvents(id);
   }
 
   createIncident(input: CreateIncidentInput) {
@@ -84,6 +113,45 @@ export class IncidentService {
     }
 
     return incidentRepository.updateIncidentStatus(id, status);
+  }
+
+  async updateIncident(id: string, input: UpdateIncidentInput) {
+    const current = await incidentRepository.getIncident(id);
+
+    if (!current) {
+      return null;
+    }
+
+    const type = input.type ?? current.type;
+    const riskLevel = input.riskLevel ?? current.riskLevel;
+
+    if (!INCIDENT_TYPES.has(type)) {
+      throw new Error("지원하지 않는 사고 유형입니다.");
+    }
+
+    if (!RISK_LEVELS.has(riskLevel)) {
+      throw new Error("위험도는 low, medium, high 중 하나여야 합니다.");
+    }
+
+    const latitude = input.latitude ?? current.latitude;
+    const longitude = input.longitude ?? current.longitude;
+    assertKoreaCoordinate({ latitude, longitude });
+
+    return incidentRepository.updateIncident(id, {
+      ...editableIncidentFields(current),
+      address: boundedText(input.address, current.address, 240),
+      description: boundedText(input.description, current.description, 1200),
+      latitude,
+      longitude,
+      occurredAt: validDateOrFallback(input.occurredAt, current.occurredAt),
+      riskLevel,
+      title: boundedText(input.title, current.title, 120),
+      type,
+    });
+  }
+
+  deleteIncident(id: string) {
+    return incidentRepository.deleteIncident(id);
   }
 }
 

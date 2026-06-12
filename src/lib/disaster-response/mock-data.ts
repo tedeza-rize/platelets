@@ -60,6 +60,15 @@ export const FIRE_STATIONS: FireStation[] = [
     name: "해운대소방서",
     resources: { ambulances: 3, fireEngines: 5, rescueTrucks: 2 },
   },
+  {
+    address: "전북특별자치도 전주시 덕진구",
+    id: "fs-jeonju-deokjin",
+    jurisdiction: "전주 덕진·도심권",
+    latitude: 35.8369,
+    longitude: 127.1546,
+    name: "전주덕진소방서",
+    resources: { ambulances: 3, fireEngines: 5, rescueTrucks: 2 },
+  },
 ];
 
 export const HOSPITALS: Hospital[] = [
@@ -122,6 +131,16 @@ export const HOSPITALS: Hospital[] = [
     name: "인제대학교 해운대백병원",
     phone: "051-797-0100",
     specialties: ["응급의학", "외상", "심혈관", "정형외과"],
+  },
+  {
+    address: "전북특별자치도 전주시 덕진구 건지로 20",
+    emergencyRoom: true,
+    id: "h-jeonbuk-national",
+    latitude: 35.847,
+    longitude: 127.1413,
+    name: "전북대학교병원",
+    phone: "063-250-1114",
+    specialties: ["응급의학", "외상", "심혈관", "중환자"],
   },
 ];
 
@@ -220,5 +239,16 @@ export const BASE_RISK_AREAS: RiskArea[] = [
     recentIncidentCount: 0,
     riskLevel: "medium",
     riskScore: 60,
+  },
+  {
+    baseScore: 48,
+    factors: ["전북 119신고접수 샘플", "주거·상업 혼재"],
+    id: "risk-jeonju",
+    latitude: 35.8358,
+    longitude: 127.153,
+    name: "전주 덕진·도심권",
+    recentIncidentCount: 0,
+    riskLevel: "medium",
+    riskScore: 48,
   },
 ];

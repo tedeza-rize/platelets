@@ -40,7 +40,8 @@ export const DATA_LICENSE_ENTRIES = [
     provider: "OpenFreeMap / OpenMapTiles / OpenStreetMap contributors",
     sourceName: "OpenFreeMap 벡터 타일과 OpenStreetMap 기반 지도 데이터",
     sourceUrl: "https://openfreemap.org/",
-    usage: "OSM 지도 배경과 지명/도로/건물 레이어, 자체 도로 경로 계산",
+    usage:
+      "OSM 지도 배경과 지명/도로/건물 레이어, 자체 도로 경로 계산과 ITS 교통 보정 기반 ETA",
   },
   {
     id: "kakao-mobility-directions",
@@ -51,6 +52,26 @@ export const DATA_LICENSE_ENTRIES = [
     sourceName: "Kakao Mobility 길찾기 API",
     sourceUrl: "https://developers.kakaomobility.com/docs/navi-api/directions/",
     usage: "실제 도로 이동시간 기반 응급기관 추천과 이송 경로 표시",
+  },
+  {
+    id: "its-national-traffic",
+    license: "공공데이터포털 및 ITS 오픈데이터 이용조건 확인 필요",
+    notes:
+      "ITS_OPEN_API_KEY 또는 MOLIT_ITS_API_KEY는 서버 환경변수로만 보관한다. API 응답의 도로 구간 속도와 통행시간은 요청 시점과 영역에 따라 달라지며, 키가 없거나 표본이 없으면 기준 A* 경로 시간을 사용한다.",
+    provider: "국토교통부 / 국가교통정보센터",
+    sourceName: "국토교통부_교통소통정보, ITS 국가교통정보센터 교통소통정보",
+    sourceUrl: "https://www.data.go.kr/data/15040463/openapi.do",
+    sourceUrls: [
+      {
+        label: "국토교통부_교통소통정보",
+        url: "https://www.data.go.kr/data/15040463/openapi.do",
+      },
+      {
+        label: "ITS 국가교통정보센터 교통소통정보",
+        url: "https://www.its.go.kr/opendata/opendataList?service=traffic",
+      },
+    ],
+    usage: "자체 A* 출동 경로의 실시간 교통 속도 표본 기반 ETA 보정",
   },
   {
     id: "openai-responses",
@@ -96,61 +117,150 @@ export const DATA_LICENSE_ENTRIES = [
     id: "bigdata119-fire-safety-targets",
     license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
     notes:
-      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 대시보드의 특정소방대상물 지도 레이어와 데이터 출처 패널에 직접 반영한다. 파일이 없으면 발표용 샘플만 사용한다.",
     provider: "소방안전 빅데이터 플랫폼 / 서울특별시소방재난본부",
     sourceName: "서울소방재난본부_특정소방대상물 현황",
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=378",
-    usage: "특정소방대상물 지도 포인트와 위험도/출동 의사결정 지원",
+    usage:
+      "특정소방대상물 지도 포인트, 대시보드 데이터 근거 표시, 위험도/출동 의사결정 지원",
   },
   {
     id: "bigdata119-fire-water-sources",
     license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
     notes:
-      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 대시보드의 소방용수 지도 레이어와 데이터 출처 패널에 직접 반영한다. 파일이 없으면 발표용 샘플만 사용한다.",
     provider: "소방안전 빅데이터 플랫폼 / 서울특별시소방재난본부",
     sourceName: "서울소방재난본부_소방용수 현황",
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=380",
-    usage: "소방용수 위치 지도 포인트와 현장 대응 자원 확인",
+    usage:
+      "소방용수 위치 지도 포인트, 현장 대응 자원 확인, 대시보드 데이터 근거 표시",
   },
   {
     id: "bigdata119-busan-fire-safety-targets",
     license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
     notes:
-      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 대시보드의 특정소방대상물 지도 레이어와 데이터 출처 패널에 직접 반영한다. 파일이 없으면 발표용 샘플만 사용한다.",
     provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
     sourceName: "부산소방재난본부_특정소방대상물 현황",
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=404",
-    usage: "부산 특정소방대상물 지도 포인트와 지역 위험도 산정",
+    usage:
+      "부산 특정소방대상물 지도 포인트, 대시보드 데이터 근거 표시, 지역 위험도 산정",
   },
   {
     id: "bigdata119-busan-fire-water-sources",
     license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
     notes:
-      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 파일이 없으면 발표용 샘플만 사용한다.",
+      "무료 CSV 다운로드 상품이며 구매/다운로드 후 30일 이용기간이 표시된다. 승인받은 CSV는 data/bigdata-119 폴더에 배치해 가져오며, 대시보드의 소방용수 지도 레이어와 데이터 출처 패널에 직접 반영한다. 파일이 없으면 발표용 샘플만 사용한다.",
     provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
     sourceName: "부산소방재난본부_소방용수 현황",
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=403",
-    usage: "부산 소방용수 위치 지도 포인트와 현장 대응 자원 확인",
+    usage:
+      "부산 소방용수 위치 지도 포인트, 현장 대응 자원 확인, 대시보드 데이터 근거 표시",
   },
   {
     id: "bigdata119-national-fire-force",
     license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
     notes:
-      "승인받은 CSV는 data/bigdata-119/national-fire-force.csv 또는 화재_소방력_2021_전국.csv로 배치한다. 파일이 없으면 발표용 샘플 통계를 사용한다.",
+      "승인받은 CSV는 data/bigdata-119/national-fire-force.csv 또는 화재_소방력_2021_전국.csv로 배치한다. 위험도 패널, 위험요인 설명, 자원 배치 추천에 직접 반영하며, 파일이 없으면 발표용 샘플 통계를 사용한다.",
     provider: "소방안전 빅데이터 플랫폼 / 한국소방안전원",
     sourceName: "전국 시군구별 화재현황 및 소방력 정보",
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9",
     usage: "지역별 위험도 산정과 소방 자원 배치 권고의 규칙 기반 통계 입력",
   },
   {
+    id: "bigdata119-seoul-119-call-reception",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "공개 sample_info XLSX를 data/bigdata-119/seoul-119-call-reception.csv로 변환한다. 전체 CSV는 플랫폼 로그인/무료구매 절차로 별도 확보해야 한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 서울특별시소방재난본부",
+    sourceName: "서울소방재난본부_119신고접수 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=377",
+    usage:
+      "서울권 신고 유형, 접수 시간대, 처리 결과 요약과 지역 위험도 운영 부하 가중치",
+  },
+  {
+    id: "bigdata119-busan-ems-dispatches",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "공개 sample_info XLSX를 data/bigdata-119/busan-ems-dispatches.csv로 변환한다. 전체 CSV는 플랫폼 로그인/무료구매 절차로 별도 확보해야 한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
+    sourceName: "부산소방재난본부_구급출동 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=390",
+    usage:
+      "부산권 구급 출동 유형, 시간대, 출동거리 요약과 지역 위험도 운영 부하 가중치",
+  },
+  {
+    id: "bigdata119-busan-rescue-dispatches",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "공개 sample_info XLSX를 data/bigdata-119/busan-rescue-dispatches.csv로 변환한다. 전체 CSV는 플랫폼 로그인/무료구매 절차로 별도 확보해야 한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 부산광역시소방재난본부",
+    sourceName: "부산소방재난본부_구조출동 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=381",
+    usage:
+      "부산권 구조 출동 원인, 사고 장소, 도착 시간대 요약과 지역 위험도 운영 부하 가중치",
+  },
+  {
+    id: "bigdata119-jeonbuk-119-call-reception",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "공개 sample_info XLSX를 data/bigdata-119/jeonbuk-119-call-reception.csv로 변환한다. 전체 CSV는 플랫폼 로그인/무료구매 절차로 별도 확보해야 한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 전북특별자치도소방본부",
+    sourceName: "전북특별자치도소방본부_119신고접수 현황",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=296",
+    usage:
+      "전북권 신고 유형, 접수 시간대, 처리 결과 요약과 전주권 위험도 운영 부하 가중치",
+  },
+  {
     id: "building-safety-profiles",
     license: "원 제공기관 이용조건 및 보안등급 확인 필요",
     notes:
-      "현재 /api/building-safety는 발표용 샘플만 제공한다. 실제 운영 전 검증된 도면/비상구 데이터로 교체해야 한다.",
-    provider: "향후 시설 관리자 / 공공기관",
-    sourceName: "시설 관리 도면, 방재실 자료, 현장 점검 데이터",
+      "현재 /api/building-safety는 data/building-safety/profiles.json의 발표용 샘플만 제공한다. 실제 운영 전 검증된 도면/비상구 데이터로 교체하고 dataStatus=verified로 표시해야 한다.",
+    provider: "현재 로컬 샘플 / 향후 시설 관리자·공공기관",
+    sourceName:
+      "data/building-safety/profiles.json, 시설 관리 도면, 방재실 자료, 현장 점검 데이터",
     sourceUrl: "/api/building-safety",
-    usage: "건물 단면도, 층별 위험 공간, 비상구, 대피 장소 안내",
+    usage: "건물 단면도, 층별 위험 공간, 비상구, 피난 경로, 대피 장소 안내",
+  },
+  {
+    id: "bigdata119-fire-mechanical-drawings",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 비정형 다운로드 상품으로 확인했다. 현재 원본 파일은 포함하지 않고 data/building-safety/profiles.json의 발표용 샘플에 원천 후보 메타데이터만 연결한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 한방유비스㈜",
+    sourceName: "소방 설계 기계도면 정보",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=165",
+    usage: "건물 층별 소방설비, 피난계단, 방재실, 기계실 정규화 후보",
+  },
+  {
+    id: "bigdata119-electrical-drawings",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "유료 비정형 다운로드 상품으로 확인했다. 원본 구매/승인 없이 실제 도면을 포함하지 않는다.",
+    provider: "소방안전 빅데이터 플랫폼 / 한방유비스㈜",
+    sourceName: "전기도면 정보",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=168",
+    usage: "전기실, 분전반, 유도등, 비상전원 등 위험 공간 보강 후보",
+  },
+  {
+    id: "bigdata119-walking-distance-images",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "무료 비정형 이미지 다운로드 상품으로 확인했다. 현재 피난 경로 값은 발표용 샘플이며 실제 이미지 판독 결과가 아니다.",
+    provider: "소방안전 빅데이터 플랫폼 / 한방유비스㈜",
+    sourceName: "보행거리 검토 이미지",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=177",
+    usage: "피난동선, 보행거리, 비상구 접근성 정규화 후보",
+  },
+  {
+    id: "bigdata119-fire-evacuation-simulation",
+    license: "소방안전 빅데이터 플랫폼 데이터 상품 이용조건 확인 필요",
+    notes:
+      "유료 비정형/혼합 다운로드 상품으로 확인했다. 운영 전 승인 파일을 별도 확보하고 민감 정보 공개 가능 범위를 확인해야 한다.",
+    provider: "소방안전 빅데이터 플랫폼 / 한방유비스㈜",
+    sourceName: "화재 및 피난 시뮬레이션",
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=181",
+    usage: "피난 병목, 층별 위험도, 화재 확산 시나리오 보강 후보",
   },
   {
     id: "police-stations",

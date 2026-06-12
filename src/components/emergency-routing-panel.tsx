@@ -30,10 +30,20 @@ type DispatchStation = {
 };
 
 export type EmergencyRouteResult = {
+  baseDurationSeconds?: number;
   coordinates: [number, number][];
   distanceMeters: number;
   durationSeconds: number;
   provider: "astar" | "kakao";
+  traffic?: {
+    averageSpeedKph: number | null;
+    congestionLevel: "congested" | "moderate" | "smooth" | "unknown";
+    durationMultiplier: number;
+    message: string;
+    provider: "its" | "kakao" | "none";
+    sampleCount: number;
+    status: "live" | "unavailable" | "unconfigured";
+  };
 };
 
 type RecommendationResponse = {
@@ -68,6 +78,26 @@ function scenarioFor(patientType: string, symptom: string) {
 
 function minutes(seconds: number) {
   return Math.max(1, Math.round(seconds / 60));
+}
+
+function routeProviderLabel(route: EmergencyRouteResult) {
+  if (route.provider === "kakao") {
+    return route.traffic?.status === "live" ? "카카오 교통 반영" : "카카오맵";
+  }
+
+  return route.traffic?.status === "live" ? "자체 A* + ITS 교통" : "자체 A*";
+}
+
+function routeTrafficText(route: EmergencyRouteResult) {
+  if (!route.traffic) {
+    return null;
+  }
+
+  if (route.traffic.status === "unconfigured") {
+    return "ITS 교통 API 키 미설정";
+  }
+
+  return route.traffic.message;
 }
 
 export function EmergencyRoutingPanel({
@@ -279,9 +309,12 @@ export function EmergencyRoutingPanel({
       {error ? <p className={styles.emergencyError}>{error}</p> : null}
       {activeRoute ? (
         <p className={styles.emergencyRouteSummary}>
-          {activeRoute.provider === "kakao" ? "카카오맵" : "자체 A*"} 경로 ·{" "}
+          {routeProviderLabel(activeRoute)} 경로 ·{" "}
           {minutes(activeRoute.durationSeconds)}분 ·{" "}
           {(activeRoute.distanceMeters / 1000).toFixed(1)}km
+          {routeTrafficText(activeRoute) ? (
+            <> · {routeTrafficText(activeRoute)}</>
+          ) : null}
         </p>
       ) : null}
 

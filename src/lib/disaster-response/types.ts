@@ -9,6 +9,8 @@ export type RiskLevel = "low" | "medium" | "high";
 
 export type IncidentStatus = "reported" | "dispatched" | "closed";
 
+export type IncidentEventType = "created" | "updated" | "status" | "deleted";
+
 export type Incident = Coordinate & {
   address: string;
   createdAt: string;
@@ -19,6 +21,16 @@ export type Incident = Coordinate & {
   status: IncidentStatus;
   title: string;
   type: IncidentType;
+};
+
+export type IncidentEvent = {
+  createdAt: string;
+  fromStatus: IncidentStatus | null;
+  id: string;
+  incidentId: string;
+  message: string;
+  toStatus: IncidentStatus | null;
+  type: IncidentEventType;
 };
 
 export type FireStation = Coordinate & {
@@ -52,6 +64,68 @@ export type RiskArea = Coordinate & {
   riskScore: number;
 };
 
+export type BigData119PointKind = "fire-safety-target" | "fire-water-source";
+
+export type BigData119OperationalKind =
+  | "call-reception"
+  | "ems-dispatch"
+  | "rescue-dispatch";
+
+export type BigData119MapPoint = Coordinate & {
+  address: string;
+  category: string;
+  centerName: string | null;
+  city: string;
+  district: string;
+  id: string;
+  isSample: boolean;
+  kind: BigData119PointKind;
+  name: string;
+  sourceId: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  sourceUpdatedAt: string | null;
+  stationName: string | null;
+  status: string | null;
+};
+
+export type BigData119SourceSummary = {
+  downloadedAt: string | null;
+  fileName: string;
+  isSample: boolean;
+  kind: BigData119PointKind;
+  mappedCount: number;
+  pointCount: number;
+  regions: string[];
+  returnedCount: number;
+  sourceId: string;
+  sourceLabel: string;
+  sourceUrl: string;
+};
+
+export type BigData119OperationalAreaLoad = {
+  areaId: string;
+  areaName: string;
+  rowCount: number;
+};
+
+export type BigData119OperationalSummary = {
+  areaLoads: BigData119OperationalAreaLoad[];
+  averageDispatchDistanceMeters: number | null;
+  downloadedAt: string | null;
+  fileName: string;
+  incidentTypeHints: string[];
+  isSample: boolean;
+  kind: BigData119OperationalKind;
+  regions: string[];
+  resultHints: string[];
+  rowCount: number;
+  sourceId: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  timeHints: string[];
+};
+
 export type DispatchRecommendation = {
   distanceMeters: number;
   etaMinutes: number;
@@ -76,6 +150,8 @@ export type ResourceRecommendation = {
   reasons: string[];
   recommendedAmbulances: number;
   recommendedFireEngines: number;
+  recommendedRescueTrucks: number;
+  riskScore: number;
   timeWindow: string;
 };
 
@@ -88,4 +164,15 @@ export type CreateIncidentInput = {
   riskLevel: RiskLevel;
   title?: string;
   type: IncidentType;
+};
+
+export type UpdateIncidentInput = {
+  address?: string;
+  description?: string;
+  latitude?: number;
+  longitude?: number;
+  occurredAt?: string;
+  riskLevel?: RiskLevel;
+  title?: string;
+  type?: IncidentType;
 };

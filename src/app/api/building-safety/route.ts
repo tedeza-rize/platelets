@@ -25,6 +25,7 @@ export async function GET(request: Request) {
     return noStoreJson({
       profile: null,
       profiles: buildingSafetyService.listProfiles(),
+      sources: buildingSafetyService.listSources(),
     });
   }
 
@@ -36,5 +37,6 @@ export async function GET(request: Request) {
   return noStoreJson({
     distanceMeters: nearest ? Math.round(nearest.distanceMeters) : null,
     profile: nearest?.profile ?? null,
+    sources: buildingSafetyService.listSources(nearest?.profile.sourceIds),
   });
 }
