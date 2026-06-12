@@ -35,6 +35,21 @@ async function ensureSetupComplete(
   expect(completed.ok()).toBeTruthy();
 }
 
+test("redirects protected pages to setup before installation", async ({
+  browserName,
+  page,
+}) => {
+  test.skip(
+    browserName === "firefox",
+    "first-run setup is verified once because CI browser projects share the same test server",
+  );
+
+  await page.goto("/admin", { waitUntil: "domcontentloaded" });
+
+  await expect(page).toHaveURL(/\/setup$/);
+  await expect(page.getByLabel("Platelets setup wizard")).toBeVisible();
+});
+
 test("redirects first-run deployments to the setup wizard", async ({
   browserName,
   page,
