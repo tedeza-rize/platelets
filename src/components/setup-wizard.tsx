@@ -127,6 +127,8 @@ const setupCopy = {
       "Platelets will create the SQLite database, store the setup configuration, and open the home map.",
     "finish.title": "Create database",
     "install.failed": "Installation failed.",
+    "json.failed":
+      "The setup API did not return JSON. Check the server console and try again.",
     "language.en": "EN",
     "language.ko": "KO",
     "license.accept": "I have read and accept the Platelets setup terms.",
@@ -211,6 +213,8 @@ const setupCopy = {
       "Platelets가 SQLite 데이터베이스를 만들고 설치 설정을 저장한 뒤 홈 지도를 엽니다.",
     "finish.title": "데이터베이스 생성",
     "install.failed": "설치에 실패했습니다.",
+    "json.failed":
+      "설치 API가 JSON을 반환하지 않았습니다. 서버 콘솔을 확인한 뒤 다시 시도해 주세요.",
     "language.en": "EN",
     "language.ko": "KO",
     "license.accept": "Platelets 설치 약관을 읽고 동의합니다.",
@@ -304,6 +308,23 @@ function validateAccount(account: AccountForm, copy: SetupCopy) {
   return null;
 }
 
+async function readJsonResponse<TPayload>(
+  response: Response,
+  fallbackMessage: string,
+) {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new Error(fallbackMessage);
+  }
+
+  try {
+    return (await response.json()) as TPayload;
+  } catch {
+    throw new Error(fallbackMessage);
+  }
+}
+
 function Field({
   children,
   label,
@@ -328,8 +349,15 @@ function Field({
   );
 }
 
-export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
+export function SetupWizard({
+  initialLocale,
+  initialStatus = null,
+}: {
+  initialLocale: Locale;
+  initialStatus?: StatusPayload | null;
+}) {
   const router = useRouter();
+  const initialJsonError = setupCopy[initialLocale]["json.failed"];
   const [locale, setLocale] = useState<Locale>(initialLocale);
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [stepIndex, setStepIndex] = useState(0);
@@ -337,7 +365,7 @@ export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
   const [sudo, setSudo] = useState<AccountForm>(initialAccount);
   const [admin, setAdmin] = useState<AccountForm>(initialAccount);
   const [apiKeys, setApiKeys] = useState<ApiKeysForm>(initialApiKeys);
-  const [status, setStatus] = useState<StatusPayload | null>(null);
+  const [status, setStatus] = useState<StatusPayload | null>(initialStatus);
   const [apiTested, setApiTested] = useState(false);
   const [apiTestMessage, setApiTestMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -369,8 +397,16 @@ export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
       setTheme("dark");
     }
 
+    if (initialStatus) {
+      return () => {
+        isDisposed = true;
+      };
+    }
+
     fetch("/api/setup/status", { cache: "no-store" })
-      .then((response) => response.json())
+      .then((response) =>
+        readJsonResponse<StatusPayload>(response, initialJsonError),
+      )
       .then((payload: StatusPayload) => {
         if (!isDisposed) {
           setStatus(payload);
@@ -389,7 +425,7 @@ export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
     return () => {
       isDisposed = true;
     };
-  }, []);
+  }, [initialJsonError, initialStatus]);
 
   const stepError = useMemo(() => {
     if (activeStep.id === "license" && !acceptedTerms) {
@@ -441,10 +477,10 @@ export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         ok?: boolean;
-      };
+      }>(response, copy["json.failed"]);
 
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? copy["api.failed"]);
@@ -478,10 +514,10 @@ export function SetupWizard({ initialLocale }: { initialLocale: Locale }) {
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      const payload = (await response.json()) as {
+      const payload = await readJsonResponse<{
         error?: string;
         ok?: boolean;
-      };
+      }>(response, copy["json.failed"]);
 
       if (!response.ok || !payload.ok) {
         throw new Error(payload.error ?? copy["install.failed"]);
