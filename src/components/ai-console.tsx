@@ -9,12 +9,10 @@ import {
   Settings,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AiSettings } from "@/lib/ai-settings";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./ai-console.module.css";
-
-const TOKEN_STORAGE_KEY = "platelets:ai-access-token";
-const TOKEN_HEADER = "x-platelets-admin-token";
 
 type AiAnswer = {
   answer: string;
@@ -27,48 +25,39 @@ type AiAnswer = {
   model: string;
 };
 
+type AiConsoleProps = {
+  dictionary: AppDictionary;
+};
+
 function AccessTokenField({
+  dictionary,
   onChange,
   value,
 }: {
+  dictionary: AppDictionary;
   onChange: (value: string) => void;
   value: string;
 }) {
+  const t = (key: string) => uiText(dictionary, key);
+
   return (
     <label className={styles.field}>
-      관리자 접근 토큰
+      {t("관리자 비밀번호")}
       <input
-        autoComplete="off"
+        autoComplete="current-password"
         onChange={(event) => onChange(event.target.value)}
-        placeholder="PLATELETS_ADMIN_TOKEN 또는 sudo 토큰"
+        placeholder={t("관리자 또는 sudo 비밀번호")}
         type="password"
         value={value}
       />
-      <small>토큰은 이 브라우저의 localStorage에만 저장됩니다.</small>
+      <small>{t("비밀번호는 저장되지 않고 세션 쿠키만 발급됩니다.")}</small>
     </label>
   );
 }
 
-function useStoredToken() {
-  const [token, setToken] = useState("");
-
-  useEffect(() => {
-    setToken(window.localStorage.getItem(TOKEN_STORAGE_KEY) ?? "");
-  }, []);
-
-  useEffect(() => {
-    if (token) {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } else {
-      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
-  }, [token]);
-
-  return [token, setToken] as const;
-}
-
-export function AiQueryConsole() {
-  const [token, setToken] = useStoredToken();
+export function AiQueryConsole({ dictionary }: AiConsoleProps) {
+  const t = (key: string) => uiText(dictionary, key);
+  const [password, setPassword] = useState("");
   const [question, setQuestion] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -76,24 +65,42 @@ export function AiQueryConsole() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  async function loginIfNeeded() {
+    const nextPassword = password.trim();
+    if (!nextPassword) return;
+
+    const response = await fetch("/api/auth/login", {
+      body: JSON.stringify({ password: nextPassword }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error ?? t("로그인에 실패했습니다."));
+    }
+
+    setPassword("");
+  }
+
   async function ask(event: React.FormEvent) {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
 
     try {
+      await loginIfNeeded();
       const response = await fetch("/api/ai/query", {
         body: JSON.stringify({ latitude, longitude, question }),
-        headers: {
-          "Content-Type": "application/json",
-          [TOKEN_HEADER]: token.trim(),
-        },
+        headers: { "Content-Type": "application/json" },
         method: "POST",
       });
       const payload = (await response.json()) as AiAnswer & { error?: string };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "AI 질의에 실패했습니다.");
+        throw new Error(payload.error ?? t("AI 질의에 실패했습니다."));
       }
 
       setResult(payload);
@@ -111,22 +118,28 @@ export function AiQueryConsole() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/">지도로 돌아가기</Link>
+        <Link href="/">{t("지도로 돌아가기")}</Link>
         <span className={styles.icon}>
           <Bot aria-hidden="true" size={22} />
         </span>
-        <h1>Platelets AI 분석</h1>
-        <p>저장된 시설·재난·갱신 시각의 요약 데이터를 근거로 답합니다.</p>
+        <h1>{t("Platelets AI 분석")}</h1>
+        <p>
+          {t("저장된 시설·재난·갱신 시각의 요약 데이터를 근거로 답합니다.")}
+        </p>
         <Link className={styles.settingsLink} href="/sudo/ai">
-          <Settings aria-hidden="true" size={16} /> AI 설정
+          <Settings aria-hidden="true" size={16} /> {t("AI 설정")}
         </Link>
       </header>
 
       <form className={styles.card} onSubmit={ask}>
-        <AccessTokenField onChange={setToken} value={token} />
+        <AccessTokenField
+          dictionary={dictionary}
+          onChange={setPassword}
+          value={password}
+        />
         <div className={styles.coordinates}>
           <label className={styles.field}>
-            위도 (선택)
+            {t("위도 (선택)")}
             <input
               inputMode="decimal"
               onChange={(event) => setLatitude(event.target.value)}
@@ -135,7 +148,7 @@ export function AiQueryConsole() {
             />
           </label>
           <label className={styles.field}>
-            경도 (선택)
+            {t("경도 (선택)")}
             <input
               inputMode="decimal"
               onChange={(event) => setLongitude(event.target.value)}
@@ -145,11 +158,13 @@ export function AiQueryConsole() {
           </label>
         </div>
         <label className={styles.field}>
-          질문
+          {t("질문")}
           <textarea
             maxLength={4000}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder="예: 서울시청 근처에서 이용 가능한 응급의료기관과 데이터 한계를 설명해줘."
+            placeholder={t(
+              "예: 서울시청 근처에서 이용 가능한 응급의료기관과 데이터 한계를 설명해줘.",
+            )}
             required
             rows={6}
             value={question}
@@ -165,7 +180,7 @@ export function AiQueryConsole() {
           ) : (
             <Send size={18} />
           )}
-          {isLoading ? "데이터를 조회하고 분석 중" : "AI에게 질문"}
+          {isLoading ? t("데이터를 조회하고 분석 중") : t("AI에게 질문")}
         </button>
         {error ? <p className={styles.error}>{error}</p> : null}
       </form>
@@ -175,13 +190,26 @@ export function AiQueryConsole() {
           <div className={styles.answerMeta}>
             <strong>{result.model}</strong>
             <span>
-              <Database size={14} /> 데이터셋{" "}
-              {result.contextSummary.datasetCount}개
+              <Database size={14} /> {t("데이터셋")}{" "}
+              {result.contextSummary.datasetCount.toLocaleString(
+                dictionary.formatLocale,
+              )}
+              {t("개")}
             </span>
             <span>
-              검색 시설 {result.contextSummary.matchingFacilityCount}개
+              {t("검색 시설")}{" "}
+              {result.contextSummary.matchingFacilityCount.toLocaleString(
+                dictionary.formatLocale,
+              )}
+              {t("개")}
             </span>
-            <span>주변 시설 {result.contextSummary.nearbyFacilityCount}개</span>
+            <span>
+              {t("주변 시설")}{" "}
+              {result.contextSummary.nearbyFacilityCount.toLocaleString(
+                dictionary.formatLocale,
+              )}
+              {t("개")}
+            </span>
           </div>
           <div className={styles.answer}>{result.answer}</div>
         </section>
@@ -190,27 +218,48 @@ export function AiQueryConsole() {
   );
 }
 
-export function AiSettingsConsole() {
-  const [token, setToken] = useStoredToken();
+export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
+  const t = (key: string) => uiText(dictionary, key);
+  const [password, setPassword] = useState("");
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  async function loginIfNeeded() {
+    const nextPassword = password.trim();
+    if (!nextPassword) return;
+
+    const response = await fetch("/api/auth/login", {
+      body: JSON.stringify({ password: nextPassword }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error ?? t("로그인에 실패했습니다."));
+    }
+
+    setPassword("");
+  }
+
   async function loadSettings() {
     setIsLoading(true);
     setError(null);
     try {
+      await loginIfNeeded();
       const response = await fetch("/api/admin/ai-settings", {
         cache: "no-store",
-        headers: { [TOKEN_HEADER]: token.trim() },
       });
       const payload = (await response.json()) as {
         error?: string;
         settings?: AiSettings;
       };
       if (!response.ok || !payload.settings) {
-        throw new Error(payload.error ?? "AI 설정을 불러오지 못했습니다.");
+        throw new Error(payload.error ?? t("AI 설정을 불러오지 못했습니다."));
       }
       setSettings(payload.settings);
     } catch (requestError) {
@@ -231,12 +280,10 @@ export function AiSettingsConsole() {
     setError(null);
     setNotice(null);
     try {
+      await loginIfNeeded();
       const response = await fetch("/api/admin/ai-settings", {
         body: JSON.stringify(settings),
-        headers: {
-          "Content-Type": "application/json",
-          [TOKEN_HEADER]: token.trim(),
-        },
+        headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
       const payload = (await response.json()) as {
@@ -244,10 +291,10 @@ export function AiSettingsConsole() {
         settings?: AiSettings;
       };
       if (!response.ok || !payload.settings) {
-        throw new Error(payload.error ?? "AI 설정을 저장하지 못했습니다.");
+        throw new Error(payload.error ?? t("AI 설정을 저장하지 못했습니다."));
       }
       setSettings(payload.settings);
-      setNotice("AI 설정을 저장했습니다.");
+      setNotice(t("AI 설정을 저장했습니다."));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -271,26 +318,31 @@ export function AiSettingsConsole() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/ai">AI 분석으로 돌아가기</Link>
+        <Link href="/ai">{t("AI 분석으로 돌아가기")}</Link>
         <span className={styles.icon}>
           <Settings aria-hidden="true" size={22} />
         </span>
-        <h1>AI 연결 설정</h1>
+        <h1>{t("AI 연결 설정")}</h1>
         <p>
-          API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만
-          저장합니다.
+          {t(
+            "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.",
+          )}
         </p>
       </header>
 
       <section className={styles.card}>
-        <AccessTokenField onChange={setToken} value={token} />
+        <AccessTokenField
+          dictionary={dictionary}
+          onChange={setPassword}
+          value={password}
+        />
         <button
           className={styles.secondaryButton}
           disabled={isLoading}
           onClick={loadSettings}
           type="button"
         >
-          설정 불러오기
+          {t("설정 불러오기")}
         </button>
       </section>
 
@@ -298,7 +350,7 @@ export function AiSettingsConsole() {
         <form className={styles.card} onSubmit={save}>
           <div className={styles.coordinates}>
             <label className={styles.field}>
-              API 방식
+              {t("API 방식")}
               <select
                 value={settings.apiMode}
                 onChange={(event) =>
@@ -311,11 +363,13 @@ export function AiSettingsConsole() {
                 }
               >
                 <option value="responses">Responses API</option>
-                <option value="chat-completions">Chat Completions 호환</option>
+                <option value="chat-completions">
+                  {t("Chat Completions 호환")}
+                </option>
               </select>
             </label>
             <label className={styles.field}>
-              모델
+              {t("모델")}
               <input
                 value={settings.model}
                 onChange={(event) => update("model", event.target.value)}
@@ -323,19 +377,20 @@ export function AiSettingsConsole() {
             </label>
           </div>
           <label className={styles.field}>
-            OpenAI 호환 Base URL
+            {t("OpenAI 호환 Base URL")}
             <input
               value={settings.baseUrl}
               onChange={(event) => update("baseUrl", event.target.value)}
             />
             <small>
-              기본값은 https://api.openai.com/v1이며 사설망 주소는 별도
-              환경변수로 허용해야 합니다.
+              {t(
+                "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.",
+              )}
             </small>
           </label>
           <div className={styles.coordinates}>
             <label className={styles.field}>
-              추론 강도
+              {t("추론 강도")}
               <select
                 value={settings.reasoningEffort}
                 onChange={(event) =>
@@ -355,7 +410,7 @@ export function AiSettingsConsole() {
               </select>
             </label>
             <label className={styles.field}>
-              답변 길이
+              {t("답변 길이")}
               <select
                 value={settings.verbosity}
                 onChange={(event) =>
@@ -372,7 +427,7 @@ export function AiSettingsConsole() {
             </label>
           </div>
           <label className={styles.field}>
-            시스템 프롬프트
+            {t("시스템 프롬프트")}
             <textarea
               maxLength={12000}
               rows={12}
@@ -385,7 +440,7 @@ export function AiSettingsConsole() {
             disabled={isLoading}
             type="submit"
           >
-            <Save size={18} /> {isLoading ? "저장 중" : "설정 저장"}
+            <Save size={18} /> {isLoading ? t("저장 중") : t("설정 저장")}
           </button>
         </form>
       ) : null}

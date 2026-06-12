@@ -29,7 +29,7 @@ import type {
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
-import type { AppDictionary } from "@/lib/i18n";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import {
   type EmergencyRouteResult,
   EmergencyRoutingPanel,
@@ -2443,10 +2443,11 @@ export function MapShell({
           type="button"
         >
           <Ambulance aria-hidden="true" size={18} strokeWidth={2.5} />
-          <span>응급 출동·이송</span>
+          <span>{uiText(dictionary, "응급 출동·이송")}</span>
         </button>
         {isEmergencyPanelOpen ? (
           <EmergencyRoutingPanel
+            dictionary={dictionary}
             onClose={() => setIsEmergencyPanelOpen(false)}
             onRoute={setEmergencyRoute}
             origin={emergencyOrigin}
