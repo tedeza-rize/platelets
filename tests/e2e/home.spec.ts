@@ -108,7 +108,7 @@ test("redirects first-run deployments to the setup wizard", async ({
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Create the sudo account" }),
+    page.getByRole("heading", { name: "Create the administrator account" }),
   ).toBeVisible();
   await page.getByLabel("Full name").fill("Setup Sudo");
   await page.getByLabel("Email address").fill("sudo@example.com");
@@ -117,7 +117,7 @@ test("redirects first-run deployments to the setup wizard", async ({
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
-    page.getByRole("heading", { name: "Create the admin account" }),
+    page.getByRole("heading", { name: "Create the operator account" }),
   ).toBeVisible();
   await page.getByLabel("Full name").fill("Setup Admin");
   await page.getByLabel("Email address").fill("admin@example.com");
