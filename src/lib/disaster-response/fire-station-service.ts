@@ -6,6 +6,7 @@ import { FIRE_STATIONS } from "@/lib/disaster-response/mock-data";
 import type {
   Coordinate,
   DispatchRecommendation,
+  FireStation,
   Incident,
 } from "@/lib/disaster-response/types";
 import {
@@ -37,6 +38,40 @@ function isMappedPoint(point: EmergencyPointSummary) {
   return point.latitude !== null && point.longitude !== null;
 }
 
+function incidentResourceWeight(
+  incident: Incident,
+  stationResources: FireStation["resources"],
+) {
+  switch (incident.type) {
+    case "fire":
+      return Math.min(
+        20,
+        stationResources.fireEngines * 4 + stationResources.rescueTrucks * 2,
+      );
+    case "medical":
+      return Math.min(
+        20,
+        stationResources.ambulances * 6 + stationResources.rescueTrucks * 2,
+      );
+    case "traffic":
+      return Math.min(
+        20,
+        stationResources.rescueTrucks * 6 + stationResources.ambulances * 4,
+      );
+    case "rescue":
+      return Math.min(
+        20,
+        stationResources.rescueTrucks * 7 + stationResources.fireEngines * 2,
+      );
+  }
+}
+
+function riskUrgencyWeight(incident: Incident) {
+  if (incident.riskLevel === "high") return 10;
+  if (incident.riskLevel === "medium") return 5;
+  return 0;
+}
+
 export class FireStationService {
   async listFireStations() {
     const points = await listPointSummaries({
@@ -60,15 +95,10 @@ export class FireStationService {
       .map((station) => {
         const distance = distanceMeters(origin, station);
         const etaMinutes = estimatedUrbanEtaMinutes(distance);
-        const typeWeight =
-          incident.type === "fire"
-            ? station.resources.fireEngines * 8
-            : incident.type === "medical"
-              ? station.resources.ambulances * 9
-              : station.resources.rescueTrucks * 8;
-        const score = Math.round(
-          Math.max(0, 100 - etaMinutes * 4) + typeWeight,
-        );
+        const distanceScore = Math.max(0, 70 - etaMinutes * 3);
+        const typeWeight = incidentResourceWeight(incident, station.resources);
+        const riskWeight = riskUrgencyWeight(incident);
+        const score = Math.round(distanceScore + typeWeight + riskWeight);
         const reasons = [
           `${Math.round(distance).toLocaleString("ko-KR")}m 거리`,
           `예상 ${etaMinutes}분 내 접근`,
@@ -83,6 +113,11 @@ export class FireStationService {
         }
         if (incident.type === "rescue" || incident.type === "traffic") {
           reasons.push(`구조차 ${station.resources.rescueTrucks}대 보유`);
+        }
+        if (incident.riskLevel !== "low") {
+          reasons.push(
+            `사고 위험도 ${incident.riskLevel === "high" ? "높음" : "보통"} 가중치 반영`,
+          );
         }
         reasons.push("향후 교통상황·과거 출동시간 가중치 확장 가능");
 

@@ -1,0 +1,548 @@
+{
+  "sources": [
+    {
+      "accessType": "free",
+      "dataFormat": "unstructured",
+      "id": "bigdata119-fire-mechanical-drawings",
+      "label": "소방안전 빅데이터 플랫폼: 소방 설계 기계도면 정보",
+      "notes": [
+        "플랫폼 상품 메타데이터 기준 무료 다운로드 상품이다.",
+        "비정형 도면 파일이므로 실제 서비스 반영 전 층, 소방설비, 피난계단, 비상구 좌표를 정규화해야 한다.",
+        "현재 프로필은 승인 원본 도면이 아니라 발표용 샘플 구조다."
+      ],
+      "provider": "한방유비스㈜",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=165",
+      "usage": "층별 소방설비, 피난계단, 방재실, 주요 위험 공간을 정규화하기 위한 원천 후보"
+    },
+    {
+      "accessType": "paid",
+      "dataFormat": "unstructured",
+      "id": "bigdata119-electrical-drawings",
+      "label": "소방안전 빅데이터 플랫폼: 전기도면 정보",
+      "notes": [
+        "플랫폼 상품 메타데이터 기준 비정형 다운로드 상품이며 구매 후 이용기간이 표시된다.",
+        "전기실, 분전반, 피난 유도등 관련 위치를 보강하는 원천 후보로만 기록한다.",
+        "현재 서비스에는 원본 파일을 포함하지 않는다."
+      ],
+      "provider": "한방유비스㈜",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=168",
+      "usage": "전기실, 분전반, 유도등, 비상전원 등 위험 공간 보강"
+    },
+    {
+      "accessType": "free",
+      "dataFormat": "image",
+      "id": "bigdata119-walking-distance-images",
+      "label": "소방안전 빅데이터 플랫폼: 보행거리 검토 이미지",
+      "notes": [
+        "플랫폼 상품 메타데이터 기준 무료 비정형 이미지 상품이다.",
+        "피난동선과 보행거리 검토 결과를 지도 팝업의 비상구·대피 경로 요약으로 정규화할 수 있다.",
+        "현재 프로필의 피난 경로는 발표용 예시이며 실제 이미지 판독 결과가 아니다."
+      ],
+      "provider": "한방유비스㈜",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=177",
+      "usage": "층별 피난동선, 보행거리, 비상구 접근성 검토"
+    },
+    {
+      "accessType": "paid",
+      "dataFormat": "mixed",
+      "id": "bigdata119-fire-evacuation-simulation",
+      "label": "소방안전 빅데이터 플랫폼: 화재 및 피난 시뮬레이션",
+      "notes": [
+        "플랫폼 상품 메타데이터 기준 비정형 시뮬레이션 다운로드 상품이다.",
+        "피난 시뮬레이션 결과를 위험층, 병목 구간, 대피 시간 가중치로 연결할 수 있다.",
+        "현재 서비스에는 원본 시뮬레이션 파일을 포함하지 않는다."
+      ],
+      "provider": "한방유비스㈜",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=181",
+      "usage": "피난 병목, 층별 위험도, 화재 확산 시나리오 보강"
+    }
+  ],
+  "profiles": [
+    {
+      "address": "서울특별시 중구 세종대로 110",
+      "dataStatus": "sample",
+      "exits": [
+        {
+          "direction": "세종대로",
+          "floor": "1F",
+          "id": "seoul-cityhall-exit-north",
+          "label": "북측 주출입구",
+          "latitude": 37.5669,
+          "longitude": 126.978
+        },
+        {
+          "direction": "덕수궁 방면",
+          "floor": "1F",
+          "id": "seoul-cityhall-exit-south",
+          "label": "남측 비상구",
+          "latitude": 37.5661,
+          "longitude": 126.9782
+        }
+      ],
+      "floors": [
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 95,
+              "floor": "B1",
+              "from": "상황실",
+              "to": "북측 주출입구",
+              "via": ["중앙 복도", "주계단", "1F 로비"]
+            }
+          ],
+          "exits": ["seoul-cityhall-exit-north", "seoul-cityhall-exit-south"],
+          "floor": "B1",
+          "hazards": ["지하 보행 연결부", "기계실"],
+          "keySpaces": ["상황실", "전기실", "기계실"],
+          "refugeArea": "지상 광장",
+          "sectionNote": "지하 기계·전기 공간과 1층 로비가 주계단으로 연결됨"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 42,
+              "floor": "1F",
+              "from": "민원실",
+              "to": "서울광장",
+              "via": ["로비", "북측 주출입구"]
+            }
+          ],
+          "exits": ["seoul-cityhall-exit-north", "seoul-cityhall-exit-south"],
+          "floor": "1F",
+          "hazards": ["민원 대기공간", "출입구 혼잡"],
+          "keySpaces": ["로비", "민원실", "방재실"],
+          "refugeArea": "서울광장",
+          "sectionNote": "1층 로비 중심의 수평 피난 후 외부 광장 대피"
+        }
+      ],
+      "id": "building-seoul-cityhall",
+      "latitude": 37.5665,
+      "longitude": 126.978,
+      "name": "서울시청 본관",
+      "nearestAssemblyPoint": "서울광장",
+      "section": [
+        {
+          "floor": "B1",
+          "label": "지하 지원층",
+          "riskNote": "기계실·전기실 인접",
+          "use": "상황실, 설비실",
+          "verticalExitAccess": ["주계단", "비상계단"]
+        },
+        {
+          "floor": "1F",
+          "label": "공개 민원층",
+          "riskNote": "민원 대기 인원 집중 가능",
+          "use": "로비, 민원실, 방재실",
+          "verticalExitAccess": ["북측 주출입구", "남측 비상구"]
+        }
+      ],
+      "sourceIds": [
+        "bigdata119-fire-mechanical-drawings",
+        "bigdata119-walking-distance-images"
+      ],
+      "sourceLabel": "발표용 건물 안전 프로필 샘플",
+      "sourceNotes": [
+        "소방안전 빅데이터 플랫폼의 도면·보행거리 상품 구조를 참고한 샘플이다.",
+        "실제 운영 전 시설관리자 또는 승인된 플랫폼 원본 도면으로 검증해야 한다."
+      ],
+      "sourceUrl": null,
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "address": "서울특별시 중구 명동길 14",
+      "dataStatus": "sample",
+      "exits": [
+        {
+          "direction": "명동길",
+          "floor": "1F",
+          "id": "myeongdong-retail-exit-main",
+          "label": "서측 주출입구",
+          "latitude": 37.5636,
+          "longitude": 126.9856
+        },
+        {
+          "direction": "이면도로",
+          "floor": "1F",
+          "id": "myeongdong-retail-exit-rear",
+          "label": "후면 비상구",
+          "latitude": 37.5638,
+          "longitude": 126.986
+        },
+        {
+          "direction": "남측 계단실",
+          "floor": "2F",
+          "id": "myeongdong-retail-exit-stair",
+          "label": "공용 피난계단",
+          "latitude": 37.5635,
+          "longitude": 126.9859
+        }
+      ],
+      "floors": [
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 78,
+              "floor": "B1",
+              "from": "지하 매장",
+              "to": "후면 비상구",
+              "via": ["직원 통로", "피난계단", "1F 후면 복도"]
+            }
+          ],
+          "exits": ["myeongdong-retail-exit-rear"],
+          "floor": "B1",
+          "hazards": ["지하 매장", "전기실 인접"],
+          "keySpaces": ["창고", "기계실", "직원 통로"],
+          "refugeArea": "1층 주출입구 외부 보행로",
+          "sectionNote": "지하 매장과 1층 후면 통로를 피난계단으로 연결"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 36,
+              "floor": "1F",
+              "from": "매장 중앙",
+              "to": "서측 주출입구",
+              "via": ["공용 복도"]
+            }
+          ],
+          "exits": [
+            "myeongdong-retail-exit-main",
+            "myeongdong-retail-exit-rear"
+          ],
+          "floor": "1F",
+          "hazards": ["보행자 밀집", "소매 매장 가연물"],
+          "keySpaces": ["매장", "계산대", "공용 복도"],
+          "refugeArea": "명동길 보행 공간",
+          "sectionNote": "전면·후면 양방향 피난 가능"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 62,
+              "floor": "2F",
+              "from": "음식점 주방",
+              "to": "후면 비상구",
+              "via": ["남측 계단실", "1F 후면 복도"]
+            }
+          ],
+          "exits": ["myeongdong-retail-exit-stair"],
+          "floor": "2F",
+          "hazards": ["식음료 조리 공간", "계단 병목"],
+          "keySpaces": ["음식점", "공용 피난계단"],
+          "refugeArea": "후면 이면도로",
+          "sectionNote": "상층부 조리공간은 남측 계단실을 우선 피난로로 사용"
+        }
+      ],
+      "id": "building-myeongdong-retail-sample",
+      "latitude": 37.56365,
+      "longitude": 126.98579,
+      "name": "명동 복합상가",
+      "nearestAssemblyPoint": "명동길 보행 공간",
+      "section": [
+        {
+          "floor": "B1",
+          "label": "지하 판매층",
+          "riskNote": "전기실과 창고 인접",
+          "use": "창고, 기계실, 지하 매장",
+          "verticalExitAccess": ["피난계단"]
+        },
+        {
+          "floor": "1F",
+          "label": "가로 접점층",
+          "riskNote": "방문객 밀집 가능",
+          "use": "매장, 계산대, 공용 복도",
+          "verticalExitAccess": ["서측 주출입구", "후면 비상구"]
+        },
+        {
+          "floor": "2F",
+          "label": "음식점층",
+          "riskNote": "조리 화재 및 계단 병목",
+          "use": "음식점, 공용 피난계단",
+          "verticalExitAccess": ["공용 피난계단"]
+        }
+      ],
+      "sourceIds": [
+        "bigdata119-fire-mechanical-drawings",
+        "bigdata119-electrical-drawings",
+        "bigdata119-walking-distance-images"
+      ],
+      "sourceLabel": "발표용 건물 안전 프로필 샘플",
+      "sourceNotes": [
+        "실제 비상구 좌표가 아닌 발표용 지도 연동 샘플이다.",
+        "승인된 도면·보행거리 검토 이미지가 확보되면 같은 JSON 구조로 교체한다."
+      ],
+      "sourceUrl": null,
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "address": "서울특별시 용산구 한강대로 95 일대",
+      "dataStatus": "sample",
+      "exits": [
+        {
+          "direction": "한강대로",
+          "floor": "1F",
+          "id": "sinyongsan-exit-main",
+          "label": "동측 주출입구",
+          "latitude": 37.52996,
+          "longitude": 126.96878
+        },
+        {
+          "direction": "이면도로",
+          "floor": "1F",
+          "id": "sinyongsan-exit-service",
+          "label": "서측 피난출구",
+          "latitude": 37.52978,
+          "longitude": 126.96821
+        }
+      ],
+      "floors": [
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 118,
+              "floor": "B1",
+              "from": "지하 설비구역",
+              "to": "서측 피난출구",
+              "via": ["방화구획 복도", "특별피난계단", "1F 서비스 복도"]
+            }
+          ],
+          "exits": ["sinyongsan-exit-service"],
+          "floor": "B1",
+          "hazards": ["지하 주차·설비구역", "전기실"],
+          "keySpaces": ["전기실", "기계실", "방화구획 복도"],
+          "refugeArea": "이면도로 대피 공간",
+          "sectionNote": "지하 설비구역은 방화구획 복도와 특별피난계단으로 분리"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 54,
+              "floor": "1F",
+              "from": "로비",
+              "to": "동측 주출입구",
+              "via": ["공용 홀"]
+            }
+          ],
+          "exits": ["sinyongsan-exit-main", "sinyongsan-exit-service"],
+          "floor": "1F",
+          "hazards": ["로비 혼잡", "상업시설 가연물"],
+          "keySpaces": ["로비", "상업시설", "방재실"],
+          "refugeArea": "한강대로 보행 공간",
+          "sectionNote": "1층 로비에서 전면·후면 출구로 분산 피난"
+        }
+      ],
+      "id": "building-sinyongsan-mixed-use-sample",
+      "latitude": 37.52987,
+      "longitude": 126.96851,
+      "name": "신용산 복합시설 샘플",
+      "nearestAssemblyPoint": "한강대로 보행 공간",
+      "section": [
+        {
+          "floor": "B1",
+          "label": "지하 설비층",
+          "riskNote": "전기실·기계실 집중",
+          "use": "주차, 설비, 방화구획 복도",
+          "verticalExitAccess": ["특별피난계단"]
+        },
+        {
+          "floor": "1F",
+          "label": "공개 로비층",
+          "riskNote": "방문객과 상업시설 동선 교차",
+          "use": "로비, 상업시설, 방재실",
+          "verticalExitAccess": ["동측 주출입구", "서측 피난출구"]
+        }
+      ],
+      "sourceIds": [
+        "bigdata119-electrical-drawings",
+        "bigdata119-fire-mechanical-drawings"
+      ],
+      "sourceLabel": "소방안전 빅데이터 플랫폼 도면 상품 메타데이터 기반 샘플",
+      "sourceNotes": [
+        "전기도면 정보 상품에 신용산역 도시환경 정비사업 파일명이 표시되어 있어 원천 후보로 연결했다.",
+        "원본 도면을 포함하지 않으며 좌표와 피난 경로는 발표용 샘플이다."
+      ],
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=168",
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "address": "부산광역시 연제구 중앙대로 1001",
+      "dataStatus": "sample",
+      "exits": [
+        {
+          "direction": "중앙대로",
+          "floor": "1F",
+          "id": "busan-cityhall-exit-main",
+          "label": "남측 주출입구",
+          "latitude": 35.1795,
+          "longitude": 129.075
+        },
+        {
+          "direction": "시청역 방면",
+          "floor": "1F",
+          "id": "busan-cityhall-exit-east",
+          "label": "동측 비상구",
+          "latitude": 35.1798,
+          "longitude": 129.0756
+        }
+      ],
+      "floors": [
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 48,
+              "floor": "1F",
+              "from": "민원실",
+              "to": "남측 주출입구",
+              "via": ["로비"]
+            }
+          ],
+          "exits": ["busan-cityhall-exit-main", "busan-cityhall-exit-east"],
+          "floor": "1F",
+          "hazards": ["민원실", "대형 로비"],
+          "keySpaces": ["안내데스크", "방재실"],
+          "refugeArea": "시청 앞 광장",
+          "sectionNote": "저층 로비에서 남측 광장과 동측 지하철 방면으로 분산"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 74,
+              "floor": "2F",
+              "from": "회의실",
+              "to": "동측 비상구",
+              "via": ["중앙계단", "1F 동측 복도"]
+            }
+          ],
+          "exits": ["busan-cityhall-exit-east"],
+          "floor": "2F",
+          "hazards": ["업무공간 밀집"],
+          "keySpaces": ["회의실", "민원 처리 부서"],
+          "refugeArea": "중앙계단 및 외부 광장",
+          "sectionNote": "상층 업무공간은 중앙계단으로 저층 로비에 연결"
+        }
+      ],
+      "id": "building-busan-cityhall",
+      "latitude": 35.1798,
+      "longitude": 129.0751,
+      "name": "부산광역시청",
+      "nearestAssemblyPoint": "부산시청 앞 광장",
+      "section": [
+        {
+          "floor": "1F",
+          "label": "민원·로비층",
+          "riskNote": "대형 로비 인원 집중",
+          "use": "안내데스크, 방재실, 민원실",
+          "verticalExitAccess": ["남측 주출입구", "동측 비상구"]
+        },
+        {
+          "floor": "2F",
+          "label": "업무·회의층",
+          "riskNote": "업무공간 밀집",
+          "use": "회의실, 민원 처리 부서",
+          "verticalExitAccess": ["중앙계단"]
+        }
+      ],
+      "sourceIds": [
+        "bigdata119-fire-mechanical-drawings",
+        "bigdata119-walking-distance-images"
+      ],
+      "sourceLabel": "발표용 건물 안전 프로필 샘플",
+      "sourceNotes": [
+        "부산 지도 시연을 위한 샘플이다.",
+        "실제 부산시청 도면 또는 시설관리 데이터로 검증해야 한다."
+      ],
+      "sourceUrl": null,
+      "updatedAt": "2026-06-12"
+    },
+    {
+      "address": "부산광역시 해운대구 APEC로 55",
+      "dataStatus": "sample",
+      "exits": [
+        {
+          "direction": "센텀시티역 방면",
+          "floor": "1F",
+          "id": "bexco-exit-west",
+          "label": "서측 출입구",
+          "latitude": 35.1695,
+          "longitude": 129.1356
+        },
+        {
+          "direction": "APEC로",
+          "floor": "1F",
+          "id": "bexco-exit-east",
+          "label": "동측 비상구",
+          "latitude": 35.1693,
+          "longitude": 129.1374
+        }
+      ],
+      "floors": [
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 145,
+              "floor": "1F",
+              "from": "제1전시장 중앙",
+              "to": "서측 출입구",
+              "via": ["전시장 주동선", "로비"]
+            }
+          ],
+          "exits": ["bexco-exit-west", "bexco-exit-east"],
+          "floor": "1F",
+          "hazards": ["전시장 대형 개방 공간", "행사 인파"],
+          "keySpaces": ["제1전시장", "로비", "방재센터"],
+          "refugeArea": "야외 광장",
+          "sectionNote": "대형 전시장 중심부에서 동서 양방향으로 장거리 피난"
+        },
+        {
+          "evacuationRoutes": [
+            {
+              "estimatedDistanceMeters": 86,
+              "floor": "2F",
+              "from": "컨벤션홀",
+              "to": "동측 비상구",
+              "via": ["연결 통로", "외부 계단"]
+            }
+          ],
+          "exits": ["bexco-exit-east"],
+          "floor": "2F",
+          "hazards": ["회의실 밀집", "연결 통로"],
+          "keySpaces": ["컨벤션홀", "회의실"],
+          "refugeArea": "외부 계단 및 야외 광장",
+          "sectionNote": "컨벤션홀은 외부 계단을 통해 동측 광장으로 피난"
+        }
+      ],
+      "id": "building-bexco",
+      "latitude": 35.1695,
+      "longitude": 129.1366,
+      "name": "벡스코",
+      "nearestAssemblyPoint": "벡스코 야외 광장",
+      "section": [
+        {
+          "floor": "1F",
+          "label": "전시장층",
+          "riskNote": "행사 인파와 대공간 피난거리",
+          "use": "제1전시장, 로비, 방재센터",
+          "verticalExitAccess": ["서측 출입구", "동측 비상구"]
+        },
+        {
+          "floor": "2F",
+          "label": "컨벤션층",
+          "riskNote": "회의실 밀집 및 연결통로 병목",
+          "use": "컨벤션홀, 회의실",
+          "verticalExitAccess": ["외부 계단"]
+        }
+      ],
+      "sourceIds": [
+        "bigdata119-fire-evacuation-simulation",
+        "bigdata119-walking-distance-images"
+      ],
+      "sourceLabel": "발표용 건물 안전 프로필 샘플",
+      "sourceNotes": [
+        "대형 복합시설 시연을 위한 샘플이다.",
+        "실제 운영 전 행사장 시설관리 도면과 피난 시뮬레이션 결과로 교체해야 한다."
+      ],
+      "sourceUrl": null,
+      "updatedAt": "2026-06-12"
+    }
+  ]
+}
