@@ -58,6 +58,14 @@ export type AppDictionary = {
 };
 
 const koUi = {
+  "password.requirement.length": "12자 이상",
+  "password.requirement.lowercase": "소문자 포함",
+  "password.requirement.met": "충족됨",
+  "password.requirement.missing": "미충족",
+  "password.requirement.number": "숫자 포함",
+  "password.requirement.symbol": "특수문자 포함",
+  "password.requirement.title": "비밀번호 요구 조건",
+  "password.requirement.uppercase": "대문자 포함",
   "% 사용, 리셋": "% 사용, 리셋",
   "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.":
     "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.",
@@ -279,6 +287,14 @@ const koUi = {
 
 const enUi = {
   ...koUi,
+  "password.requirement.length": "At least 12 characters",
+  "password.requirement.lowercase": "Includes a lowercase letter",
+  "password.requirement.met": "Met",
+  "password.requirement.missing": "Not met",
+  "password.requirement.number": "Includes a number",
+  "password.requirement.symbol": "Includes a symbol",
+  "password.requirement.title": "Password requirements",
+  "password.requirement.uppercase": "Includes an uppercase letter",
   "% 사용, 리셋": "% used, resets",
   "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.":
     "A 5-minute update interval is active. Try again in {duration}.",

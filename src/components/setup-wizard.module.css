@@ -208,6 +208,62 @@
   border-color: #0078d4;
 }
 
+.passwordChecklist {
+  display: grid;
+  gap: 10px;
+  margin: -6px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid #d8e0ea;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.passwordChecklistTitle {
+  color: #334155;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.passwordChecklist ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passwordChecklist li {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.passwordChecklist .passwordRequirementMet {
+  color: #047857;
+}
+
+.passwordChecklist .passwordRequirementMissing {
+  color: #b42318;
+}
+
+.passwordChecklist li svg {
+  flex: 0 0 auto;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 .checkList {
   display: grid;
   gap: 12px;
@@ -336,6 +392,10 @@
   }
 
   .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .passwordChecklist ul {
     grid-template-columns: 1fr;
   }
 

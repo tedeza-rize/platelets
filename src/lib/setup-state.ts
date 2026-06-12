@@ -1,5 +1,6 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
+import { isPasswordValid } from "@/lib/password-policy";
 import {
   databaseFileExists,
   getAppSetting,
@@ -78,8 +79,10 @@ function assertEmail(value: string, label: string) {
 }
 
 function assertPassword(value: string, label: string) {
-  if (value.length < 12) {
-    throw new Error(`${label} password must be at least 12 characters.`);
+  if (!isPasswordValid(value)) {
+    throw new Error(
+      `${label} password must be at least 12 characters and include lowercase, uppercase, number, and special characters.`,
+    );
   }
 }
 

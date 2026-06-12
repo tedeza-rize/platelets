@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserCog,
   Users,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -23,6 +24,12 @@ import {
   useMemo,
   useState,
 } from "react";
+import { type AppDictionary, uiText } from "@/lib/i18n";
+import {
+  getPasswordRequirementResults,
+  isPasswordValid,
+  type PasswordRequirementId,
+} from "@/lib/password-policy";
 import styles from "./setup-wizard.module.css";
 
 type AccountForm = {
@@ -84,13 +91,21 @@ const initialApiKeys: ApiKeysForm = {
   vworldApiKey: "",
 };
 
+const passwordRequirementLabelKeys: Record<PasswordRequirementId, string> = {
+  length: "password.requirement.length",
+  lowercase: "password.requirement.lowercase",
+  number: "password.requirement.number",
+  symbol: "password.requirement.symbol",
+  uppercase: "password.requirement.uppercase",
+};
+
 function validateAccount(account: AccountForm) {
   if (!account.fullName.trim()) return "Full name is required.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account.email.trim())) {
     return "A valid email address is required.";
   }
-  if (account.password.length < 12) {
-    return "Password must be at least 12 characters.";
+  if (!isPasswordValid(account.password)) {
+    return "Password must be at least 12 characters and include lowercase, uppercase, number, and special characters.";
   }
   if (account.password !== account.confirmPassword) {
     return "Passwords do not match.";
@@ -122,7 +137,7 @@ function Field({
   );
 }
 
-export function SetupWizard() {
+export function SetupWizard({ dictionary }: { dictionary: AppDictionary }) {
   const router = useRouter();
   const [stepIndex, setStepIndex] = useState(0);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -410,6 +425,7 @@ export function SetupWizard() {
             {activeStep.id === "sudo" && (
               <AccountStep
                 account={sudo}
+                dictionary={dictionary}
                 description="This developer/operator account controls setup, datasets, logs, schedules, and AI configuration."
                 onChange={updateSudo}
                 title="Create the sudo account"
@@ -419,6 +435,7 @@ export function SetupWizard() {
             {activeStep.id === "admin" && (
               <AccountStep
                 account={admin}
+                dictionary={dictionary}
                 description="This user-facing administrator can access protected operational and AI workflows without sudo privileges."
                 onChange={updateAdmin}
                 title="Create the admin account"
@@ -560,15 +577,19 @@ export function SetupWizard() {
 
 function AccountStep({
   account,
+  dictionary,
   description,
   onChange,
   title,
 }: {
   account: AccountForm;
+  dictionary: AppDictionary;
   description: string;
   onChange: (patch: Partial<AccountForm>) => void;
   title: string;
 }) {
+  const passwordRequirementsId = useId();
+
   return (
     <>
       <h1>{title}</h1>
@@ -590,14 +611,22 @@ function AccountStep({
           />
         </Field>
       </div>
-      <Field label="Password">
+      <label className={styles.field} htmlFor={passwordRequirementsId}>
+        <span>Password</span>
         <input
           autoComplete="new-password"
+          aria-describedby={`${passwordRequirementsId}-requirements`}
+          id={passwordRequirementsId}
           onChange={(event) => onChange({ password: event.target.value })}
           type="password"
           value={account.password}
         />
-      </Field>
+      </label>
+      <PasswordRequirementList
+        dictionary={dictionary}
+        id={`${passwordRequirementsId}-requirements`}
+        password={account.password}
+      />
       <Field label="Confirm password">
         <input
           autoComplete="new-password"
@@ -609,5 +638,56 @@ function AccountStep({
         />
       </Field>
     </>
+  );
+}
+
+function PasswordRequirementList({
+  dictionary,
+  id,
+  password,
+}: {
+  dictionary: AppDictionary;
+  id: string;
+  password: string;
+}) {
+  const requirements = getPasswordRequirementResults(password);
+
+  return (
+    <output aria-live="polite" className={styles.passwordChecklist} id={id}>
+      <span className={styles.passwordChecklistTitle}>
+        {uiText(dictionary, "password.requirement.title")}
+      </span>
+      <ul>
+        {requirements.map((requirement) => {
+          const status = requirement.met
+            ? uiText(dictionary, "password.requirement.met")
+            : uiText(dictionary, "password.requirement.missing");
+
+          return (
+            <li
+              className={
+                requirement.met
+                  ? styles.passwordRequirementMet
+                  : styles.passwordRequirementMissing
+              }
+              key={requirement.id}
+            >
+              {requirement.met ? (
+                <Check aria-hidden="true" size={15} />
+              ) : (
+                <X aria-hidden="true" size={15} />
+              )}
+              <span>
+                {uiText(
+                  dictionary,
+                  passwordRequirementLabelKeys[requirement.id],
+                )}
+              </span>
+              <span className={styles.visuallyHidden}>{status}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </output>
   );
 }
