@@ -31,10 +31,20 @@ type DispatchStation = {
 };
 
 export type EmergencyRouteResult = {
+  baseDurationSeconds?: number;
   coordinates: [number, number][];
   distanceMeters: number;
   durationSeconds: number;
   provider: "astar" | "kakao";
+  traffic?: {
+    averageSpeedKph: number | null;
+    congestionLevel: "congested" | "moderate" | "smooth" | "unknown";
+    durationMultiplier: number;
+    message: string;
+    provider: "its" | "kakao" | "none";
+    sampleCount: number;
+    status: "live" | "unavailable" | "unconfigured";
+  };
 };
 
 type RecommendationResponse = {
@@ -69,6 +79,36 @@ function scenarioFor(patientType: string, symptom: string) {
 
 function minutes(seconds: number) {
   return Math.max(1, Math.round(seconds / 60));
+}
+
+function routeProviderLabel(
+  route: EmergencyRouteResult,
+  t: (key: string) => string,
+) {
+  if (route.provider === "kakao") {
+    return route.traffic?.status === "live"
+      ? t("카카오 교통 반영")
+      : t("카카오맵");
+  }
+
+  return route.traffic?.status === "live"
+    ? t("자체 A* + ITS 교통")
+    : t("자체 A*");
+}
+
+function routeTrafficText(
+  route: EmergencyRouteResult,
+  t: (key: string) => string,
+) {
+  if (!route.traffic) {
+    return null;
+  }
+
+  if (route.traffic.status === "unconfigured") {
+    return t("ITS 교통 API 키 미설정");
+  }
+
+  return route.traffic.message;
 }
 
 export function EmergencyRoutingPanel({
@@ -284,9 +324,12 @@ export function EmergencyRoutingPanel({
       {error ? <p className={styles.emergencyError}>{error}</p> : null}
       {activeRoute ? (
         <p className={styles.emergencyRouteSummary}>
-          {activeRoute.provider === "kakao" ? t("카카오맵") : t("자체 A*")}{" "}
-          {t("경로 ·")} {minutes(activeRoute.durationSeconds)}
+          {routeProviderLabel(activeRoute, t)} {t("경로 ·")}{" "}
+          {minutes(activeRoute.durationSeconds)}
           {t("분 ·")} {(activeRoute.distanceMeters / 1000).toFixed(1)}km
+          {routeTrafficText(activeRoute, t) ? (
+            <> · {routeTrafficText(activeRoute, t)}</>
+          ) : null}
         </p>
       ) : null}
 

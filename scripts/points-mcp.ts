@@ -8,6 +8,10 @@ import { z } from "zod/v4";
 
 const DATASET_SOURCE_IDS = [
   "fire-stations",
+  "fire-safety-targets",
+  "fire-water-sources",
+  "busan-fire-safety-targets",
+  "busan-fire-water-sources",
   "police-stations",
   "aeds",
   "childcare-centers",
@@ -23,6 +27,8 @@ type DatasetSourceType =
   | "childcare"
   | "emergency-medical"
   | "fire"
+  | "fire-safety-target"
+  | "fire-water"
   | "hospital"
   | "pharmacy"
   | "police"
@@ -37,6 +43,22 @@ const DATASET_SOURCES = {
   "fire-stations": {
     label: "소방서/119안전센터",
     type: "fire",
+  },
+  "fire-safety-targets": {
+    label: "소방안전 빅데이터: 특정소방대상물",
+    type: "fire-safety-target",
+  },
+  "fire-water-sources": {
+    label: "소방안전 빅데이터: 소방용수",
+    type: "fire-water",
+  },
+  "busan-fire-safety-targets": {
+    label: "소방안전 빅데이터: 부산 특정소방대상물",
+    type: "fire-safety-target",
+  },
+  "busan-fire-water-sources": {
+    label: "소방안전 빅데이터: 부산 소방용수",
+    type: "fire-water",
   },
   "police-stations": {
     label: "경찰서/지구대/파출소",

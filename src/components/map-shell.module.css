@@ -238,6 +238,77 @@
   outline: 0;
 }
 
+.dimensionButton,
+.dimensionButtonActive {
+  position: absolute;
+  top: 18px;
+  right: 154px;
+  z-index: 950;
+  display: inline-flex;
+  min-width: 68px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 0 9px;
+  box-shadow: var(--control-shadow);
+}
+
+.dimensionButtonActive {
+  border-color: #225ea8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dimensionButton:hover,
+.dimensionButton:focus-visible,
+.dimensionButtonActive:hover,
+.dimensionButtonActive:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.locationButton {
+  position: absolute;
+  top: 18px;
+  right: 232px;
+  z-index: 950;
+  display: inline-flex;
+  min-width: 86px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 0 9px;
+  box-shadow: var(--control-shadow);
+}
+
+.locationButton:hover,
+.locationButton:focus-visible {
+  border-color: var(--focus-ring);
+  color: #1d4ed8;
+  outline: 0;
+}
+
+.locationButton:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .emergencyPanel {
   position: absolute;
   top: 66px;
@@ -673,6 +744,12 @@
   box-shadow: var(--notice-shadow);
 }
 
+.notice strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  line-height: 1.2;
+}
+
 .notice span {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -796,8 +873,13 @@
   display: grid;
   min-width: 220px;
   gap: 10px;
-  color: var(--text-strong);
+  color: #18201c;
   font-family: var(--font-geist-sans);
+}
+
+.popup ::selection {
+  background: #dbeafe;
+  color: #0f172a;
 }
 
 .popupHeader {
@@ -806,19 +888,40 @@
 }
 
 .popupHeader strong {
+  color: #0f172a;
   font-size: 0.96rem;
+  font-weight: 850;
   line-height: 1.25;
 }
 
 .popupHeader span {
-  color: var(--text-muted);
+  color: #334155;
   font-size: 0.78rem;
+  font-weight: 800;
   line-height: 1.2;
 }
 
 .popupDetails {
   display: grid;
   gap: 6px;
+}
+
+.popupSafety {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.popupSafety strong {
+  color: #0f172a;
+  font-size: 0.82rem;
+}
+
+.popupSafety p {
+  color: #475569;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .popupRow {
@@ -830,12 +933,15 @@
 }
 
 .popupRow dt {
-  color: var(--text-muted);
+  color: #475569;
+  font-weight: 800;
 }
 
 .popupRow dd {
   min-width: 0;
-  color: var(--text-strong);
+  color: #111827;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .popupActions {
@@ -975,6 +1081,29 @@
   .sourceMenu {
     top: 12px;
     right: 72px;
+  }
+
+  .dimensionButton,
+  .dimensionButtonActive {
+    top: 54px;
+    right: 164px;
+  }
+
+  .locationButton {
+    top: 54px;
+    right: 240px;
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .locationButton span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .emergencyLauncher {
