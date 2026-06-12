@@ -7,7 +7,7 @@ import type {
 } from "maplibre-gl";
 import type { EmergencyRouteResult } from "@/components/emergency-routing-panel";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
-import type { AppDictionary } from "@/lib/i18n";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 export type MapProvider = "vworld" | "osm";
 
 export type MapShellProps = {
@@ -844,7 +844,10 @@ export function getPolygonCenter(coordinates: number[][][]) {
   ] as [number, number];
 }
 
-export function createSeoulAreaPointData(areas: SeoulAreasData) {
+export function createSeoulAreaPointData(
+  areas: SeoulAreasData,
+  dictionary: AppDictionary,
+) {
   return {
     features: areas.features.map((feature) => {
       const [longitude, latitude] = getPolygonCenter(
@@ -854,6 +857,7 @@ export function createSeoulAreaPointData(areas: SeoulAreasData) {
         formatPopulationRangeValues(
           feature.properties.minPopulation,
           feature.properties.maxPopulation,
+          dictionary,
         ) ?? "";
 
       return {
@@ -969,27 +973,40 @@ export function formatDateTime(value: string | null) {
   return `${formatted} KST`;
 }
 
-export function hazardTypeLabel(eventType: HazardEvent["eventType"]) {
-  return eventType === "earthquake" ? "지진" : "지진해일";
+export function hazardTypeLabel(
+  eventType: HazardEvent["eventType"],
+  dictionary: AppDictionary,
+) {
+  return eventType === "earthquake"
+    ? uiText(dictionary, "지진")
+    : uiText(dictionary, "지진해일");
 }
 
 export function formatPopulationRangeValues(
   minPopulation: number | null | undefined,
   maxPopulation: number | null | undefined,
+  dictionary: AppDictionary,
 ) {
   if (typeof minPopulation !== "number" || typeof maxPopulation !== "number") {
     return null;
   }
 
   return `${minPopulation.toLocaleString(
-    "ko-KR",
-  )} - ${maxPopulation.toLocaleString("ko-KR")}명`;
+    dictionary.formatLocale,
+  )} - ${maxPopulation.toLocaleString(dictionary.formatLocale)}${uiText(
+    dictionary,
+    "명",
+  )}`;
 }
 
-export function formatPopulationRange(population: SeoulPopulationStatus) {
+export function formatPopulationRange(
+  population: SeoulPopulationStatus,
+  dictionary: AppDictionary,
+) {
   return formatPopulationRangeValues(
     population.minPopulation,
     population.maxPopulation,
+    dictionary,
   );
 }
 
@@ -1044,14 +1061,18 @@ export function buildSeoulPopulationPopupHtml(
   area: SeoulAreaProperties,
   population: SeoulPopulationStatus | null,
   error: string | null,
+  dictionary: AppDictionary,
   classNames: PopupClassNames,
 ) {
   const rows = error
-    ? [["상태", error]]
+    ? [[uiText(dictionary, "상태"), error]]
     : [
-        ["예상 인원", population ? formatPopulationRange(population) : null],
-        ["기준 시각", population?.populationTime],
-        ["분류", area.category],
+        [
+          uiText(dictionary, "예상 인원"),
+          population ? formatPopulationRange(population, dictionary) : null,
+        ],
+        [uiText(dictionary, "기준 시각"), population?.populationTime],
+        [uiText(dictionary, "분류"), area.category],
       ];
   const rowsHtml = rows
     .filter((row): row is [string, string] => Boolean(row[1]))
@@ -1065,7 +1086,9 @@ export function buildSeoulPopulationPopupHtml(
 
   return `<article class="${classNames.popup}">
     <div class="${classNames.popupHeader}">
-      <strong>${escapeHtml(`[서울 실시간 인구] ${area.areaName}`)}</strong>
+      <strong>${escapeHtml(
+        `[${uiText(dictionary, "서울 실시간 인구")}] ${area.areaName}`,
+      )}</strong>
       <span>${escapeHtml(area.category)}</span>
     </div>
     <dl class="${classNames.popupDetails}">${rowsHtml}</dl>
@@ -1349,12 +1372,13 @@ export function syncPointLayerWhenReady(
 export function syncSeoulAreaLayer(
   map: MapLibreMap,
   areas: SeoulAreasData | null,
+  dictionary: AppDictionary,
 ) {
   if (!areas || !map.isStyleLoaded()) {
     return;
   }
 
-  const areaData = createSeoulAreaPointData(areas);
+  const areaData = createSeoulAreaPointData(areas, dictionary);
   const source = map.getSource(SEOUL_AREAS_SOURCE_ID) as
     | GeoJSONSource
     | undefined;
@@ -1375,13 +1399,13 @@ export function syncSeoulAreaLayer(
         "circle-color": [
           "match",
           ["get", "congestionLevel"],
-          "붐빔",
+          uiText(dictionary, "붐빔"),
           "#dc2626",
-          "약간 붐빔",
+          uiText(dictionary, "약간 붐빔"),
           "#f97316",
-          "보통",
+          uiText(dictionary, "보통"),
           "#eab308",
-          "여유",
+          uiText(dictionary, "여유"),
           "#16a34a",
           "#2563eb",
         ],
@@ -1400,13 +1424,13 @@ export function syncSeoulAreaLayer(
         "circle-color": [
           "match",
           ["get", "congestionLevel"],
-          "붐빔",
+          uiText(dictionary, "붐빔"),
           "#dc2626",
-          "약간 붐빔",
+          uiText(dictionary, "약간 붐빔"),
           "#f97316",
-          "보통",
+          uiText(dictionary, "보통"),
           "#eab308",
-          "여유",
+          uiText(dictionary, "여유"),
           "#16a34a",
           "#2563eb",
         ],
@@ -1443,13 +1467,14 @@ export function syncSeoulAreaLayer(
 export function syncSeoulAreaLayerWhenReady(
   map: MapLibreMap,
   areas: SeoulAreasData | null,
+  dictionary: AppDictionary,
 ) {
   if (map.isStyleLoaded()) {
-    syncSeoulAreaLayer(map, areas);
+    syncSeoulAreaLayer(map, areas, dictionary);
     return;
   }
 
-  runWhenStyleReady(map, () => syncSeoulAreaLayer(map, areas));
+  runWhenStyleReady(map, () => syncSeoulAreaLayer(map, areas, dictionary));
 }
 
 export function syncHazardLayer(map: MapLibreMap, events: HazardEvent[]) {
