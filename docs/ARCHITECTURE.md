@@ -86,7 +86,9 @@ nearest-point, ranking, and grounding tools. Tool results exclude raw JSON.
 - Public: summarized map, hazards, congestion, recommendation, and routing
 - Admin: AI query access
 - Sudo: imports, schedules, detailed logs, quotas, NTP, and AI configuration
-- Secrets: environment variables only
+- Secrets: API keys are encrypted in SQLite with AES-256-GCM using
+  `PLATELETS_SECRET_KEY` or a generated local secret file; real keys still must
+  never be committed
 - External routing: South Korea coordinates and per-process rate limits
 - AI proxy: HTTPS only; credentials in URLs and private DNS/IP targets blocked
 - HTML: popup builders escape source text; AI output renders as plain text
