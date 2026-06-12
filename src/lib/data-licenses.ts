@@ -25,11 +25,12 @@ export const DATA_LICENSE_ENTRIES = [
     id: "vworld-map-tiles",
     license: "브이월드 이용약관 및 오픈API 이용정책 준수",
     notes:
-      "브이월드 API 키는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로만 주입한다. 타일 저작권 표기는 지도 attribution에 유지한다.",
+      "브이월드 API 키는 설치 설정 DB 또는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로 주입한다. 벡터 모드는 https://api.vworld.kr/req/wmts/vector/... 타일을, 레스터 모드는 https://api.vworld.kr/req/wmts/1.0.0/... 타일을 사용하며 지도 attribution을 유지한다.",
     provider: "공간정보산업진흥원 / 브이월드",
     sourceName: "브이월드 WMTS 배경지도, 교통, POI 벡터 타일",
     sourceUrl: "https://www.vworld.kr/",
-    usage: "기본 지도 배경, 도로/POI 지도 레이어",
+    usage:
+      "관리자 설정으로 선택하는 브이월드 레스터/벡터 기본 지도와 도로 벡터 레이어",
   },
   {
     id: "openfreemap-openstreetmap",
@@ -42,6 +43,22 @@ export const DATA_LICENSE_ENTRIES = [
     sourceUrl: "https://openfreemap.org/",
     usage:
       "OSM 지도 배경과 지명/도로/건물 레이어, 자체 도로 경로 계산과 ITS 교통 보정 기반 ETA",
+  },
+  {
+    id: "openstreetmap-official-vector-tiles",
+    license: "OpenStreetMap ODbL 및 OSMF Vector Tile Usage Policy 준수",
+    notes:
+      "현재 shortbread_v1 tilejson을 사용한다. OSMF 정책의 attribution과 타일 사용 제한을 유지하며, 스키마는 OpenMapTiles가 아닌 Shortbread라 별도 MapLibre 스타일을 사용한다.",
+    provider: "OpenStreetMap Foundation / OpenStreetMap contributors",
+    sourceName: "OpenStreetMap 공식 Shortbread 벡터 타일",
+    sourceUrl: "https://operations.osmfoundation.org/policies/vector/",
+    sourceUrls: [
+      {
+        label: "Shortbread tilejson",
+        url: "https://vector.openstreetmap.org/shortbread_v1/tilejson.json",
+      },
+    ],
+    usage: "관리자 설정으로 선택하는 OSM 공식 벡터 기본 지도",
   },
   {
     id: "kakao-mobility-directions",

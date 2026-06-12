@@ -78,6 +78,10 @@ export type SetupPayload = {
 const SETUP_STATE_KEY = "setup-state";
 const PASSWORD_ITERATIONS = 210_000;
 const PASSWORD_KEY_LENGTH = 32;
+const ROLE_LABELS: Record<SetupRole, string> = {
+  admin: "operator",
+  sudo: "administrator",
+};
 
 const EMPTY_API_KEYS: SetupApiKeys = {
   kakaoMobilityRestApiKey: "",
@@ -192,15 +196,16 @@ function accountFromPayload(
   role: SetupRole,
   input: SetupPayload[SetupRole],
 ): SetupAccount {
+  const label = ROLE_LABELS[role];
   const fullName = cleanText(input.fullName, 120);
   const email = cleanText(input.email, 200).toLowerCase();
   const password = String(input.password ?? "");
 
   if (!fullName) {
-    throw new Error(`${role} full name is required.`);
+    throw new Error(`${label} full name is required.`);
   }
-  assertEmail(email, role);
-  assertPassword(password, role);
+  assertEmail(email, label);
+  assertPassword(password, label);
 
   return {
     email,
