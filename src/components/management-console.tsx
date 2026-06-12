@@ -3,9 +3,11 @@
 import {
   AlertTriangle,
   BookOpen,
+  Building2,
   ClipboardList,
   Clock3,
   Database,
+  Droplets,
   Flame,
   GraduationCap,
   HeartPulse,
@@ -183,6 +185,20 @@ function statusClassName(status: ApiLogEntry["status"]) {
 function datasetIcon(source: DatasetSourceId) {
   if (source === "fire-stations") {
     return <Flame aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
+  if (
+    source === "fire-safety-targets" ||
+    source === "busan-fire-safety-targets"
+  ) {
+    return <Building2 aria-hidden="true" size={16} strokeWidth={2.4} />;
+  }
+
+  if (
+    source === "fire-water-sources" ||
+    source === "busan-fire-water-sources"
+  ) {
+    return <Droplets aria-hidden="true" size={16} strokeWidth={2.4} />;
   }
 
   if (source === "police-stations") {

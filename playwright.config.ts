@@ -24,11 +24,11 @@ const projects = browserChannel
     ];
 
 export default defineConfig({
-  testDir: "./tests/e2e",
   fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  projects,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  retries: process.env.CI ? 2 : 0,
+  testDir: "./tests/e2e",
   use: {
     baseURL,
     trace: "on-first-retry",
@@ -39,9 +39,9 @@ export default defineConfig({
       ...process.env,
       PLATELETS_DATA_DIR: e2eDataDir,
     },
-    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    url: baseURL,
   },
-  projects,
+  workers: process.env.CI ? 1 : undefined,
 });

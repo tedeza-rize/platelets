@@ -1,5 +1,10 @@
 import { getOperationalSettings } from "@/lib/operational-settings";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
+import {
+  fetchItsTrafficSummary,
+  kakaoTrafficSummary,
+  type TrafficSummary,
+} from "@/lib/traffic/realtime-traffic-service";
 
 type Coordinate = {
   latitude: number;
@@ -9,10 +14,12 @@ type Coordinate = {
 export type RouteProvider = "astar" | "kakao";
 
 export type EmergencyRoute = {
+  baseDurationSeconds: number;
   coordinates: [number, number][];
   distanceMeters: number;
   durationSeconds: number;
   provider: RouteProvider;
+  traffic: TrafficSummary;
 };
 
 type OverpassElement = {
@@ -385,6 +392,7 @@ async function routeWithAstar(
       }
 
       return {
+        baseDurationSeconds: Math.round(gScore.get(goalId) ?? 0),
         coordinates: [
           [origin.longitude, origin.latitude],
           ...coordinates,
@@ -393,6 +401,17 @@ async function routeWithAstar(
         distanceMeters: Math.round(distanceMeters),
         durationSeconds: Math.round(gScore.get(goalId) ?? 0),
         provider: "astar",
+        traffic: {
+          averageSpeedKph: null,
+          baseDurationSeconds: Math.round(gScore.get(goalId) ?? 0),
+          congestionLevel: "unknown",
+          durationMultiplier: 1,
+          message: "실시간 교통 보정 전 기준 A* 경로",
+          provider: "none",
+          sampleCount: 0,
+          status: "unconfigured",
+          updatedAt: null,
+        },
       };
     }
 
@@ -483,10 +502,38 @@ async function routeWithKakao(
   }
 
   return {
+    baseDurationSeconds: Math.round(route.summary?.duration ?? 0),
     coordinates,
     distanceMeters: Math.round(route.summary?.distance ?? 0),
     durationSeconds: Math.round(route.summary?.duration ?? 0),
     provider: "kakao",
+    traffic: kakaoTrafficSummary(Math.round(route.summary?.duration ?? 0)),
+  };
+}
+
+async function applyTrafficAdjustment(
+  route: EmergencyRoute,
+  origin: Coordinate,
+  destination: Coordinate,
+) {
+  if (route.provider === "kakao") {
+    return route;
+  }
+
+  const traffic = await fetchItsTrafficSummary({
+    baseDurationSeconds: route.baseDurationSeconds,
+    destination,
+    distanceMeters: route.distanceMeters,
+    origin,
+  });
+
+  return {
+    ...route,
+    durationSeconds: Math.max(
+      1,
+      Math.round(route.baseDurationSeconds * traffic.durationMultiplier),
+    ),
+    traffic,
   };
 }
 
@@ -498,9 +545,12 @@ export async function calculateEmergencyRoute(params: {
   assertCoordinate(params.origin);
   assertCoordinate(params.destination);
 
-  return params.provider === "kakao"
-    ? routeWithKakao(params.origin, params.destination)
-    : routeWithAstar(params.origin, params.destination);
+  const route =
+    params.provider === "kakao"
+      ? routeWithKakao(params.origin, params.destination)
+      : routeWithAstar(params.origin, params.destination);
+
+  return applyTrafficAdjustment(await route, params.origin, params.destination);
 }
 
 export async function hasKakaoMobilityKey() {
