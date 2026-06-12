@@ -19,7 +19,7 @@ import {
 import Image from "next/image";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
-import type { AppDictionary } from "@/lib/i18n";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
 import styles from "./map-shell.module.css";
 
@@ -70,6 +70,7 @@ type DatasetPanelProps = {
 type HazardModalProps = {
   activeHazard: mapCore.HazardEvent;
   activeHazardImageUrl: string | null;
+  dictionary: AppDictionary;
   onClose: () => void;
 };
 
@@ -96,13 +97,13 @@ export function MapNavbar({
       </a>
       <div className={styles.desktopLinks}>
         <a className={styles.desktopLinkActive} href="/">
-          지도
+          {uiText(dictionary, "지도")}
         </a>
         <a className={styles.desktopLink} href="/ai">
-          AI 분석
+          {uiText(dictionary, "AI 분석")}
         </a>
         <a className={styles.desktopLink} href="/admin">
-          관리자
+          {uiText(dictionary, "관리자")}
         </a>
       </div>
       <div className={styles.navActions}>
@@ -112,13 +113,13 @@ export function MapNavbar({
           type="button"
         >
           <Search aria-hidden="true" size={18} strokeWidth={2.2} />
-          <span>시설 검색</span>
+          <span>{uiText(dictionary, "시설 검색")}</span>
         </button>
         <a
-          aria-label="데이터 출처 및 라이선스"
+          aria-label={uiText(dictionary, "데이터 출처 및 라이선스")}
           className={styles.navIconLink}
           href="/licenses"
-          title="데이터 출처 및 라이선스"
+          title={uiText(dictionary, "데이터 출처 및 라이선스")}
         >
           <ShieldCheck aria-hidden="true" size={18} strokeWidth={2.5} />
         </a>
@@ -146,10 +147,10 @@ export function MobileMapTools({
   return (
     <div className={styles.mobileMapTools} ref={mobileProviderMenuRef}>
       <a
-        aria-label="데이터 출처 및 라이선스"
+        aria-label={uiText(providerProps.dictionary, "데이터 출처 및 라이선스")}
         className={styles.mobileToolButton}
         href="/licenses"
-        title="데이터 출처 및 라이선스"
+        title={uiText(providerProps.dictionary, "데이터 출처 및 라이선스")}
       >
         <ShieldCheck aria-hidden="true" size={18} strokeWidth={2.5} />
       </a>
@@ -203,10 +204,10 @@ export function SourceMenu({
           </legend>
           <label className={styles.sourceSearch}>
             <Search aria-hidden="true" size={15} strokeWidth={2.4} />
-            <span>표시 항목 검색</span>
+            <span>{uiText(dictionary, "표시 항목 검색")}</span>
             <input
               onChange={(event) => setSourceQuery(event.target.value)}
-              placeholder="검색"
+              placeholder={uiText(dictionary, "검색")}
               ref={sourceSearchInputRef}
               type="search"
               value={sourceQuery}
@@ -239,7 +240,9 @@ export function SourceMenu({
               </label>
             ))}
             {filteredDatasets.length === 0 ? (
-              <p className={styles.sourceEmpty}>검색 결과가 없습니다.</p>
+              <p className={styles.sourceEmpty}>
+                {uiText(dictionary, "검색 결과가 없습니다.")}
+              </p>
             ) : null}
           </div>
           <label className={styles.settingItem}>
@@ -249,7 +252,7 @@ export function SourceMenu({
               type="checkbox"
             />
             <Settings aria-hidden="true" size={15} strokeWidth={2.4} />
-            <span>이벤트 발생 시 지도 이동</span>
+            <span>{uiText(dictionary, "이벤트 발생 시 지도 이동")}</span>
           </label>
         </fieldset>
       ) : null}
@@ -287,7 +290,7 @@ export function DatasetPanel({
         <span className={styles.datasetMetric}>
           <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
           <span>{hazardsCount.toLocaleString("ko-KR")}</span>
-          <span>최근 이벤트</span>
+          <span>{uiText(dictionary, "최근 이벤트")}</span>
         </span>
       </div>
 
@@ -303,6 +306,7 @@ export function DatasetPanel({
 export function HazardModal({
   activeHazard,
   activeHazardImageUrl,
+  dictionary,
   onClose,
 }: HazardModalProps) {
   return (
@@ -315,11 +319,13 @@ export function HazardModal({
       >
         <div className={styles.hazardHeader}>
           <div>
-            <span>{mapCore.hazardTypeLabel(activeHazard.eventType)}</span>
+            <span>
+              {mapCore.hazardTypeLabel(activeHazard.eventType, dictionary)}
+            </span>
             <h2 id="hazard-modal-title">{activeHazard.title}</h2>
           </div>
           <button
-            aria-label="이벤트 정보 닫기"
+            aria-label={uiText(dictionary, "이벤트 정보 닫기")}
             className={styles.modalCloseButton}
             onClick={onClose}
             type="button"
@@ -329,27 +335,27 @@ export function HazardModal({
         </div>
         <dl className={styles.hazardDetails}>
           <div>
-            <dt>통보 시각</dt>
+            <dt>{uiText(dictionary, "통보 시각")}</dt>
             <dd>{mapCore.formatDateTime(activeHazard.issuedAt) ?? "-"}</dd>
           </div>
           <div>
-            <dt>발생 시각</dt>
+            <dt>{uiText(dictionary, "발생 시각")}</dt>
             <dd>{mapCore.formatDateTime(activeHazard.occurredAt) ?? "-"}</dd>
           </div>
           <div>
-            <dt>위치</dt>
+            <dt>{uiText(dictionary, "위치")}</dt>
             <dd>{activeHazard.location}</dd>
           </div>
           <div>
-            <dt>규모</dt>
+            <dt>{uiText(dictionary, "규모")}</dt>
             <dd>{activeHazard.magnitude ?? "-"}</dd>
           </div>
           <div>
-            <dt>진도/지역</dt>
+            <dt>{uiText(dictionary, "진도/지역")}</dt>
             <dd>{activeHazard.intensity ?? "-"}</dd>
           </div>
           <div>
-            <dt>깊이</dt>
+            <dt>{uiText(dictionary, "깊이")}</dt>
             <dd>{activeHazard.depth ?? "-"}</dd>
           </div>
         </dl>
@@ -359,7 +365,7 @@ export function HazardModal({
         {activeHazardImageUrl ? (
           <figure className={styles.hazardImageFrame}>
             <Image
-              alt={`${activeHazard.title} 기상청 관측 이미지`}
+              alt={`${activeHazard.title} ${uiText(dictionary, "기상청 관측 이미지")}`}
               className={styles.hazardImage}
               height={800}
               loading="lazy"
@@ -367,7 +373,7 @@ export function HazardModal({
               unoptimized
               width={1200}
             />
-            <figcaption>기상청 제공 이미지</figcaption>
+            <figcaption>{uiText(dictionary, "기상청 제공 이미지")}</figcaption>
           </figure>
         ) : null}
       </section>
@@ -376,19 +382,24 @@ export function HazardModal({
 }
 
 export function MobileNav({
+  dictionary,
   onOpenSourceSearch,
 }: {
+  dictionary: AppDictionary;
   onOpenSourceSearch: () => void;
 }) {
   return (
-    <nav className={styles.mobileNav} aria-label="모바일 주요 탐색">
+    <nav
+      className={styles.mobileNav}
+      aria-label={uiText(dictionary, "모바일 주요 탐색")}
+    >
       <a className={styles.mobileNavActive} href="/">
         <MapIcon aria-hidden="true" size={20} strokeWidth={2.5} />
-        <span>지도</span>
+        <span>{uiText(dictionary, "지도")}</span>
       </a>
       <button onClick={onOpenSourceSearch} type="button">
         <Search aria-hidden="true" size={20} strokeWidth={2.5} />
-        <span>시설</span>
+        <span>{uiText(dictionary, "시설")}</span>
       </button>
       <a href="/ai">
         <Sparkles aria-hidden="true" size={20} strokeWidth={2.5} />
@@ -396,7 +407,7 @@ export function MobileNav({
       </a>
       <a href="/admin">
         <UserCog aria-hidden="true" size={20} strokeWidth={2.5} />
-        <span>관리</span>
+        <span>{uiText(dictionary, "관리")}</span>
       </a>
     </nav>
   );

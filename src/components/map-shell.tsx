@@ -372,8 +372,8 @@ export function MapShell({
       return;
     }
 
-    mapCore.syncSeoulAreaLayerWhenReady(mapRef.current, seoulAreas);
-  }, [seoulAreas]);
+    mapCore.syncSeoulAreaLayerWhenReady(mapRef.current, seoulAreas, dictionary);
+  }, [dictionary, seoulAreas]);
 
   useEffect(() => {
     pointsRef.current = visiblePoints;
@@ -539,7 +539,11 @@ export function MapShell({
             mapCore.buildSeoulPopulationPopupHtml(
               area,
               population,
-              population ? null : (payload.error ?? "실시간 인구 조회 실패"),
+              population
+                ? null
+                : (payload.error ??
+                    uiText(dictionary, "실시간 인구 조회 실패")),
+              dictionary,
               popupClassNames,
             ),
           )
@@ -636,7 +640,11 @@ export function MapShell({
 
       map.once("load", () => {
         setIsMapReady(true);
-        mapCore.syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
+        mapCore.syncSeoulAreaLayerWhenReady(
+          map,
+          seoulAreasRef.current,
+          dictionary,
+        );
         mapCore.syncPointLayerWhenReady(map, pointsRef.current);
         mapCore.syncHazardLayerWhenReady(map, hazardsRef.current);
         mapCore.syncEmergencyRouteLayerWhenReady(
@@ -670,7 +678,11 @@ export function MapShell({
       const style = mapCore.createMapStyle(activeProvider, vworldApiKey);
       const syncOverlays = () => {
         map.resize();
-        mapCore.syncSeoulAreaLayerWhenReady(map, seoulAreasRef.current);
+        mapCore.syncSeoulAreaLayerWhenReady(
+          map,
+          seoulAreasRef.current,
+          dictionary,
+        );
         mapCore.syncPointLayerWhenReady(map, pointsRef.current);
         mapCore.syncHazardLayerWhenReady(map, hazardsRef.current);
         mapCore.syncEmergencyRouteLayerWhenReady(
@@ -705,7 +717,7 @@ export function MapShell({
         window.clearTimeout(timeoutId);
       }
     };
-  }, [activeProvider, vworldApiKey]);
+  }, [activeProvider, dictionary, vworldApiKey]);
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -837,11 +849,15 @@ export function MapShell({
           <HazardModal
             activeHazard={activeHazard}
             activeHazardImageUrl={activeHazardImageUrl}
+            dictionary={dictionary}
             onClose={() => setActiveHazard(null)}
           />
         ) : null}
       </main>
-      <MobileNav onOpenSourceSearch={openSourceSearch} />
+      <MobileNav
+        dictionary={dictionary}
+        onOpenSourceSearch={openSourceSearch}
+      />
     </div>
   );
 }
