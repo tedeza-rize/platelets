@@ -566,50 +566,6 @@ export function SetupWizard({
                 <span>{copy["brand.subtitle"]}</span>
               </div>
             </div>
-
-            <div className={styles.controls}>
-              <fieldset
-                aria-label={copy["controls.language"]}
-                className={styles.segmented}
-              >
-                <button
-                  aria-pressed={locale === "ko"}
-                  onClick={() => changeLocale("ko")}
-                  type="button"
-                >
-                  <Languages aria-hidden="true" size={15} />
-                  {copy["language.ko"]}
-                </button>
-                <button
-                  aria-pressed={locale === "en"}
-                  onClick={() => changeLocale("en")}
-                  type="button"
-                >
-                  {copy["language.en"]}
-                </button>
-              </fieldset>
-              <fieldset
-                aria-label={copy["controls.theme"]}
-                className={styles.segmented}
-              >
-                <button
-                  aria-pressed={theme === "light"}
-                  onClick={() => changeTheme("light")}
-                  type="button"
-                >
-                  <Sun aria-hidden="true" size={15} />
-                  {copy["theme.light"]}
-                </button>
-                <button
-                  aria-pressed={theme === "dark"}
-                  onClick={() => changeTheme("dark")}
-                  type="button"
-                >
-                  <Moon aria-hidden="true" size={15} />
-                  {copy["theme.dark"]}
-                </button>
-              </fieldset>
-            </div>
           </div>
 
           <ol className={styles.steps}>
@@ -642,6 +598,56 @@ export function SetupWizard({
         </aside>
 
         <div className={styles.content}>
+          <div className={styles.controls}>
+            <fieldset
+              aria-label={copy["controls.language"]}
+              className={styles.segmented}
+            >
+              <button
+                aria-label={copy["language.ko"]}
+                aria-pressed={locale === "ko"}
+                onClick={() => changeLocale("ko")}
+                title={copy["controls.language"]}
+                type="button"
+              >
+                <Languages aria-hidden="true" size={15} />
+                <span>{copy["language.ko"]}</span>
+              </button>
+              <button
+                aria-label={copy["language.en"]}
+                aria-pressed={locale === "en"}
+                onClick={() => changeLocale("en")}
+                title={copy["controls.language"]}
+                type="button"
+              >
+                <Languages aria-hidden="true" size={15} />
+                <span>{copy["language.en"]}</span>
+              </button>
+            </fieldset>
+            <fieldset
+              aria-label={copy["controls.theme"]}
+              className={styles.segmented}
+            >
+              <button
+                aria-label={copy["theme.light"]}
+                aria-pressed={theme === "light"}
+                onClick={() => changeTheme("light")}
+                title={copy["theme.light"]}
+                type="button"
+              >
+                <Sun aria-hidden="true" size={15} />
+              </button>
+              <button
+                aria-label={copy["theme.dark"]}
+                aria-pressed={theme === "dark"}
+                onClick={() => changeTheme("dark")}
+                title={copy["theme.dark"]}
+                type="button"
+              >
+                <Moon aria-hidden="true" size={15} />
+              </button>
+            </fieldset>
+          </div>
           <div className={styles.mainPanel}>
             <span className={styles.eyebrow}>
               {t("status.step", {
