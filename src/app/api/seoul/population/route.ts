@@ -46,6 +46,7 @@ type CacheEntry = {
 };
 
 const SEOUL_CITYDATA_CACHE_MS = 60_000;
+const SEOUL_CITYDATA_TIMEOUT_MS = 10_000;
 const seoulPopulationCache = new Map<string, CacheEntry>();
 
 async function getSeoulOpenApiKey() {
@@ -172,7 +173,19 @@ export async function GET(request: NextRequest) {
       apiKey,
     )}/json/citydata_ppltn/1/5/${encodeURIComponent(area.areaName)}`,
   );
-  const response = await fetch(url, { cache: "no-store" });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(SEOUL_CITYDATA_TIMEOUT_MS),
+    });
+  } catch {
+    return noStoreJson(
+      { error: "Seoul citydata request failed" },
+      { status: 502 },
+    );
+  }
 
   if (!response.ok) {
     return noStoreJson(
@@ -181,7 +194,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const payload = (await response.json()) as unknown;
+  let payload: unknown;
+
+  try {
+    payload = await response.json();
+  } catch {
+    return noStoreJson(
+      { error: "Seoul citydata request failed" },
+      { status: 502 },
+    );
+  }
+
   const row = findCitydataRow(payload);
 
   if (!row) {
