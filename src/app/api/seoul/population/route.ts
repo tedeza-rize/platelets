@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
   }
 
   const url = new URL(
-    `http://openapi.seoul.go.kr:8088/${encodeURIComponent(
+    `https://openapi.seoul.go.kr:8088/${encodeURIComponent(
       apiKey,
     )}/json/citydata_ppltn/1/5/${encodeURIComponent(area.areaName)}`,
   );
