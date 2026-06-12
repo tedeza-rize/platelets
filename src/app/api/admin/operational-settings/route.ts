@@ -23,9 +23,16 @@ export async function PUT(request: Request) {
     settings?: unknown;
   } | null;
 
-  return noStoreJson({
-    settings: await saveOperationalSettings(
-      (payload?.settings ?? {}) as Record<string, unknown>,
-    ),
-  });
+  try {
+    return noStoreJson({
+      settings: await saveOperationalSettings(
+        (payload?.settings ?? {}) as Record<string, unknown>,
+      ),
+    });
+  } catch (error) {
+    return noStoreJson(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 400 },
+    );
+  }
 }

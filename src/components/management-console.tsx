@@ -937,6 +937,70 @@ export function ManagementConsole({
                 {t("데이터셋 자동 갱신")}
               </label>
               <label className={styles.fieldLabel}>
+                {t("기본 지도 제공자")}
+                <select
+                  className={styles.textInput}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            mapProvider: event.target.value as "osm" | "vworld",
+                          }
+                        : current,
+                    )
+                  }
+                  value={operationalSettings.mapProvider}
+                >
+                  <option value="osm">{t("OSM")}</option>
+                  <option value="vworld">{t("브이월드")}</option>
+                </select>
+              </label>
+              <label className={styles.fieldLabel}>
+                {t("지도 타일 방식")}
+                <select
+                  className={styles.textInput}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            mapTileMode: event.target.value as
+                              | "raster"
+                              | "vector",
+                          }
+                        : current,
+                    )
+                  }
+                  value={operationalSettings.mapTileMode}
+                >
+                  <option value="vector">{t("벡터")}</option>
+                  <option value="raster">{t("레스터")}</option>
+                </select>
+              </label>
+              <label className={styles.fieldLabel}>
+                {t("OSM 타일 소스")}
+                <select
+                  className={styles.textInput}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            osmTileSource: event.target.value as
+                              | "official"
+                              | "openfreemap",
+                          }
+                        : current,
+                    )
+                  }
+                  value={operationalSettings.osmTileSource}
+                >
+                  <option value="openfreemap">OpenFreeMap</option>
+                  <option value="official">{t("OSM 공식")}</option>
+                </select>
+              </label>
+              <label className={styles.fieldLabel}>
                 {t("지진 API 폴링 간격(ms)")}
                 <input
                   className={styles.textInput}

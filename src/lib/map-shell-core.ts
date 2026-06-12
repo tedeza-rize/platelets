@@ -8,11 +8,20 @@ import type {
 import type { EmergencyRouteResult } from "@/components/emergency-routing-panel";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
-export type MapProvider = "vworld" | "osm";
+import {
+  DEFAULT_MAP_RENDERING_SETTINGS,
+  type MapProvider,
+  type MapRenderingSettings,
+  type MapTileMode,
+  type OsmTileSource,
+} from "@/lib/map-settings";
+
+export type { MapProvider };
 
 export type MapShellProps = {
   dictionary: AppDictionary;
   initialProvider: MapProvider;
+  mapSettings?: MapRenderingSettings;
   vworldApiKey: string;
 };
 
@@ -124,6 +133,7 @@ export const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
 export const VWORLD_BASE_SOURCE_ID = "vworld-base";
 export const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
 export const OPENFREEMAP_SOURCE_ID = "openmaptiles";
+export const OSM_OFFICIAL_SOURCE_ID = "osm-shortbread";
 export const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
   "childcare-centers": "#db2777",
@@ -370,14 +380,21 @@ export function createVworldTileUrl(path: string, vworldApiKey: string) {
   )}`;
 }
 
+export function createVworldRasterTileUrl(vworldApiKey: string) {
+  return `https://api.vworld.kr/req/wmts/1.0.0/${vworldApiKey}/Base/{z}/{y}/{x}.png`;
+}
+
 export function createVworldVectorTileUrl(
-  layer: "traffic",
+  layer: "poi" | "traffic",
   vworldApiKey: string,
 ) {
   return `https://api.vworld.kr/req/wmts/vector/getTile/${vworldApiKey}/${layer}/{z}/{x}/{y}.pbf`;
 }
 
-export function createVworldStyle(vworldApiKey: string): StyleSpecification {
+export function createVworldStyle(
+  vworldApiKey: string,
+  mapTileMode: MapTileMode = DEFAULT_MAP_RENDERING_SETTINGS.mapTileMode,
+): StyleSpecification {
   if (!vworldApiKeyExists(vworldApiKey)) {
     return {
       glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
@@ -389,6 +406,36 @@ export function createVworldStyle(vworldApiKey: string): StyleSpecification {
         },
       ],
       sources: {},
+      version: 8,
+    } as StyleSpecification;
+  }
+
+  if (mapTileMode === "raster") {
+    return {
+      glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+      layers: [
+        {
+          id: "background",
+          paint: { "background-color": VECTOR_PALETTES.vworld.background },
+          type: "background",
+        },
+        {
+          id: "vworld-base-raster",
+          source: VWORLD_BASE_SOURCE_ID,
+          type: "raster",
+        },
+      ],
+      sources: {
+        [VWORLD_BASE_SOURCE_ID]: {
+          attribution:
+            '<a href="https://www.vworld.kr" target="_blank">&copy; VWorld</a>',
+          maxzoom: 19,
+          minzoom: 6,
+          tileSize: 256,
+          tiles: [createVworldRasterTileUrl(vworldApiKey)],
+          type: "raster",
+        },
+      },
       version: 8,
     } as StyleSpecification;
   }
@@ -455,7 +502,197 @@ export function vworldApiKeyExists(vworldApiKey: string) {
   return vworldApiKey.length > 0;
 }
 
-export function createOsmStyle(): StyleSpecification {
+export function createOsmOfficialStyle(): StyleSpecification {
+  const palette = VECTOR_PALETTES.osm;
+
+  return {
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+    layers: [
+      {
+        id: "background",
+        paint: { "background-color": palette.background },
+        type: "background",
+      },
+      {
+        id: "ocean",
+        paint: { "fill-color": palette.water },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "ocean",
+        type: "fill",
+      },
+      {
+        id: "land",
+        paint: { "fill-color": palette.land },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "land",
+        type: "fill",
+      },
+      {
+        id: "sites",
+        minzoom: 12,
+        paint: {
+          "fill-color": [
+            "match",
+            ["get", "kind"],
+            "park",
+            palette.park,
+            "hospital",
+            "#f7d9dd",
+            "school",
+            "#efe4bd",
+            palette.landuse,
+          ],
+          "fill-opacity": 0.72,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "sites",
+        type: "fill",
+      },
+      {
+        id: "water-polygons",
+        paint: { "fill-color": palette.water },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "water_polygons",
+        type: "fill",
+      },
+      {
+        id: "buildings",
+        minzoom: 14,
+        paint: {
+          "fill-color": palette.building,
+          "fill-opacity": 0.72,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "buildings",
+        type: "fill",
+      },
+      {
+        id: "street-polygons",
+        minzoom: 13,
+        paint: { "fill-color": palette.road },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "street_polygons",
+        type: "fill",
+      },
+      {
+        id: "water-lines",
+        minzoom: 9,
+        paint: {
+          "line-color": palette.waterLine,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 15, 2.5],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "water_lines",
+        type: "line",
+      },
+      {
+        id: "streets-casing",
+        minzoom: 7,
+        paint: {
+          "line-color": palette.roadCasing,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 16, 9],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "streets",
+        type: "line",
+      },
+      {
+        id: "streets",
+        minzoom: 7,
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "kind"],
+            "motorway",
+            palette.roadMajor,
+            "trunk",
+            palette.roadMajor,
+            "primary",
+            palette.roadMajor,
+            palette.road,
+          ],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 16, 6],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "streets",
+        type: "line",
+      },
+      {
+        id: "boundaries",
+        paint: {
+          "line-color": palette.boundary,
+          "line-dasharray": [2, 2],
+          "line-opacity": 0.62,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 12, 1.4],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "boundaries",
+        type: "line",
+      },
+      {
+        id: "street-labels",
+        layout: {
+          "symbol-placement": "line",
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 12],
+        },
+        minzoom: 12,
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.2,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "street_labels",
+        type: "symbol",
+      },
+      {
+        id: "place-labels",
+        layout: {
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            5,
+            11,
+            12,
+            15,
+            16,
+            18,
+          ],
+        },
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.5,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "place_labels",
+        type: "symbol",
+      },
+    ],
+    sources: {
+      [OSM_OFFICIAL_SOURCE_ID]: {
+        attribution:
+          '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+        type: "vector",
+        url: "https://vector.openstreetmap.org/shortbread_v1/tilejson.json",
+      },
+    },
+    version: 8,
+  } as StyleSpecification;
+}
+
+export function createOsmStyle(
+  osmTileSource: OsmTileSource = DEFAULT_MAP_RENDERING_SETTINGS.osmTileSource,
+): StyleSpecification {
+  if (osmTileSource === "official") {
+    return createOsmOfficialStyle();
+  }
+
   const palette = VECTOR_PALETTES.osm;
 
   return {
@@ -655,10 +892,16 @@ export function createOsmStyle(): StyleSpecification {
 export function createMapStyle(
   provider: MapProvider,
   vworldApiKey: string,
+  settings: Partial<MapRenderingSettings> = {},
 ): StyleSpecification {
+  const mapTileMode =
+    settings.mapTileMode ?? DEFAULT_MAP_RENDERING_SETTINGS.mapTileMode;
+  const osmTileSource =
+    settings.osmTileSource ?? DEFAULT_MAP_RENDERING_SETTINGS.osmTileSource;
+
   return provider === "vworld"
-    ? createVworldStyle(vworldApiKey)
-    : createOsmStyle();
+    ? createVworldStyle(vworldApiKey, mapTileMode)
+    : createOsmStyle(osmTileSource);
 }
 
 export function isSourceVisible(
