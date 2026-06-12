@@ -102,11 +102,13 @@ export class HospitalService {
         const specialtyMatches = preferred.filter((specialty) =>
           hospital.specialties.includes(specialty),
         );
-        const emergencyBonus = hospital.emergencyRoom ? 28 : 0;
-        const specialtyBonus = specialtyMatches.length * 16;
-        const distancePenalty = Math.min(45, distance / 260);
+        const distanceScore = Math.max(0, 45 - Math.min(45, distance / 220));
+        const emergencyBonus = hospital.emergencyRoom ? 25 : 0;
+        const specialtyBonus = Math.min(24, specialtyMatches.length * 12);
+        const riskBonus =
+          incident.riskLevel === "high" && hospital.emergencyRoom ? 6 : 0;
         const score = Math.round(
-          Math.max(0, 100 + emergencyBonus + specialtyBonus - distancePenalty),
+          distanceScore + emergencyBonus + specialtyBonus + riskBonus,
         );
         const reasons = [
           `${Math.round(distance).toLocaleString("ko-KR")}m 거리`,
@@ -115,6 +117,14 @@ export class HospitalService {
 
         if (specialtyMatches.length > 0) {
           reasons.push(`${specialtyMatches.join(", ")} 진료역량 우선`);
+        } else {
+          reasons.push(
+            `${TYPE_SPECIALTIES[incident.type].join(", ")} 역량 확인 필요`,
+          );
+        }
+
+        if (incident.riskLevel === "high") {
+          reasons.push("고위험 사고로 응급실·전문진료 우선");
         }
 
         return {

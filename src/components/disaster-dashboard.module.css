@@ -208,6 +208,14 @@
   background: #d97706;
 }
 
+.legendBigDataTarget {
+  background: #0ea5e9;
+}
+
+.legendBigDataWater {
+  background: #2563eb;
+}
+
 .panel {
   display: grid;
   max-height: 100%;
@@ -364,6 +372,59 @@
   overflow-wrap: anywhere;
 }
 
+.dataSourceGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.dataSourceItem {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  padding: 10px;
+}
+
+.dataSourceItem:hover,
+.dataSourceItem:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.dataSourceItem svg {
+  margin-top: 2px;
+  color: #0ea5e9;
+}
+
+.dataSourceItem div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.dataSourceItem strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataSourceItem span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .recommendationMeta {
   display: flex;
   flex-wrap: wrap;
@@ -382,6 +443,22 @@
   padding: 6px 9px;
 }
 
+.criteriaGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.criteriaGrid span {
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--control-surface);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  padding: 5px 8px;
+}
+
 .reasonList {
   display: grid;
   gap: 6px;
@@ -397,6 +474,35 @@
 .list {
   display: grid;
   gap: 8px;
+}
+
+.filterBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.filterBar input,
+.filterBar select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 750;
+  padding: 9px 10px;
+}
+
+.emptyState {
+  border: 1px dashed var(--control-border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 750;
+  padding: 12px;
+  text-align: center;
 }
 
 .listItem,
@@ -595,6 +701,93 @@
   font-weight: 850;
 }
 
+.resourceCounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.resourceCounts span {
+  border-radius: 999px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  padding: 6px 8px;
+}
+
+.analysisCard {
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  padding: 10px;
+}
+
+.analysisCard > div {
+  display: grid;
+  gap: 3px;
+}
+
+.analysisCard strong {
+  font-size: 0.9rem;
+}
+
+.analysisCard span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.analysisCard dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analysisCard dl div {
+  display: grid;
+  gap: 3px;
+}
+
+.analysisCard dt {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.analysisCard dd {
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.timeline {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.timelineItem {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid #e11d48;
+  padding-left: 9px;
+}
+
+.timelineItem strong {
+  color: var(--text-strong);
+  font-size: 0.82rem;
+}
+
+.timelineItem span,
+.timelineItem small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .popup {
   display: grid;
   min-width: 250px;
@@ -667,16 +860,24 @@
   gap: 8px;
 }
 
-.popupActions a {
+.popupActions a,
+.popupActions button {
   display: inline-flex;
   min-height: 30px;
   align-items: center;
+  border: 0;
   border-radius: 6px;
   background: #2563eb;
   color: #ffffff;
+  cursor: pointer;
+  font: inherit;
   font-size: 0.78rem;
   font-weight: 850;
   padding: 0 10px;
+}
+
+.popupActions button {
+  background: #dc2626;
 }
 
 @media (max-width: 980px) {
