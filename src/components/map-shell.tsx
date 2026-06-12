@@ -33,6 +33,10 @@ const popupClassNames: mapCore.PopupClassNames = {
   popupRow: styles.popupRow,
 };
 
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
 export function MapShell({
   dictionary,
   initialProvider,
@@ -49,6 +53,10 @@ export function MapShell({
   const hazardsRef = useRef<mapCore.HazardEvent[]>([]);
   const seoulAreasRef = useRef<mapCore.SeoulAreasData | null>(null);
   const emergencyRouteRef = useRef<EmergencyRouteResult | null>(null);
+  const pointRequestRef = useRef<{
+    controller: AbortController;
+    id: number;
+  } | null>(null);
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
@@ -175,17 +183,34 @@ export function MapShell({
       .filter((dataset) => mapCore.isSourceVisible(visibleSources, dataset.id))
       .map((dataset) => dataset.id);
 
+    pointRequestRef.current?.controller.abort();
+
     if (selectedSources.length === 0) {
+      pointRequestRef.current = null;
       setPoints([]);
       return;
     }
 
+    const controller = new AbortController();
+    const requestId = (pointRequestRef.current?.id ?? 0) + 1;
+    pointRequestRef.current = { controller, id: requestId };
+
     const viewport = mapCore.getViewportFromMap(map);
     const responses = await Promise.all(
       selectedSources.map((source) =>
-        fetch(mapCore.buildPointsUrl(source, viewport), { cache: "no-store" }),
+        fetch(mapCore.buildPointsUrl(source, viewport), {
+          cache: "no-store",
+          signal: controller.signal,
+        }),
       ),
     );
+
+    if (
+      pointRequestRef.current?.id !== requestId ||
+      controller.signal.aborted
+    ) {
+      return;
+    }
 
     if (responses.some((response) => !response.ok)) {
       throw new Error("Failed to load viewport points");
@@ -194,6 +219,13 @@ export function MapShell({
     const payloads = (await Promise.all(
       responses.map((response) => response.json()),
     )) as mapCore.PointsResponse[];
+
+    if (
+      pointRequestRef.current?.id !== requestId ||
+      controller.signal.aborted
+    ) {
+      return;
+    }
 
     setPoints(payloads.flatMap((payload) => payload.points));
     setDataError(null);
@@ -321,6 +353,10 @@ export function MapShell({
 
       timeoutId = window.setTimeout(() => {
         refreshPointsForViewport().catch((error) => {
+          if (isAbortError(error)) {
+            return;
+          }
+
           setDataError(error instanceof Error ? error.message : String(error));
         });
       }, 180);
@@ -658,6 +694,7 @@ export function MapShell({
 
     return () => {
       isDisposed = true;
+      pointRequestRef.current?.controller.abort();
       popupRef.current?.remove();
       mapRef.current?.remove();
       mapRef.current = null;
