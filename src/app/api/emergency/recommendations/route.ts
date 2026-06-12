@@ -1,4 +1,8 @@
 import {
+  KOREA_COORDINATE_ERROR,
+  parseRequiredKoreaCoordinates,
+} from "@/lib/coordinates";
+import {
   type EmergencyScenario,
   findEmergencyDispatchStation,
   recommendEmergencyHospitals,
@@ -34,31 +38,23 @@ export async function POST(request: Request) {
     longitude?: unknown;
     scenario?: unknown;
   } | null;
-  const latitude = Number(payload?.latitude);
-  const longitude = Number(payload?.longitude);
+  const coordinates = parseRequiredKoreaCoordinates({
+    latitude: payload?.latitude,
+    longitude: payload?.longitude,
+  });
   const scenario = SCENARIOS.has(payload?.scenario as EmergencyScenario)
     ? (payload?.scenario as EmergencyScenario)
     : "general";
 
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    latitude < 32 ||
-    latitude > 39 ||
-    longitude < 124 ||
-    longitude > 132
-  ) {
-    return noStoreJson(
-      { error: "올바른 사고 위치가 필요합니다." },
-      { status: 400 },
-    );
+  if (!coordinates) {
+    return noStoreJson({ error: KOREA_COORDINATE_ERROR }, { status: 400 });
   }
 
   try {
     const [hospitals, dispatchStation] = await Promise.all([
-      recommendEmergencyHospitals({ latitude, longitude, scenario }),
+      recommendEmergencyHospitals({ ...coordinates, scenario }),
       payload?.incidentType === "fire"
-        ? findEmergencyDispatchStation({ latitude, longitude })
+        ? findEmergencyDispatchStation(coordinates)
         : Promise.resolve(null),
     ]);
 

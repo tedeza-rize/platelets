@@ -1,37 +1,25 @@
 import { updateHazardEvents } from "@/lib/hazard-events";
+import { getOperationalSettings } from "@/lib/operational-settings";
 import { recordApiLog } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
 
-const DEFAULT_INTERVAL_MS = 120_000;
-const MINIMUM_INTERVAL_MS = 60_000;
+const SCHEDULER_TICK_MS = 60_000;
 
 type SchedulerState = {
   intervalId?: ReturnType<typeof setInterval>;
   isRunning: boolean;
+  lastRunAt: number;
 };
 
 const schedulerGlobal = globalThis as typeof globalThis & {
   __plateletsHazardScheduler?: SchedulerState;
 };
 
-function intervalMs() {
-  const value = Number(process.env.KMA_EARTHQUAKE_POLL_INTERVAL_MS);
-
-  if (!Number.isFinite(value) || value <= 0) {
-    return DEFAULT_INTERVAL_MS;
-  }
-
-  return Math.max(value, MINIMUM_INTERVAL_MS);
-}
-
 export function startHazardEventScheduler() {
-  if (!getPublicDataApiKey()) {
-    return;
-  }
-
   if (!schedulerGlobal.__plateletsHazardScheduler) {
     schedulerGlobal.__plateletsHazardScheduler = {
       isRunning: false,
+      lastRunAt: 0,
     };
   }
 
@@ -49,6 +37,18 @@ export function startHazardEventScheduler() {
     state.isRunning = true;
 
     try {
+      const settings = await getOperationalSettings();
+      const now = Date.now();
+
+      if (now - state.lastRunAt < settings.kmaEarthquakePollIntervalMs) {
+        return;
+      }
+
+      if (!(await getPublicDataApiKey())) {
+        return;
+      }
+
+      state.lastRunAt = now;
       await updateHazardEvents("background");
     } catch (error) {
       await recordApiLog({
@@ -63,6 +63,6 @@ export function startHazardEventScheduler() {
     }
   }
 
-  state.intervalId = setInterval(run, intervalMs());
+  state.intervalId = setInterval(run, SCHEDULER_TICK_MS);
   setTimeout(run, 5_000);
 }

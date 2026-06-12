@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
 
   if (forbidden) {
     return forbidden;
