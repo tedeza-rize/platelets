@@ -8,6 +8,12 @@ import {
   getDataDirectoryPath,
   setAppSetting,
 } from "@/lib/points-db";
+import {
+  isSecretBox,
+  type ProtectedSecret,
+  protectSecret,
+  revealSecret,
+} from "@/lib/secret-box";
 
 export type SetupRole = "admin" | "sudo";
 
@@ -30,9 +36,26 @@ export type SetupApiKeys = {
   vworldApiKey: string;
 };
 
+type StoredSetupApiKeys = Omit<
+  SetupApiKeys,
+  | "kakaoMobilityRestApiKey"
+  | "kakaoRestApiKey"
+  | "openaiApiKey"
+  | "publicDataApiKey"
+  | "seoulOpenApiKey"
+  | "vworldApiKey"
+> & {
+  kakaoMobilityRestApiKey: ProtectedSecret;
+  kakaoRestApiKey: ProtectedSecret;
+  openaiApiKey: ProtectedSecret;
+  publicDataApiKey: ProtectedSecret;
+  seoulOpenApiKey: ProtectedSecret;
+  vworldApiKey: ProtectedSecret;
+};
+
 export type SetupState = {
   accounts: Record<SetupRole, SetupAccount>;
-  apiKeys: SetupApiKeys;
+  apiKeys: StoredSetupApiKeys;
   completedAt: string;
   licenseAcceptedAt: string;
 };
@@ -129,6 +152,42 @@ function normalizeApiKeys(input: Partial<SetupApiKeys> = {}): SetupApiKeys {
   };
 }
 
+function protectApiKeys(input: SetupApiKeys): StoredSetupApiKeys {
+  return {
+    kakaoMobilityRestApiKey: protectSecret(input.kakaoMobilityRestApiKey),
+    kakaoRestApiKey: protectSecret(input.kakaoRestApiKey),
+    openaiApiKey: protectSecret(input.openaiApiKey),
+    openaiBaseUrl: input.openaiBaseUrl,
+    publicDataApiKey: protectSecret(input.publicDataApiKey),
+    seoulOpenApiKey: protectSecret(input.seoulOpenApiKey),
+    vworldApiKey: protectSecret(input.vworldApiKey),
+  };
+}
+
+function revealApiKeys(input: SetupState["apiKeys"]): SetupApiKeys {
+  return {
+    kakaoMobilityRestApiKey: revealSecret(input.kakaoMobilityRestApiKey),
+    kakaoRestApiKey: revealSecret(input.kakaoRestApiKey),
+    openaiApiKey: revealSecret(input.openaiApiKey),
+    openaiBaseUrl:
+      cleanText(input.openaiBaseUrl, 500) || EMPTY_API_KEYS.openaiBaseUrl,
+    publicDataApiKey: revealSecret(input.publicDataApiKey),
+    seoulOpenApiKey: revealSecret(input.seoulOpenApiKey),
+    vworldApiKey: revealSecret(input.vworldApiKey),
+  };
+}
+
+function hasPlainApiKeys(input: SetupState["apiKeys"]) {
+  return [
+    input.kakaoMobilityRestApiKey,
+    input.kakaoRestApiKey,
+    input.openaiApiKey,
+    input.publicDataApiKey,
+    input.seoulOpenApiKey,
+    input.vworldApiKey,
+  ].some((value) => Boolean(value) && !isSecretBox(value));
+}
+
 function accountFromPayload(
   role: SetupRole,
   input: SetupPayload[SetupRole],
@@ -166,7 +225,21 @@ export async function isSetupComplete() {
 
 export async function getConfiguredApiKeys() {
   const state = await getSetupState();
-  return state?.apiKeys ?? EMPTY_API_KEYS;
+
+  if (!state) {
+    return EMPTY_API_KEYS;
+  }
+
+  const apiKeys = revealApiKeys(state.apiKeys);
+
+  if (hasPlainApiKeys(state.apiKeys)) {
+    await setAppSetting(SETUP_STATE_KEY, {
+      ...state,
+      apiKeys: protectApiKeys(apiKeys),
+    });
+  }
+
+  return apiKeys;
 }
 
 export async function getStoredAccessRole(password: string) {
@@ -208,7 +281,7 @@ export async function completeSetup(payload: SetupPayload) {
       admin: accountFromPayload("admin", payload.admin),
       sudo: accountFromPayload("sudo", payload.sudo),
     },
-    apiKeys: normalizeApiKeys(payload.apiKeys),
+    apiKeys: protectApiKeys(normalizeApiKeys(payload.apiKeys)),
     completedAt,
     licenseAcceptedAt: completedAt,
   };
