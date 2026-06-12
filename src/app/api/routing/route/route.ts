@@ -1,3 +1,7 @@
+import {
+  KOREA_COORDINATE_ERROR,
+  parseRequiredKoreaCoordinates,
+} from "@/lib/coordinates";
 import { calculateEmergencyRoute } from "@/lib/emergency-routing";
 import { noStoreJson } from "@/lib/http";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -19,28 +23,17 @@ export async function POST(request: Request) {
     provider?: unknown;
   } | null;
   const provider = payload?.provider === "kakao" ? "kakao" : "astar";
-  const origin = {
-    latitude: Number(payload?.origin?.latitude),
-    longitude: Number(payload?.origin?.longitude),
-  };
-  const destination = {
-    latitude: Number(payload?.destination?.latitude),
-    longitude: Number(payload?.destination?.longitude),
-  };
+  const origin = parseRequiredKoreaCoordinates({
+    latitude: payload?.origin?.latitude,
+    longitude: payload?.origin?.longitude,
+  });
+  const destination = parseRequiredKoreaCoordinates({
+    latitude: payload?.destination?.latitude,
+    longitude: payload?.destination?.longitude,
+  });
 
-  if (
-    [origin, destination].some(
-      (coordinate) =>
-        coordinate.latitude < 32 ||
-        coordinate.latitude > 39 ||
-        coordinate.longitude < 124 ||
-        coordinate.longitude > 132,
-    )
-  ) {
-    return noStoreJson(
-      { error: "현재 이송 경로는 대한민국 영역만 지원합니다." },
-      { status: 400 },
-    );
+  if (!origin || !destination) {
+    return noStoreJson({ error: KOREA_COORDINATE_ERROR }, { status: 400 });
   }
 
   try {

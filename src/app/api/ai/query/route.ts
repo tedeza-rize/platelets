@@ -2,13 +2,25 @@ import OpenAI from "openai";
 import { requireAccessRole } from "@/lib/access-control";
 import { buildAiGrounding } from "@/lib/ai-grounding";
 import { assertAiBaseUrlSafe, getAiSettings } from "@/lib/ai-settings";
+import {
+  KOREA_COORDINATE_ERROR,
+  parseOptionalKoreaCoordinates,
+} from "@/lib/coordinates";
 import { noStoreJson } from "@/lib/http";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, {
+    bucket: "ai-query",
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (limited) return limited;
+
   const forbidden = await requireAccessRole(request, "admin");
   if (forbidden) return forbidden;
 
@@ -29,19 +41,25 @@ export async function POST(request: Request) {
   const apiKey = openaiApiKey;
   if (!apiKey) {
     return noStoreJson(
-      { error: "OPENAI_API_KEY가 설정되지 않았습니다." },
+      { error: "AI API key is not registered. Configure it in setup." },
       { status: 503 },
     );
   }
 
   try {
-    const latitudeText = String(payload?.latitude ?? "").trim();
-    const longitudeText = String(payload?.longitude ?? "").trim();
+    const coordinates = parseOptionalKoreaCoordinates({
+      latitude: payload?.latitude,
+      longitude: payload?.longitude,
+    });
+    if (coordinates === null) {
+      return noStoreJson({ error: KOREA_COORDINATE_ERROR }, { status: 400 });
+    }
+
     const settings = await getAiSettings();
     const safeBaseUrl = await assertAiBaseUrlSafe(settings.baseUrl);
     const grounding = await buildAiGrounding({
-      latitude: latitudeText ? Number(latitudeText) : undefined,
-      longitude: longitudeText ? Number(longitudeText) : undefined,
+      latitude: coordinates?.latitude,
+      longitude: coordinates?.longitude,
       question,
     });
     const client = new OpenAI({
@@ -83,6 +101,7 @@ export async function POST(request: Request) {
       answer: answer || "모델이 텍스트 응답을 반환하지 않았습니다.",
       contextSummary: {
         datasetCount: grounding.datasets.length,
+        locationApplied: coordinates !== undefined,
         matchingFacilityCount: grounding.matchingFacilities.length,
         nearbyFacilityCount: grounding.nearbyFacilities.length,
         recentHazardCount: grounding.recentHazards.length,
