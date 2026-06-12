@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises";
+import { getOperationalSettings } from "@/lib/operational-settings";
 import { getAppSetting, setAppSetting } from "@/lib/points-db";
 
 export type AiApiMode = "responses" | "chat-completions";
@@ -29,7 +30,7 @@ const DEFAULT_SYSTEM_PROMPT = `당신은 Platelets 재난·응급 대응 분석 
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   apiMode: "responses",
-  baseUrl: process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1",
+  baseUrl: "https://api.openai.com/v1",
   model: "gpt-5.5",
   reasoningEffort: "medium",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -77,7 +78,7 @@ function isPrivateAddress(address: string) {
   return isPrivateHostname(normalized.replace(/^::ffff:/, ""));
 }
 
-export function validateAiBaseUrl(value: string) {
+export function validateAiBaseUrl(value: string, allowPrivateBaseUrl = false) {
   const url = new URL(value.trim());
 
   if (url.protocol !== "https:") {
@@ -86,12 +87,9 @@ export function validateAiBaseUrl(value: string) {
   if (url.username || url.password) {
     throw new Error("AI 프록시 URL에 인증정보를 포함할 수 없습니다.");
   }
-  if (
-    isPrivateHostname(url.hostname) &&
-    process.env.AI_ALLOW_PRIVATE_BASE_URL !== "true"
-  ) {
+  if (isPrivateHostname(url.hostname) && !allowPrivateBaseUrl) {
     throw new Error(
-      "사설망 AI 프록시는 AI_ALLOW_PRIVATE_BASE_URL=true일 때만 허용됩니다.",
+      "Private-network AI proxy URLs must be explicitly allowed in operational settings.",
     );
   }
 
@@ -99,9 +97,13 @@ export function validateAiBaseUrl(value: string) {
 }
 
 export async function assertAiBaseUrlSafe(value: string) {
-  const validated = validateAiBaseUrl(value);
+  const operationalSettings = await getOperationalSettings();
+  const validated = validateAiBaseUrl(
+    value,
+    operationalSettings.aiAllowPrivateBaseUrl,
+  );
 
-  if (process.env.AI_ALLOW_PRIVATE_BASE_URL === "true") {
+  if (operationalSettings.aiAllowPrivateBaseUrl) {
     return validated;
   }
 
@@ -114,12 +116,18 @@ export async function assertAiBaseUrlSafe(value: string) {
 }
 
 export async function getAiSettings() {
-  const stored = await getAppSetting<Partial<AiSettings>>(AI_SETTINGS_KEY, {});
+  const [stored, operationalSettings] = await Promise.all([
+    getAppSetting<Partial<AiSettings>>(AI_SETTINGS_KEY, {}),
+    getOperationalSettings(),
+  ]);
 
   return {
     apiMode:
       stored.apiMode === "chat-completions" ? "chat-completions" : "responses",
-    baseUrl: validateAiBaseUrl(stored.baseUrl || DEFAULT_AI_SETTINGS.baseUrl),
+    baseUrl: validateAiBaseUrl(
+      stored.baseUrl || DEFAULT_AI_SETTINGS.baseUrl,
+      operationalSettings.aiAllowPrivateBaseUrl,
+    ),
     model: stored.model?.trim().slice(0, 120) || DEFAULT_AI_SETTINGS.model,
     reasoningEffort: [
       "none",

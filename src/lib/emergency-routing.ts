@@ -1,3 +1,4 @@
+import { getOperationalSettings } from "@/lib/operational-settings";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 type Coordinate = {
@@ -33,7 +34,6 @@ type QueueItem = {
   score: number;
 };
 
-const OVERPASS_DEFAULT_URL = "https://overpass-api.de/api/interpreter";
 const MAX_ASTAR_DISTANCE_METERS = 70_000;
 const graphCache = new Map<string, { expiresAt: number; graph: RoadGraph }>();
 
@@ -118,20 +118,8 @@ class MinPriorityQueue {
   }
 }
 
-function overpassEndpoint() {
-  const configured = process.env.OVERPASS_API_URL?.trim();
-
-  if (!configured) {
-    return OVERPASS_DEFAULT_URL;
-  }
-
-  const url = new URL(configured);
-
-  if (url.protocol !== "https:") {
-    throw new Error("OVERPASS_API_URL must use HTTPS.");
-  }
-
-  return url.toString();
+async function overpassEndpoint() {
+  return (await getOperationalSettings()).overpassApiUrl;
 }
 
 function radians(value: number) {
@@ -228,7 +216,7 @@ async function fetchRoadGraph(
   }
 
   const query = `[out:json][timeout:25];way["highway"]["highway"!~"footway|path|cycleway|steps|pedestrian|bridleway"]["access"!="private"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});(._;>;);out body;`;
-  const response = await fetch(overpassEndpoint(), {
+  const response = await fetch(await overpassEndpoint(), {
     body: new URLSearchParams({ data: query }),
     cache: "no-store",
     headers: {

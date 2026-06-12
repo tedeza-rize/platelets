@@ -56,7 +56,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "openai-responses",
     license: "OpenAI 서비스 약관·API 데이터 정책 또는 호환 제공자의 약관 준수",
     notes:
-      "OPENAI_API_KEY는 서버 환경변수로만 보관한다. AI에는 원시 레코드 대신 시설 검색 결과, 데이터셋 집계, 최근 재난의 요약값만 전송하며 응답은 참고 정보다.",
+      "OpenAI API keys are stored in the application settings database. AI receives summarized facility search results, dataset aggregates, and recent hazard summaries instead of raw records, and responses are reference information.",
     provider: "OpenAI 또는 관리자가 지정한 OpenAI 호환 제공자",
     sourceName: "OpenAI Responses API",
     sourceUrl: "https://developers.openai.com/api/docs/guides/text",
