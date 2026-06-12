@@ -2,9 +2,48 @@ import { expect, test } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
+async function ensureSetupComplete(
+  request: import("@playwright/test").APIRequestContext,
+) {
+  const status = await request.get("/api/setup/status");
+  const statusPayload = (await status.json()) as { installed?: boolean };
+
+  if (statusPayload.installed) {
+    return;
+  }
+
+  const completed = await request.post("/api/setup/complete", {
+    data: {
+      admin: {
+        email: "admin@example.com",
+        fullName: "Setup Admin",
+        password: "StrongAdminPass1!",
+      },
+      apiKeys: {
+        openaiApiKey: "sk-test",
+        openaiBaseUrl: "https://api.openai.com/v1",
+      },
+      licenseAccepted: true,
+      sudo: {
+        email: "sudo@example.com",
+        fullName: "Setup Sudo",
+        password: "StrongSudoPass1!",
+      },
+    },
+  });
+
+  expect(completed.ok()).toBeTruthy();
+}
+
 test("redirects first-run deployments to the setup wizard", async ({
+  browserName,
   page,
 }) => {
+  test.skip(
+    browserName === "firefox",
+    "first-run setup is verified once because CI browser projects share the same test server",
+  );
+
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page).toHaveURL(/\/setup$/);
@@ -64,7 +103,11 @@ test("redirects first-run deployments to the setup wizard", async ({
   await expect(page.getByText("Platelets 통합 재난 지도")).toBeVisible();
 });
 
-test("loads the integrated disaster response map", async ({ page }) => {
+test("loads the integrated disaster response map", async ({
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("Platelets 통합 재난 지도")).toBeVisible();
@@ -75,7 +118,9 @@ test("loads the integrated disaster response map", async ({ page }) => {
 
 test("shows BigData119 operational evidence and resource recommendations", async ({
   page,
+  request,
 }) => {
+  await ensureSetupComplete(request);
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByText("119 신고·출동 데이터")).toBeVisible({
@@ -101,7 +146,9 @@ test("shows BigData119 operational evidence and resource recommendations", async
 
 test("renders a dispatch road route when the route API succeeds", async ({
   page,
+  request,
 }) => {
+  await ensureSetupComplete(request);
   await page.route("**/api/routing/route", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -134,6 +181,7 @@ test("renders a dispatch road route when the route API succeeds", async ({
 test("incident API records create, edit, and status history", async ({
   request,
 }) => {
+  await ensureSetupComplete(request);
   const created = await request.post("/api/disaster/incidents", {
     data: {
       address: "서울특별시 중구 세종대로 110",
