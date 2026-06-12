@@ -1,9 +1,21 @@
+import {
+  cleanMapProvider,
+  cleanMapTileMode,
+  cleanOsmTileSource,
+  DEFAULT_MAP_RENDERING_SETTINGS,
+  type MapProvider,
+  type MapTileMode,
+  type OsmTileSource,
+} from "@/lib/map-settings";
 import { getAppSetting, setAppSetting } from "@/lib/points-db";
 
 export type OperationalSettings = {
   aiAllowPrivateBaseUrl: boolean;
   datasetAutoUpdateEnabled: boolean;
   kmaEarthquakePollIntervalMs: number;
+  mapProvider: MapProvider;
+  mapTileMode: MapTileMode;
+  osmTileSource: OsmTileSource;
   overpassApiUrl: string;
 };
 
@@ -16,6 +28,9 @@ export const DEFAULT_OPERATIONAL_SETTINGS: OperationalSettings = {
   aiAllowPrivateBaseUrl: false,
   datasetAutoUpdateEnabled: process.env.NODE_ENV === "production",
   kmaEarthquakePollIntervalMs: DEFAULT_KMA_INTERVAL_MS,
+  mapProvider: DEFAULT_MAP_RENDERING_SETTINGS.mapProvider,
+  mapTileMode: DEFAULT_MAP_RENDERING_SETTINGS.mapTileMode,
+  osmTileSource: DEFAULT_MAP_RENDERING_SETTINGS.osmTileSource,
   overpassApiUrl: DEFAULT_OVERPASS_API_URL,
 };
 
@@ -62,6 +77,9 @@ export async function getOperationalSettings() {
     kmaEarthquakePollIntervalMs: cleanInterval(
       stored.kmaEarthquakePollIntervalMs,
     ),
+    mapProvider: cleanMapProvider(stored.mapProvider),
+    mapTileMode: cleanMapTileMode(stored.mapTileMode),
+    osmTileSource: cleanOsmTileSource(stored.osmTileSource),
     overpassApiUrl: cleanOverpassUrl(stored.overpassApiUrl),
   } satisfies OperationalSettings;
 }
@@ -81,6 +99,9 @@ export async function saveOperationalSettings(
     kmaEarthquakePollIntervalMs: cleanInterval(
       input.kmaEarthquakePollIntervalMs,
     ),
+    mapProvider: cleanMapProvider(input.mapProvider),
+    mapTileMode: cleanMapTileMode(input.mapTileMode),
+    osmTileSource: cleanOsmTileSource(input.osmTileSource),
     overpassApiUrl: cleanOverpassUrl(input.overpassApiUrl),
   } satisfies OperationalSettings;
 

@@ -68,6 +68,11 @@ sources for facilities, Seoul population areas, hazards, and emergency routes.
 Provider style changes recreate overlay layers after `style.load`. Point icons
 are generated in canvas and keyed by dataset source.
 
+Operational settings control the default public map provider, raster/vector
+tile mode, and OSM tile source. Defaults are OSM, vector tiles, and OpenFreeMap.
+The official OSM option uses the Shortbread vector tile schema, so it has a
+separate MapLibre style from the OpenFreeMap/OpenMapTiles style.
+
 Earthquakes outside South Korea remain stored and visible to administrators,
 but are filtered from public map rendering and automatic map focus.
 

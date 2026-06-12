@@ -40,6 +40,7 @@ function isAbortError(error: unknown) {
 export function MapShell({
   dictionary,
   initialProvider,
+  mapSettings,
   vworldApiKey,
 }: mapCore.MapShellProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,7 @@ export function MapShell({
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
-    mapCore.createMapStyle(initialProvider, vworldApiKey),
+    mapCore.createMapStyle(initialProvider, vworldApiKey, mapSettings),
   );
   const [provider, setProvider] =
     useState<mapCore.MapProvider>(initialProvider);
@@ -712,7 +713,11 @@ export function MapShell({
     let timeoutId: number | undefined;
 
     async function updateStyle() {
-      const style = mapCore.createMapStyle(activeProvider, vworldApiKey);
+      const style = mapCore.createMapStyle(
+        activeProvider,
+        vworldApiKey,
+        mapSettings,
+      );
       const syncOverlays = () => {
         map.resize();
         mapCore.syncSeoulAreaLayerWhenReady(
@@ -754,7 +759,7 @@ export function MapShell({
         window.clearTimeout(timeoutId);
       }
     };
-  }, [activeProvider, dictionary, vworldApiKey]);
+  }, [activeProvider, dictionary, mapSettings, vworldApiKey]);
 
   useEffect(() => {
     if (!isMenuOpen) {

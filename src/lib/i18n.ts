@@ -114,6 +114,9 @@ const koUi = {
   "NTP 서버 목록 저장 완료": "NTP 서버 목록 저장 완료",
   "NTP 서버 목록 저장 중": "NTP 서버 목록 저장 중",
   "OpenAI 호환 Base URL": "OpenAI 호환 Base URL",
+  OSM: "OSM",
+  "OSM 공식": "OSM 공식",
+  "OSM 타일 소스": "OSM 타일 소스",
   "Platelets AI 분석": "Platelets AI 분석",
   "경고 기준": "경고 기준",
   "경도 (선택)": "경도 (선택)",
@@ -138,6 +141,7 @@ const koUi = {
   "검색 시설": "검색 시설",
   "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.":
     "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.",
+  "기본 지도 제공자": "기본 지도 제공자",
   "기상청 지진 API": "기상청 지진 API",
   "기상청 지진/지진해일 정보 요청 중": "기상청 지진/지진해일 정보 요청 중",
   낙상·골절: "낙상·골절",
@@ -308,10 +312,14 @@ const koUi = {
   "Overpass API URL": "Overpass API URL",
   "데이터셋 자동 갱신": "데이터셋 자동 갱신",
   "사설망 AI Base URL 허용": "사설망 AI Base URL 허용",
+  "지도 타일 방식": "지도 타일 방식",
   "운영 설정": "운영 설정",
   "운영 설정 저장 실패": "운영 설정 저장 실패",
   "운영 설정을 저장했습니다.": "운영 설정을 저장했습니다.",
   "지진 API 폴링 간격(ms)": "지진 API 폴링 간격(ms)",
+  레스터: "레스터",
+  벡터: "벡터",
+  브이월드: "브이월드",
 } satisfies Record<string, string>;
 
 const enUi = {
@@ -372,6 +380,9 @@ const enUi = {
   "NTP 서버 목록 저장 완료": "NTP server list saved",
   "NTP 서버 목록 저장 중": "Saving NTP server list",
   "OpenAI 호환 Base URL": "OpenAI-compatible Base URL",
+  OSM: "OSM",
+  "OSM 공식": "Official OSM",
+  "OSM 타일 소스": "OSM tile source",
   "Platelets AI 분석": "Platelets AI analysis",
   "경고 기준": "Warning threshold",
   "경도 (선택)": "Longitude (optional)",
@@ -396,6 +407,7 @@ const enUi = {
   "검색 시설": "Matching facilities",
   "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.":
     "The default is https://api.openai.com/v1. Private network addresses must be allowed through a separate environment variable.",
+  "기본 지도 제공자": "Default map provider",
   "기상청 지진 API": "KMA earthquake API",
   "기상청 지진/지진해일 정보 요청 중":
     "Requesting KMA earthquake and tsunami information",
@@ -567,10 +579,14 @@ const enUi = {
   "Overpass API URL": "Overpass API URL",
   "데이터셋 자동 갱신": "Automatic dataset updates",
   "사설망 AI Base URL 허용": "Allow private AI Base URL",
+  "지도 타일 방식": "Map tile mode",
   "운영 설정": "Operational settings",
   "운영 설정 저장 실패": "Could not save operational settings",
   "운영 설정을 저장했습니다.": "Operational settings saved.",
   "지진 API 폴링 간격(ms)": "Earthquake API polling interval (ms)",
+  레스터: "Raster",
+  벡터: "Vector",
+  브이월드: "VWorld",
 } satisfies Record<string, string>;
 
 export function uiText(

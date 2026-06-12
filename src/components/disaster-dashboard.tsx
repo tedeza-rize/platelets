@@ -46,6 +46,11 @@ import type {
   RiskArea,
   RiskLevel,
 } from "@/lib/disaster-response/types";
+import {
+  DEFAULT_MAP_RENDERING_SETTINGS,
+  type MapRenderingSettings,
+} from "@/lib/map-settings";
+import { createVworldStyle } from "@/lib/map-shell-core";
 import styles from "./disaster-dashboard.module.css";
 
 type DashboardView =
@@ -67,6 +72,12 @@ type DashboardSnapshot = {
   incidents: Incident[];
   resourceRecommendations: ResourceRecommendation[];
   riskAreas: RiskArea[];
+};
+
+type DisasterDashboardProps = {
+  initialView?: DashboardView;
+  mapSettings?: MapRenderingSettings;
+  vworldApiKey?: string;
 };
 
 type RecommendationResponse = {
@@ -117,10 +128,6 @@ type IncidentDetailResponse = {
   incident?: Incident;
 };
 
-type DisasterDashboardProps = {
-  initialView?: DashboardView;
-};
-
 type FeatureProperties = Record<string, string | number | boolean | null>;
 type GeoJsonData = GeoJSON.FeatureCollection<
   GeoJSON.Geometry,
@@ -150,6 +157,7 @@ const MAP_ROTATION_TUNING = {
   rotateDegreesPerPixelMoved: 0.24,
 };
 const OPENFREEMAP_SOURCE_ID = "dashboard-openmaptiles";
+const OSM_OFFICIAL_SOURCE_ID = "dashboard-osm-shortbread";
 const BUILDING_FOOTPRINT_LAYER_ID = "dashboard-building-footprint";
 const BUILDING_3D_LAYER_ID = "dashboard-building-3d";
 const POI_LABEL_LAYER_ID = "dashboard-poi-label";
@@ -279,7 +287,7 @@ function localizedNameExpression() {
   return ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name_en"]];
 }
 
-function createMapStyle(): StyleSpecification {
+function createOpenFreeMapDashboardStyle(): StyleSpecification {
   const palette = VECTOR_PALETTE;
 
   return {
@@ -520,6 +528,244 @@ function createMapStyle(): StyleSpecification {
     },
     version: 8,
   } as StyleSpecification;
+}
+
+function createOfficialOsmDashboardStyle(): StyleSpecification {
+  const palette = VECTOR_PALETTE;
+
+  return {
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+    layers: [
+      {
+        id: "background",
+        paint: { "background-color": palette.background },
+        type: "background",
+      },
+      {
+        id: "dashboard-osm-ocean",
+        paint: { "fill-color": palette.water },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "ocean",
+        type: "fill",
+      },
+      {
+        id: "dashboard-osm-land",
+        paint: { "fill-color": palette.land },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "land",
+        type: "fill",
+      },
+      {
+        id: "dashboard-osm-sites",
+        minzoom: 12,
+        paint: {
+          "fill-color": [
+            "match",
+            ["get", "kind"],
+            "park",
+            palette.park,
+            "hospital",
+            "#f7d9dd",
+            "school",
+            "#efe4bd",
+            palette.landuse,
+          ],
+          "fill-opacity": 0.72,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "sites",
+        type: "fill",
+      },
+      {
+        id: "dashboard-osm-water",
+        paint: { "fill-color": palette.water },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "water_polygons",
+        type: "fill",
+      },
+      {
+        id: BUILDING_FOOTPRINT_LAYER_ID,
+        minzoom: 14,
+        paint: {
+          "fill-color": palette.building,
+          "fill-opacity": 0.46,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "buildings",
+        type: "fill",
+      },
+      {
+        id: BUILDING_3D_LAYER_ID,
+        minzoom: 14,
+        paint: {
+          "fill-extrusion-base": 0,
+          "fill-extrusion-color": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            14,
+            palette.building,
+            16,
+            "#c7c0b4",
+          ],
+          "fill-extrusion-height": 12,
+          "fill-extrusion-opacity": 0.72,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "buildings",
+        type: "fill-extrusion",
+      },
+      {
+        id: "dashboard-osm-street-polygons",
+        minzoom: 13,
+        paint: { "fill-color": palette.road },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "street_polygons",
+        type: "fill",
+      },
+      {
+        id: "dashboard-osm-water-lines",
+        minzoom: 9,
+        paint: {
+          "line-color": palette.waterLine,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 15, 2.5],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "water_lines",
+        type: "line",
+      },
+      {
+        id: "dashboard-osm-road-casing",
+        minzoom: 7,
+        paint: {
+          "line-color": palette.roadCasing,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 16, 9],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "streets",
+        type: "line",
+      },
+      {
+        id: "dashboard-osm-road",
+        minzoom: 7,
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "kind"],
+            "motorway",
+            palette.roadMajor,
+            "trunk",
+            palette.roadMajor,
+            "primary",
+            palette.roadMajor,
+            palette.road,
+          ],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 16, 6],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "streets",
+        type: "line",
+      },
+      {
+        id: "dashboard-osm-boundaries",
+        paint: {
+          "line-color": palette.boundary,
+          "line-dasharray": [2, 2],
+          "line-opacity": 0.62,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 12, 1.4],
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "boundaries",
+        type: "line",
+      },
+      {
+        id: "dashboard-osm-road-label",
+        layout: {
+          "symbol-placement": "line",
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 16, 12],
+        },
+        minzoom: 12,
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.2,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "street_labels",
+        type: "symbol",
+      },
+      {
+        filter: ["has", "name"],
+        id: POI_LABEL_LAYER_ID,
+        layout: {
+          "text-anchor": "top",
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-offset": [0, 0.55],
+          "text-size": ["interpolate", ["linear"], ["zoom"], 14, 10, 17, 12],
+        },
+        minzoom: 14,
+        paint: {
+          "text-color": "#23324a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "pois",
+        type: "symbol",
+      },
+      {
+        id: "dashboard-osm-place-label",
+        layout: {
+          "text-field": localizedNameExpression(),
+          "text-font": ["Noto Sans Regular"],
+          "text-size": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            5,
+            11,
+            12,
+            15,
+            16,
+            18,
+          ],
+        },
+        paint: {
+          "text-color": palette.text,
+          "text-halo-color": palette.textHalo,
+          "text-halo-width": 1.5,
+        },
+        source: OSM_OFFICIAL_SOURCE_ID,
+        "source-layer": "place_labels",
+        type: "symbol",
+      },
+    ],
+    sources: {
+      [OSM_OFFICIAL_SOURCE_ID]: {
+        attribution:
+          '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+        type: "vector",
+        url: "https://vector.openstreetmap.org/shortbread_v1/tilejson.json",
+      },
+    },
+    version: 8,
+  } as StyleSpecification;
+}
+
+function createDashboardMapStyle(
+  settings: MapRenderingSettings,
+  vworldApiKey: string,
+): StyleSpecification {
+  if (settings.mapProvider === "vworld") {
+    return createVworldStyle(vworldApiKey, settings.mapTileMode);
+  }
+
+  return settings.osmTileSource === "official"
+    ? createOfficialOsmDashboardStyle()
+    : createOpenFreeMapDashboardStyle();
 }
 
 function syncThreeDimensionalView(
@@ -1622,6 +1868,8 @@ function fitMapToSnapshot(map: MapLibreMap, snapshot: DashboardSnapshot) {
 
 export function DisasterDashboard({
   initialView = "dashboard",
+  mapSettings = DEFAULT_MAP_RENDERING_SETTINGS,
+  vworldApiKey = "",
 }: DisasterDashboardProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -1629,6 +1877,13 @@ export function DisasterDashboard({
   const [isMapReady, setIsMapReady] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(true);
   const isThreeDimensionalRef = useRef(true);
+  const effectiveMapSettings = useMemo(
+    () => ({
+      ...DEFAULT_MAP_RENDERING_SETTINGS,
+      ...mapSettings,
+    }),
+    [mapSettings],
+  );
   const [isLocating, setIsLocating] = useState(false);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [reportLocation, setReportLocation] = useState<ReportLocation | null>(
@@ -2046,7 +2301,7 @@ export function DisasterDashboard({
         center: MAP_CENTER,
         container: mapContainerRef.current,
         ...MAP_ROTATION_TUNING,
-        style: createMapStyle(),
+        style: createDashboardMapStyle(effectiveMapSettings, vworldApiKey),
         zoom: DEFAULT_ZOOM,
       });
 
@@ -2392,7 +2647,12 @@ export function DisasterDashboard({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [loadRecommendations, visibleBigDataKinds]);
+  }, [
+    effectiveMapSettings,
+    loadRecommendations,
+    visibleBigDataKinds,
+    vworldApiKey,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
