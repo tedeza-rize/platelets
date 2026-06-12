@@ -35,6 +35,20 @@ async function ensureSetupComplete(
   expect(completed.ok()).toBeTruthy();
 }
 
+async function showEnglishSetup(page: import("@playwright/test").Page) {
+  if (
+    (await page
+      .getByRole("heading", { name: "Platelets에 오신 것을 환영합니다" })
+      .count()) > 0
+  ) {
+    await page.getByRole("button", { name: "EN" }).click();
+  }
+
+  await expect(
+    page.getByRole("heading", { name: "Welcome to Platelets" }),
+  ).toBeVisible();
+}
+
 test("redirects protected pages to setup before installation", async ({
   browserName,
   page,
@@ -63,9 +77,18 @@ test("redirects first-run deployments to the setup wizard", async ({
 
   await expect(page).toHaveURL(/\/setup$/);
   await expect(page.getByLabel("Platelets setup wizard")).toBeVisible();
+  await showEnglishSetup(page);
+  await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  await page.getByRole("button", { name: "KO" }).click();
   await expect(
-    page.getByRole("heading", { name: "Welcome to Platelets" }),
+    page.getByRole("heading", {
+      name: "Platelets에 오신 것을 환영합니다",
+    }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "EN" }).click();
+  await showEnglishSetup(page);
+  await page.getByRole("button", { name: "Dark" }).click();
+  await expect(page.locator("main")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
