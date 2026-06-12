@@ -1,13 +1,10 @@
-import { redirect } from "next/navigation";
 import { DisasterDashboard } from "@/components/disaster-dashboard";
-import { isSetupComplete } from "@/lib/setup-state";
+import { requireSetupComplete } from "@/lib/setup-redirect";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  if (!(await isSetupComplete())) {
-    redirect("/setup");
-  }
+  await requireSetupComplete();
 
   return <DisasterDashboard initialView="dashboard" />;
 }
