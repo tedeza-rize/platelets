@@ -273,7 +273,15 @@ type HazardEventRow = {
   title: string;
 };
 
-const dataDirectory = path.join(process.cwd(), "data");
+const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
+const dataDirectory = configuredDataDirectory
+  ? path.isAbsolute(configuredDataDirectory)
+    ? configuredDataDirectory
+    : path.join(
+        /*turbopackIgnore: true*/ process.cwd(),
+        configuredDataDirectory,
+      )
+  : path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
@@ -281,6 +289,18 @@ const KAKAO_LOCAL_DAILY_LIMIT = 100_000;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeTransactionQueue: Promise<void> = Promise.resolve();
+
+export function getDatabaseFilePath() {
+  return databasePath;
+}
+
+export function getDataDirectoryPath() {
+  return dataDirectory;
+}
+
+export function databaseFileExists() {
+  return fs.existsSync(databasePath);
+}
 
 function run(db: SqliteDatabase, sql: string, params: unknown[] = []) {
   return new Promise<void>((resolve, reject) => {

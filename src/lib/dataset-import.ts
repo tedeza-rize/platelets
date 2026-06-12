@@ -27,6 +27,7 @@ import {
   setDatasetUpdateProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
 import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
 
 type CsvRecord = Record<string, unknown>;
@@ -510,12 +511,9 @@ async function downloadCsv(source: DatasetSourceId) {
   throw lastError;
 }
 
-function getKakaoRestApiKey() {
-  return (
-    process.env.KAKAO_REST_API_KEY?.trim() ??
-    process.env.KAKAO_LOCAL_REST_API_KEY?.trim() ??
-    null
-  );
+async function getKakaoRestApiKey() {
+  const { kakaoRestApiKey } = await getRuntimeApiKeys();
+  return kakaoRestApiKey || null;
 }
 
 function parseCsv(csv: string) {
@@ -659,7 +657,7 @@ function sourceRecordIdFromRecord(
 }
 
 async function fetchAedPage(pageNo: number) {
-  const serviceKey = getPublicDataApiKey();
+  const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
     throw new Error(
@@ -1101,7 +1099,7 @@ function compactRecord(record: CsvRecord) {
 }
 
 async function geocodeAddress(address: string) {
-  const restApiKey = getKakaoRestApiKey();
+  const restApiKey = await getKakaoRestApiKey();
 
   if (!address) {
     return null;

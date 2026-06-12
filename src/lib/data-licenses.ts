@@ -36,7 +36,7 @@ export const DATA_LICENSE_ENTRIES = [
     license:
       "OpenStreetMap ODbL, OpenMapTiles 라이선스, OpenFreeMap 이용 조건 준수",
     notes:
-      "OSM 제공자 전환 시 벡터 타일과 글꼴을 불러온다. 자체 경로 계산은 Overpass 도로 그래프의 일방통행과 접근제한 태그를 적용하지만 실시간 교통은 반영하지 않는다. 지도 attribution을 유지한다.",
+      "OSM 제공자 전환 시 벡터 타일과 글꼴을 불러온다. 자체 경로 계산은 Overpass 도로 그래프의 일방통행과 접근제한 태그를 적용하며, ITS API 키가 있으면 인근 교통 표본으로 ETA를 보정한다. 지도 attribution을 유지한다.",
     provider: "OpenFreeMap / OpenMapTiles / OpenStreetMap contributors",
     sourceName: "OpenFreeMap 벡터 타일과 OpenStreetMap 기반 지도 데이터",
     sourceUrl: "https://openfreemap.org/",
@@ -47,7 +47,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "kakao-mobility-directions",
     license: "카카오모빌리티 API 이용약관 및 쿼터 정책 준수",
     notes:
-      "KAKAO_MOBILITY_REST_API_KEY는 서버 환경변수로만 보관한다. 응답 경로와 ETA는 요청 시점 교통·도로 정보에 따라 달라질 수 있다.",
+      "KAKAO_MOBILITY_REST_API_KEY는 서버 환경변수 또는 암호화된 애플리케이션 설정 DB에만 보관한다. 응답 경로와 ETA는 요청 시점 교통·도로 정보에 따라 달라질 수 있다.",
     provider: "카카오모빌리티",
     sourceName: "Kakao Mobility 길찾기 API",
     sourceUrl: "https://developers.kakaomobility.com/docs/navi-api/directions/",
@@ -77,7 +77,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "openai-responses",
     license: "OpenAI 서비스 약관·API 데이터 정책 또는 호환 제공자의 약관 준수",
     notes:
-      "OPENAI_API_KEY는 서버 환경변수로만 보관한다. AI에는 원시 레코드 대신 시설 검색 결과, 데이터셋 집계, 최근 재난의 요약값만 전송하며 응답은 참고 정보다.",
+      "OpenAI API keys are stored in server environment variables or the encrypted application settings database. AI receives summarized facility search results, dataset aggregates, and recent hazard summaries instead of raw records, and responses are reference information.",
     provider: "OpenAI 또는 관리자가 지정한 OpenAI 호환 제공자",
     sourceName: "OpenAI Responses API",
     sourceUrl: "https://developers.openai.com/api/docs/guides/text",
@@ -87,7 +87,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "kakao-local-geocoding",
     license: "카카오 Developers 이용약관 및 Local API 정책 준수",
     notes:
-      "주소 좌표 변환에만 사용하며 KAKAO_REST_API_KEY는 서버 환경변수로만 보관한다. 원문 API 응답은 sudo/debug 용도 외 공개하지 않는다.",
+      "주소 좌표 변환에만 사용하며 KAKAO_REST_API_KEY는 서버 환경변수 또는 암호화된 애플리케이션 설정 DB에만 보관한다. 원문 API 응답은 sudo/debug 용도 외 공개하지 않는다.",
     provider: "카카오",
     sourceName: "Kakao Local 주소 검색 API",
     sourceUrl: "https://developers.kakao.com/docs/latest/ko/local/dev-guide",

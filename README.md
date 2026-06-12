@@ -41,11 +41,20 @@ PLATELETS_ADMIN_TOKEN=
 PLATELETS_SUDO_TOKEN=
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
+PLATELETS_DATA_DIR=data
+PLATELETS_SECRET_KEY=
 ```
 
 `PLATELETS_ADMIN_TOKEN` grants AI-query access. A sudo token also satisfies
 admin access. `PLATELETS_SUDO_TOKEN` protects dataset refreshes, logs, quota
 details, schedules, NTP settings, and AI configuration.
+
+When `data/points.sqlite` or a completed setup state is missing, Platelets
+redirects `/` to `/setup`. The setup assistant stores hashed sudo/admin
+credentials and encrypted API key configuration in SQLite, then sends the
+operator to the integrated disaster dashboard. `PLATELETS_DATA_DIR` can point
+deployments or tests at a different data directory. `PLATELETS_SECRET_KEY`
+overrides the local encryption key file used to protect stored setup secrets.
 
 ## Development
 
@@ -61,15 +70,78 @@ Before changing Next.js code, read the relevant local guide under
 
 ## Verification
 
+Before starting a branch or continuing existing work, synchronize and inspect
+remote state:
+
+```bash
+git fetch --all --prune
+git pull --ff-only
+git branch --all --verbose
+gh pr list --state open
+gh run list --limit 5
+```
+
+Required local order:
+
+1. code changes
+2. linting
+3. tests, including browser verification when relevant
+4. formatting
+5. tests again
+6. git commit
+7. git push
+
 ```bash
 npm run lint
+npm run test
 npm run format
 npm run build
+npm run test:e2e
 npm audit
 ```
 
 For UI work, also verify the affected flow in the in-app browser at desktop
-and mobile breakpoints. Commit each coherent feature or fix separately.
+and mobile breakpoints. Commit each coherent feature, bug fix, or
+documentation/process update separately. Always push after committing;
+completed work should not remain only in local commits.
+
+`npm run test:e2e` runs Playwright against Chromium and Firefox when Playwright
+browser binaries are installed. If local Playwright browsers are unavailable,
+use a system Chrome or Edge channel when present:
+
+```powershell
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "chrome"; npm run test:e2e
+$env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"; npm run test:e2e
+```
+
+If neither is available, use the in-app browser for local verification and rely
+on GitHub Actions for the full Chromium and Firefox run.
+
+## GitHub Flow
+
+Use short-lived branches from `main` and open a pull request back to `main`.
+Recommended branch names:
+
+- `feature/work-name` for new functionality and durable improvements
+- `fix/bug-name` for ordinary bug fixes
+- `hotfix/urgent-fix-name` for urgent production fixes
+
+Create or link a GitHub issue before starting work whenever the scope is more
+than a trivial local cleanup, and always assign at least one GitHub label such
+as `enhancement`, `bug`, or `documentation`. A pull request is merge-ready only
+after the CI workflow passes linting, type tests, production build, and the
+browser smoke test, and any required review or branch-protection checks are
+satisfied.
+
+Useful GitHub CLI commands:
+
+```bash
+gh issue create --title "Work title" --label enhancement --body "Scope and verification plan"
+gh pr create --base main --head feature/work-name --fill
+gh run watch
+gh pr checks
+gh pr merge --merge --delete-branch
+```
 
 ## AI And MCP
 
@@ -163,6 +235,7 @@ ETA and are marked as traffic-aware external routes.
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
+- [CI/CD And GitHub Flow](docs/CI_CD_AND_GITHUB_FLOW.md)
 - [Data Sources And Licenses](docs/DATA_SOURCES_AND_LICENSES.md)
 - [AI Forecast And Response Plan](docs/AI_FORECAST_AND_RESPONSE.md)
 - [Building Safety Data](docs/BUILDING_SAFETY_DATA.md)

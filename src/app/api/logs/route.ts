@@ -22,7 +22,7 @@ function isLogCategory(value: string): value is LogCategory {
 }
 
 export async function GET(request: NextRequest) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
 
   if (forbidden) {
     return forbidden;

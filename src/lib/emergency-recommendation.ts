@@ -303,7 +303,7 @@ export async function recommendEmergencyHospitals(params: {
     limit: 12,
     radiusMeters: 120_000,
   });
-  const useKakaoEta = hasKakaoMobilityKey();
+  const useKakaoEta = await hasKakaoMobilityKey();
   const withEta = await mapWithConcurrency(candidates, 3, async (candidate) => {
     if (useKakaoEta) {
       try {

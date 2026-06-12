@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const forbidden = requireAccessRole(request, "sudo");
+  const forbidden = await requireAccessRole(request, "sudo");
 
   if (forbidden) {
     return forbidden;

@@ -250,7 +250,7 @@ async function fetchPublicDataPage(params: {
   source: DatasetSourceId;
   url: string;
 }) {
-  const serviceKey = getPublicDataApiKey();
+  const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
     throw new Error(
@@ -324,7 +324,7 @@ async function fetchAllPublicData(params: {
 }
 
 async function fetchMoisPharmacyPage(pageNo: number) {
-  const serviceKey = getPublicDataApiKey();
+  const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
     throw new Error(

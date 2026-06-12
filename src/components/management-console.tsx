@@ -19,6 +19,8 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
+import { type AppDictionary, uiText } from "@/lib/i18n";
+import type { OperationalSettings } from "@/lib/operational-settings";
 import styles from "./management-console.module.css";
 
 type DatasetStatus = {
@@ -114,6 +116,7 @@ type TimeStatus = {
 };
 
 type ManagementConsoleProps = {
+  dictionary: AppDictionary;
   mode: "admin" | "sudo";
 };
 
@@ -128,10 +131,7 @@ type DatasetScheduleSettings = Record<
   { enabled: boolean; intervalDays: number }
 >;
 
-const SUDO_TOKEN_STORAGE_KEY = "platelets:sudo-token";
-const ACCESS_TOKEN_HEADER = "x-platelets-admin-token";
-
-function formatDateTime(value: string | null) {
+function formatDateTime(value: string | null, locale: string) {
   if (!value) {
     return "-";
   }
@@ -142,7 +142,7 @@ function formatDateTime(value: string | null) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("ko-KR", {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeZone: "Asia/Seoul",
     timeStyle: "short",
@@ -157,14 +157,14 @@ function formatDuration(value: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatSignedSeconds(value: number | null) {
+function formatSignedSeconds(value: number | null, locale: string) {
   if (value === null) {
     return "-";
   }
 
   const sign = value > 0 ? "+" : "";
 
-  return `${sign}${(value / 1000).toLocaleString("ko-KR", {
+  return `${sign}${(value / 1000).toLocaleString(locale, {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   })}s`;
@@ -216,21 +216,35 @@ function datasetIcon(source: DatasetSourceId) {
   return <HeartPulse aria-hidden="true" size={16} strokeWidth={2.4} />;
 }
 
-function formatImportProgress(progress: DatasetImportProgress | null) {
+function formatImportProgress(
+  progress: DatasetImportProgress | null,
+  dictionary: AppDictionary,
+) {
   if (!progress) {
     return "-";
   }
 
-  const label = progress.status === "paused" ? "일시중단" : "진행 중";
+  const label =
+    progress.status === "paused"
+      ? uiText(dictionary, "일시중단")
+      : uiText(dictionary, "진행 중");
 
-  return `${label} ${progress.nextIndex.toLocaleString(
-    "ko-KR",
-  )}/${progress.totalCount.toLocaleString(
-    "ko-KR",
-  )}, 좌표 ${progress.geocodedCount.toLocaleString("ko-KR")}`;
+  return uiText(dictionary, "진행 중 {current}/{total}, 좌표 {geocoded}", {
+    current: progress.nextIndex.toLocaleString(dictionary.formatLocale),
+    geocoded: progress.geocodedCount.toLocaleString(dictionary.formatLocale),
+    total: progress.totalCount.toLocaleString(dictionary.formatLocale),
+  }).replace(uiText(dictionary, "진행 중"), label);
 }
 
-export function ManagementConsole({ mode }: ManagementConsoleProps) {
+export function ManagementConsole({
+  dictionary,
+  mode,
+}: ManagementConsoleProps) {
+  const t = useCallback(
+    (key: string, values?: Record<string, string | number>) =>
+      uiText(dictionary, key, values),
+    [dictionary],
+  );
   const [datasets, setDatasets] = useState<DatasetStatus[]>([]);
   const [quota, setQuota] = useState<ApiUsageWindow | null>(null);
   const [kmaQuota, setKmaQuota] = useState<ApiUsageWindow | null>(null);
@@ -246,24 +260,36 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   const [schedules, setSchedules] = useState<DatasetScheduleSettings | null>(
     null,
   );
+  const [operationalSettings, setOperationalSettings] =
+    useState<OperationalSettings | null>(null);
   const [savingSchedules, setSavingSchedules] = useState(false);
+  const [savingOperationalSettings, setSavingOperationalSettings] =
+    useState(false);
   const [savingNtpServers, setSavingNtpServers] = useState(false);
   const [clockTick, setClockTick] = useState(0);
-  const [sudoAccessToken, setSudoAccessToken] = useState("");
-  const [sudoTokenLoaded, setSudoTokenLoaded] = useState(false);
+  const [sudoPassword, setSudoPassword] = useState("");
 
-  const title = mode === "sudo" ? "개발자 총 권한 페이지" : "관리자 페이지";
-  const sudoHeaders = useMemo<Record<string, string>>(() => {
-    const token = sudoAccessToken.trim();
-    const headers: Record<string, string> = {};
+  const title =
+    mode === "sudo" ? t("개발자 총 권한 페이지") : t("관리자 페이지");
+  const loginIfNeeded = useCallback(async () => {
+    const password = sudoPassword.trim();
+    if (!password) return;
 
-    if (token) {
-      headers[ACCESS_TOKEN_HEADER] = token;
+    const response = await fetch("/api/auth/login", {
+      body: JSON.stringify({ password }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    const payload = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
+
+    if (!response.ok) {
+      throw new Error(payload?.error ?? t("로그인에 실패했습니다."));
     }
 
-    return headers;
-  }, [sudoAccessToken]);
-  const hasSudoToken = mode === "sudo" && sudoAccessToken.trim().length > 0;
+    setSudoPassword("");
+  }, [sudoPassword, t]);
   const quotaPercent = useMemo(() => {
     if (!quota || quota.monthlyLimit === 0) {
       return 0;
@@ -300,9 +326,10 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     if (!updateProgress) {
       return {
-        currentStep: "업데이트 요청을 서버에 전달하고 있습니다.",
+        currentStep: t("업데이트 요청을 서버에 전달하고 있습니다."),
         percent: 1,
-        title: activeUpdate === "all" ? "전체 데이터 갱신" : "데이터셋 갱신",
+        title:
+          activeUpdate === "all" ? t("전체 데이터 갱신") : t("데이터셋 갱신"),
       };
     }
 
@@ -310,9 +337,11 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       currentStep: `${current.label}: ${updateProgress.message}`,
       percent: updateProgress.percent,
       title:
-        activeUpdate === "all" ? "전체 데이터 갱신" : `${current.label} 갱신`,
+        activeUpdate === "all"
+          ? t("전체 데이터 갱신")
+          : `${current.label} ${t("갱신")}`,
     };
-  }, [activeDatasetSource, activeUpdate, datasets]);
+  }, [activeDatasetSource, activeUpdate, datasets, t]);
   const visibleProgress = progress ?? datasetProgress;
 
   function getCooldown(action: string) {
@@ -344,7 +373,9 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       return "";
     }
 
-    return `다시 가능: ${formatDuration(cooldown.remainingMs)}`;
+    return t("다시 가능: {duration}", {
+      duration: formatDuration(cooldown.remainingMs),
+    });
   }
 
   async function parseUpdateError(response: Response, fallback: string) {
@@ -354,33 +385,45 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     } | null;
 
     if (response.status === 429 && payload?.cooldown) {
-      return `5분 갱신 간격 적용 중입니다. ${formatDuration(
-        payload.cooldown.remainingMs,
-      )} 뒤 다시 시도할 수 있습니다.`;
+      return t(
+        "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.",
+        { duration: formatDuration(payload.cooldown.remainingMs) },
+      );
     }
 
     return payload?.error ?? fallback;
   }
 
   const refresh = useCallback(async () => {
-    const [datasetsResponse, timeResponse, schedulesResponse] =
-      await Promise.all([
-        fetch("/api/datasets", { cache: "no-store" }),
-        fetch("/api/server-time", { cache: "no-store" }),
-        fetch("/api/admin/dataset-schedules", { cache: "no-store" }),
-      ]);
+    const [
+      datasetsResponse,
+      timeResponse,
+      schedulesResponse,
+      operationalSettingsResponse,
+    ] = await Promise.all([
+      fetch("/api/datasets", { cache: "no-store" }),
+      fetch("/api/server-time", { cache: "no-store" }),
+      fetch("/api/admin/dataset-schedules", { cache: "no-store" }),
+      fetch("/api/admin/operational-settings", { cache: "no-store" }),
+    ]);
 
-    if (!datasetsResponse.ok || !timeResponse.ok || !schedulesResponse.ok) {
-      throw new Error("관리 데이터를 불러오지 못했습니다.");
+    if (
+      !datasetsResponse.ok ||
+      !timeResponse.ok ||
+      !schedulesResponse.ok ||
+      !operationalSettingsResponse.ok
+    ) {
+      throw new Error(t("관리 데이터를 불러오지 못했습니다."));
     }
 
     setDatasets((await datasetsResponse.json()).datasets);
     setSchedules((await schedulesResponse.json()).schedules);
+    setOperationalSettings((await operationalSettingsResponse.json()).settings);
     const nextTimeStatus = (await timeResponse.json()) as TimeStatus;
     setTimeStatus(nextTimeStatus);
     setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
 
-    if (mode !== "sudo" || !hasSudoToken) {
+    if (mode !== "sudo") {
       setQuota(null);
       setKmaQuota(null);
       setLogs([]);
@@ -392,19 +435,15 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       await Promise.all([
         fetch("/api/geocoding/quota", {
           cache: "no-store",
-          headers: sudoHeaders,
         }),
         fetch("/api/hazards/quota", {
           cache: "no-store",
-          headers: sudoHeaders,
         }),
         fetch(`/api/logs?limit=12&ts=${Date.now()}`, {
           cache: "no-store",
-          headers: sudoHeaders,
         }),
         fetch("/api/admin/update-cooldowns", {
           cache: "no-store",
-          headers: sudoHeaders,
         }),
       ]);
 
@@ -414,14 +453,14 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       !logsResponse.ok ||
       !cooldownsResponse.ok
     ) {
-      throw new Error("개발자 권한 데이터를 불러오지 못했습니다.");
+      throw new Error(t("개발자 권한 데이터를 불러오지 못했습니다."));
     }
 
     setQuota((await quotaResponse.json()).quota);
     setKmaQuota((await kmaQuotaResponse.json()).quota);
     setLogs((await logsResponse.json()).logs);
     setCooldowns((await cooldownsResponse.json()).cooldowns);
-  }, [hasSudoToken, mode, sudoHeaders]);
+  }, [mode, t]);
 
   async function requestDatasetUpdate(
     source: DatasetSourceId,
@@ -429,12 +468,12 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   ) {
     const response = await fetch(`/api/datasets/${source}/update`, {
       body: JSON.stringify({ mode }),
-      headers: { "Content-Type": "application/json", ...sudoHeaders },
+      headers: { "Content-Type": "application/json" },
       method: "POST",
     });
 
     if (!response.ok) {
-      throw new Error(await parseUpdateError(response, "업데이트 실패"));
+      throw new Error(await parseUpdateError(response, t("업데이트 실패")));
     }
 
     const payload = (await response.json().catch(() => null)) as {
@@ -443,7 +482,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     } | null;
 
     return payload?.paused
-      ? (payload.error ?? "업데이트가 일시중단되었습니다.")
+      ? (payload.error ?? t("업데이트가 일시중단되었습니다."))
       : null;
   }
 
@@ -451,8 +490,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     source: DatasetSourceId | "all",
     updateMode: "restart" | "resume" = "restart",
   ) {
-    if (mode !== "sudo" || !hasSudoToken) {
-      setNotice("개발자 토큰이 필요합니다.");
+    if (mode !== "sudo") {
       return;
     }
 
@@ -465,17 +503,19 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     if (blockedCooldown && !blockedCooldown.available) {
       setNotice(
-        `5분 갱신 간격 적용 중입니다. ${formatDuration(
-          blockedCooldown.remainingMs,
-        )} 뒤 다시 시도할 수 있습니다.`,
+        t(
+          "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.",
+          { duration: formatDuration(blockedCooldown.remainingMs) },
+        ),
       );
       return;
     }
 
     setActiveUpdate(source);
-    setNotice("업데이트 중");
+    setNotice(t("업데이트 중"));
 
     try {
+      await loginIfNeeded();
       let pausedMessage: string | null = null;
 
       if (source === "all") {
@@ -493,7 +533,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
       }
 
       await refresh();
-      setNotice(pausedMessage ?? "업데이트 완료");
+      setNotice(pausedMessage ?? t("업데이트 완료"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -503,17 +543,17 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   async function saveSchedules() {
-    if (mode !== "sudo" || !hasSudoToken || !schedules) {
-      setNotice("개발자 토큰이 필요합니다.");
+    if (mode !== "sudo" || !schedules) {
       return;
     }
 
     setSavingSchedules(true);
 
     try {
+      await loginIfNeeded();
       const response = await fetch("/api/admin/dataset-schedules", {
         body: JSON.stringify({ schedules }),
-        headers: { "Content-Type": "application/json", ...sudoHeaders },
+        headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
 
@@ -521,11 +561,11 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(payload?.error ?? "갱신 주기 저장 실패");
+        throw new Error(payload?.error ?? t("갱신 주기 저장 실패"));
       }
 
       setSchedules((await response.json()).schedules);
-      setNotice("데이터셋 갱신 주기를 저장했습니다.");
+      setNotice(t("데이터셋 갱신 주기를 저장했습니다."));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -533,9 +573,40 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     }
   }
 
+  async function saveOperationalSettingsForm() {
+    if (mode !== "sudo" || !operationalSettings) {
+      return;
+    }
+
+    setSavingOperationalSettings(true);
+
+    try {
+      await loginIfNeeded();
+      const response = await fetch("/api/admin/operational-settings", {
+        body: JSON.stringify({ settings: operationalSettings }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        settings?: OperationalSettings;
+      } | null;
+
+      if (!response.ok || !payload?.settings) {
+        throw new Error(payload?.error ?? t("운영 설정 저장 실패"));
+      }
+
+      setOperationalSettings(payload.settings);
+      setNotice(t("운영 설정을 저장했습니다."));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingOperationalSettings(false);
+    }
+  }
+
   async function updateHazards() {
-    if (mode !== "sudo" || !hasSudoToken) {
-      setNotice("개발자 토큰이 필요합니다.");
+    if (mode !== "sudo") {
       return;
     }
 
@@ -543,43 +614,44 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
     if (blockedCooldown && !blockedCooldown.available) {
       setNotice(
-        `5분 갱신 간격 적용 중입니다. ${formatDuration(
-          blockedCooldown.remainingMs,
-        )} 뒤 다시 시도할 수 있습니다.`,
+        t(
+          "5분 갱신 간격 적용 중입니다. {duration} 뒤 다시 시도할 수 있습니다.",
+          { duration: formatDuration(blockedCooldown.remainingMs) },
+        ),
       );
       return;
     }
 
-    setNotice("지진/지진해일 업데이트 중");
+    setNotice(t("지진/지진해일 업데이트 중"));
     setProgress({
-      currentStep: "기상청 지진/지진해일 정보 요청 중",
+      currentStep: t("기상청 지진/지진해일 정보 요청 중"),
       percent: 35,
-      title: "재난 이벤트 갱신",
+      title: t("재난 이벤트 갱신"),
     });
 
     try {
+      await loginIfNeeded();
       const response = await fetch("/api/hazards/update", {
-        headers: sudoHeaders,
         method: "POST",
       });
 
       if (!response.ok) {
         throw new Error(
-          await parseUpdateError(response, "지진/지진해일 업데이트 실패"),
+          await parseUpdateError(response, t("지진/지진해일 업데이트 실패")),
         );
       }
 
       setProgress({
-        currentStep: "갱신 결과 불러오는 중",
+        currentStep: t("갱신 결과 불러오는 중"),
         percent: 90,
-        title: "재난 이벤트 갱신",
+        title: t("재난 이벤트 갱신"),
       });
       await refresh();
-      setNotice("지진/지진해일 업데이트 완료");
+      setNotice(t("지진/지진해일 업데이트 완료"));
       setProgress({
-        currentStep: "완료",
+        currentStep: t("완료"),
         percent: 100,
-        title: "재난 이벤트 갱신",
+        title: t("재난 이벤트 갱신"),
       });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
@@ -589,22 +661,22 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
   }
 
   async function saveNtpServers() {
-    if (mode !== "sudo" || !hasSudoToken) {
-      setNotice("개발자 토큰이 필요합니다.");
+    if (mode !== "sudo") {
       return;
     }
 
     setSavingNtpServers(true);
-    setNotice("NTP 서버 목록 저장 중");
+    setNotice(t("NTP 서버 목록 저장 중"));
 
     try {
+      await loginIfNeeded();
       const servers = ntpServersDraft
         .split(/\r?\n/)
         .map((server) => server.trim())
         .filter(Boolean);
       const response = await fetch("/api/ntp/servers", {
         body: JSON.stringify({ servers }),
-        headers: { "Content-Type": "application/json", ...sudoHeaders },
+        headers: { "Content-Type": "application/json" },
         method: "PUT",
       });
 
@@ -612,42 +684,17 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
         } | null;
-        throw new Error(payload?.error ?? "NTP 서버 목록 저장 실패");
+        throw new Error(payload?.error ?? t("NTP 서버 목록 저장 실패"));
       }
 
       await refresh();
-      setNotice("NTP 서버 목록 저장 완료");
+      setNotice(t("NTP 서버 목록 저장 완료"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
       setSavingNtpServers(false);
     }
   }
-
-  useEffect(() => {
-    if (mode !== "sudo") {
-      return;
-    }
-
-    setSudoAccessToken(
-      window.sessionStorage.getItem(SUDO_TOKEN_STORAGE_KEY) ?? "",
-    );
-    setSudoTokenLoaded(true);
-  }, [mode]);
-
-  useEffect(() => {
-    if (mode !== "sudo" || !sudoTokenLoaded) {
-      return;
-    }
-
-    const token = sudoAccessToken.trim();
-
-    if (token) {
-      window.sessionStorage.setItem(SUDO_TOKEN_STORAGE_KEY, token);
-    } else {
-      window.sessionStorage.removeItem(SUDO_TOKEN_STORAGE_KEY);
-    }
-  }, [mode, sudoAccessToken, sudoTokenLoaded]);
 
   useEffect(() => {
     refresh().catch((error) => {
@@ -700,20 +747,20 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
     <div className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>{title}</h1>
-        <nav className={styles.navLinks} aria-label="관리 메뉴">
+        <nav className={styles.navLinks} aria-label={t("관리 메뉴")}>
           <Link className={styles.navLink} href="/">
-            지도
+            {t("지도")}
           </Link>
           <Link className={styles.navLink} href="/admin">
-            관리자
+            {t("관리자")}
           </Link>
           {mode === "sudo" ? (
             <>
               <Link className={styles.navLink} href="/sudo">
-                개발자
+                {t("개발자")}
               </Link>
               <Link className={styles.navLink} href="/logs">
-                로그
+                {t("로그")}
               </Link>
             </>
           ) : null}
@@ -726,15 +773,15 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>
                 <Database aria-hidden="true" size={18} strokeWidth={2.4} />
-                데이터셋
+                {t("데이터셋")}
               </span>
             </div>
             <strong className={styles.metric}>
               {datasets
                 .reduce((total, dataset) => total + dataset.recordCount, 0)
-                .toLocaleString("ko-KR")}
+                .toLocaleString(dictionary.formatLocale)}
             </strong>
-            <span className={styles.muted}>저장된 전체 기록</span>
+            <span className={styles.muted}>{t("저장된 전체 기록")}</span>
           </div>
 
           {mode === "sudo" ? (
@@ -747,16 +794,25 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                       size={18}
                       strokeWidth={2.4}
                     />
-                    카카오 로컬 API
+                    {t("카카오 로컬 API")}
                   </span>
                 </div>
                 <strong className={styles.metric}>
-                  {(quota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
-                  {(quota?.monthlyLimit ?? 100000).toLocaleString("ko-KR")}
+                  {(quota?.usedCount ?? 0).toLocaleString(
+                    dictionary.formatLocale,
+                  )}{" "}
+                  /{" "}
+                  {(quota?.monthlyLimit ?? 100000).toLocaleString(
+                    dictionary.formatLocale,
+                  )}
                 </strong>
                 <span className={styles.muted}>
-                  {quotaPercent}% 사용, 리셋{" "}
-                  {formatDateTime(quota?.windowEndsAt ?? null)}
+                  {quotaPercent}
+                  {t("% 사용, 리셋")}{" "}
+                  {formatDateTime(
+                    quota?.windowEndsAt ?? null,
+                    dictionary.formatLocale,
+                  )}
                 </span>
               </div>
 
@@ -768,16 +824,25 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                       size={18}
                       strokeWidth={2.4}
                     />
-                    기상청 지진 API
+                    {t("기상청 지진 API")}
                   </span>
                 </div>
                 <strong className={styles.metric}>
-                  {(kmaQuota?.usedCount ?? 0).toLocaleString("ko-KR")} /{" "}
-                  {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString("ko-KR")}
+                  {(kmaQuota?.usedCount ?? 0).toLocaleString(
+                    dictionary.formatLocale,
+                  )}{" "}
+                  /{" "}
+                  {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString(
+                    dictionary.formatLocale,
+                  )}
                 </strong>
                 <span className={styles.muted}>
-                  {kmaQuotaPercent}% 사용, 리셋{" "}
-                  {formatDateTime(kmaQuota?.windowEndsAt ?? null)}
+                  {kmaQuotaPercent}
+                  {t("% 사용, 리셋")}{" "}
+                  {formatDateTime(
+                    kmaQuota?.windowEndsAt ?? null,
+                    dictionary.formatLocale,
+                  )}
                 </span>
               </div>
 
@@ -789,11 +854,13 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                       size={18}
                       strokeWidth={2.4}
                     />
-                    최근 로그
+                    {t("최근 로그")}
                   </span>
                 </div>
-                <strong className={styles.metric}>{logs.length}</strong>
-                <span className={styles.muted}>최근 12건</span>
+                <strong className={styles.metric}>
+                  {logs.length.toLocaleString(dictionary.formatLocale)}
+                </strong>
+                <span className={styles.muted}>{t("최근 12건")}</span>
               </div>
             </>
           ) : null}
@@ -802,21 +869,109 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         {mode === "sudo" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>개발자 권한</span>
+              <span className={styles.cardTitle}>{t("개발자 권한")}</span>
               <span className={styles.muted}>
-                {hasSudoToken ? "토큰 적용됨" : "토큰 필요"}
+                {sudoPassword ? t("비밀번호 입력됨") : t("세션 필요")}
               </span>
             </div>
             <label className={styles.fieldLabel}>
-              접근 토큰
+              {t("sudo 비밀번호")}
               <input
                 autoComplete="current-password"
                 className={styles.textInput}
-                onChange={(event) => setSudoAccessToken(event.target.value)}
+                onChange={(event) => setSudoPassword(event.target.value)}
                 type="password"
-                value={sudoAccessToken}
+                value={sudoPassword}
               />
             </label>
+          </section>
+        ) : null}
+
+        {mode === "sudo" && operationalSettings ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>{t("운영 설정")}</span>
+              <button
+                className={styles.actionButton}
+                disabled={savingOperationalSettings}
+                onClick={saveOperationalSettingsForm}
+                type="button"
+              >
+                <Save aria-hidden="true" size={16} strokeWidth={2.4} />
+                {t("저장")}
+              </button>
+            </div>
+            <div className={styles.settingsGrid}>
+              <label className={styles.fieldLabel}>
+                <input
+                  checked={operationalSettings.aiAllowPrivateBaseUrl}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            aiAllowPrivateBaseUrl: event.target.checked,
+                          }
+                        : current,
+                    )
+                  }
+                  type="checkbox"
+                />
+                {t("사설망 AI Base URL 허용")}
+              </label>
+              <label className={styles.fieldLabel}>
+                <input
+                  checked={operationalSettings.datasetAutoUpdateEnabled}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            datasetAutoUpdateEnabled: event.target.checked,
+                          }
+                        : current,
+                    )
+                  }
+                  type="checkbox"
+                />
+                {t("데이터셋 자동 갱신")}
+              </label>
+              <label className={styles.fieldLabel}>
+                {t("지진 API 폴링 간격(ms)")}
+                <input
+                  className={styles.textInput}
+                  min={60000}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? {
+                            ...current,
+                            kmaEarthquakePollIntervalMs: Number(
+                              event.target.value,
+                            ),
+                          }
+                        : current,
+                    )
+                  }
+                  type="number"
+                  value={operationalSettings.kmaEarthquakePollIntervalMs}
+                />
+              </label>
+              <label className={styles.fieldLabel}>
+                {t("Overpass API URL")}
+                <input
+                  className={styles.textInput}
+                  onChange={(event) =>
+                    setOperationalSettings((current) =>
+                      current
+                        ? { ...current, overpassApiUrl: event.target.value }
+                        : current,
+                    )
+                  }
+                  value={operationalSettings.overpassApiUrl}
+                />
+              </label>
+            </div>
           </section>
         ) : null}
 
@@ -825,7 +980,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>
                 <Clock3 aria-hidden="true" size={18} strokeWidth={2.4} />
-                자동 갱신 주기
+                {t("자동 갱신 주기")}
               </span>
               <button
                 className={styles.actionButton}
@@ -834,7 +989,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                 type="button"
               >
                 <Save aria-hidden="true" size={16} strokeWidth={2.4} />
-                주기 저장
+                {t("주기 저장")}
               </button>
             </div>
             <div className={styles.scheduleGrid}>
@@ -884,7 +1039,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                         type="number"
                         value={schedule.intervalDays}
                       />
-                      <span>일마다</span>
+                      <span>{t("일마다")}</span>
                     </label>
                   </div>
                 );
@@ -896,7 +1051,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         {mode === "sudo" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>데이터 갱신</span>
+              <span className={styles.cardTitle}>{t("데이터 갱신")}</span>
             </div>
             <div className={styles.actions}>
               <button
@@ -914,7 +1069,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                   size={16}
                   strokeWidth={2.4}
                 />
-                전체
+                {t("전체")}
                 {allDatasetCooldown ? (
                   <span className={styles.buttonMeta}>
                     {formatDuration(allDatasetCooldown.remainingMs)}
@@ -977,7 +1132,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                         size={16}
                         strokeWidth={2.4}
                       />
-                      처음부터 다시 하기
+                      {t("처음부터 다시 하기")}
                     </button>
                     <button
                       className={styles.actionButton}
@@ -991,7 +1146,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                         size={16}
                         strokeWidth={2.4}
                       />
-                      이어서 하기
+                      {t("이어서 하기")}
                     </button>
                   </div>
                 );
@@ -1007,7 +1162,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                 type="button"
               >
                 <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
-                지진/지진해일
+                {t("지진/지진해일")}
                 {hazardsCooldown && !hazardsCooldown.available ? (
                   <span className={styles.buttonMeta}>
                     {formatDuration(hazardsCooldown.remainingMs)}
@@ -1024,12 +1179,12 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>
                 <Clock3 aria-hidden="true" size={18} strokeWidth={2.4} />
-                NTP 시간 기준
+                {t("NTP 시간 기준")}
               </span>
             </div>
             <div className={styles.settingsGrid}>
               <label className={styles.fieldLabel}>
-                서버 목록
+                {t("서버 목록")}
                 <textarea
                   className={styles.textarea}
                   onChange={(event) => setNtpServersDraft(event.target.value)}
@@ -1040,19 +1195,20 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
               <div className={styles.statusPanel}>
                 <dl className={styles.compactDetails}>
                   <div>
-                    <dt>선택 서버</dt>
+                    <dt>{t("선택 서버")}</dt>
                     <dd>{timeStatus?.ntp.selected?.host ?? "-"}</dd>
                   </div>
                   <div>
-                    <dt>서버-NTP 오차</dt>
+                    <dt>{t("서버-NTP 오차")}</dt>
                     <dd>
                       {formatSignedSeconds(
                         timeStatus?.ntp.selected?.offsetMs ?? null,
+                        dictionary.formatLocale,
                       )}
                     </dd>
                   </div>
                   <div>
-                    <dt>왕복 지연</dt>
+                    <dt>{t("왕복 지연")}</dt>
                     <dd>
                       {timeStatus?.ntp.selected?.roundTripDelayMs === null ||
                       timeStatus?.ntp.selected?.roundTripDelayMs === undefined
@@ -1063,9 +1219,12 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                     </dd>
                   </div>
                   <div>
-                    <dt>경고 기준</dt>
+                    <dt>{t("경고 기준")}</dt>
                     <dd>
-                      {formatSignedSeconds(timeStatus?.thresholdMs ?? 3000)}
+                      {formatSignedSeconds(
+                        timeStatus?.thresholdMs ?? 3000,
+                        dictionary.formatLocale,
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -1076,7 +1235,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
                   type="button"
                 >
                   <Save aria-hidden="true" size={16} strokeWidth={2.4} />
-                  저장
+                  {t("저장")}
                 </button>
               </div>
             </div>
@@ -1085,30 +1244,49 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
 
         <section className={styles.card}>
           <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>데이터셋 상태</span>
+            <span className={styles.cardTitle}>{t("데이터셋 상태")}</span>
           </div>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>데이터셋</th>
-                  <th>기록</th>
-                  <th>좌표</th>
-                  <th>실패</th>
-                  <th>진행</th>
-                  <th>가져온 시각</th>
-                  {mode === "sudo" ? <th>오류</th> : null}
+                  <th>{t("데이터셋")}</th>
+                  <th>{t("기록")}</th>
+                  <th>{t("좌표")}</th>
+                  <th>{t("실패")}</th>
+                  <th>{t("진행")}</th>
+                  <th>{t("가져온 시각")}</th>
+                  {mode === "sudo" ? <th>{t("오류")}</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {datasets.map((dataset) => (
                   <tr key={dataset.id}>
                     <td>{dataset.label}</td>
-                    <td>{dataset.recordCount.toLocaleString("ko-KR")}</td>
-                    <td>{dataset.geocodedCount.toLocaleString("ko-KR")}</td>
-                    <td>{dataset.failedCount.toLocaleString("ko-KR")}</td>
-                    <td>{formatImportProgress(dataset.importProgress)}</td>
-                    <td>{formatDateTime(dataset.fetchedAt)}</td>
+                    <td>
+                      {dataset.recordCount.toLocaleString(
+                        dictionary.formatLocale,
+                      )}
+                    </td>
+                    <td>
+                      {dataset.geocodedCount.toLocaleString(
+                        dictionary.formatLocale,
+                      )}
+                    </td>
+                    <td>
+                      {dataset.failedCount.toLocaleString(
+                        dictionary.formatLocale,
+                      )}
+                    </td>
+                    <td>
+                      {formatImportProgress(dataset.importProgress, dictionary)}
+                    </td>
+                    <td>
+                      {formatDateTime(
+                        dataset.fetchedAt,
+                        dictionary.formatLocale,
+                      )}
+                    </td>
                     {mode === "sudo" ? <td>{dataset.error ?? "-"}</td> : null}
                   </tr>
                 ))}
@@ -1120,27 +1298,29 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
         {mode === "sudo" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>최근 로그</span>
+              <span className={styles.cardTitle}>{t("최근 로그")}</span>
               <Link className={styles.navLink} href="/logs">
-                전체 보기
+                {t("전체 보기")}
               </Link>
             </div>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>시각</th>
-                    <th>상태</th>
-                    <th>분류</th>
-                    <th>작업</th>
-                    <th>메시지</th>
-                    {mode === "sudo" ? <th>상세</th> : null}
+                    <th>{t("시각")}</th>
+                    <th>{t("상태")}</th>
+                    <th>{t("분류")}</th>
+                    <th>{t("작업")}</th>
+                    <th>{t("메시지")}</th>
+                    {mode === "sudo" ? <th>{t("상세")}</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {logs.map((log) => (
                     <tr key={log.id}>
-                      <td>{formatDateTime(log.eventAt)}</td>
+                      <td>
+                        {formatDateTime(log.eventAt, dictionary.formatLocale)}
+                      </td>
                       <td className={statusClassName(log.status)}>
                         {log.status}
                       </td>
@@ -1175,7 +1355,7 @@ export function ManagementConsole({ mode }: ManagementConsoleProps) {
               <span>{visibleProgress.percent}%</span>
             </div>
             <div
-              aria-label="갱신 진행률"
+              aria-label={t("갱신 진행률")}
               aria-valuemax={100}
               aria-valuemin={0}
               aria-valuenow={visibleProgress.percent}

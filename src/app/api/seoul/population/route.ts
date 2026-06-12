@@ -4,6 +4,7 @@ import {
   SEOUL_CITYDATA_AREA_BY_NAME,
 } from "@/data/seoul-citydata-areas";
 import { noStoreJson } from "@/lib/http";
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,14 +46,12 @@ type CacheEntry = {
 };
 
 const SEOUL_CITYDATA_CACHE_MS = 60_000;
+const SEOUL_CITYDATA_TIMEOUT_MS = 10_000;
 const seoulPopulationCache = new Map<string, CacheEntry>();
 
-function getSeoulOpenApiKey() {
-  return (
-    process.env.SEOUL_OPEN_API_KEY?.trim() ??
-    process.env.SEOUL_CITYDATA_API_KEY?.trim() ??
-    null
-  );
+async function getSeoulOpenApiKey() {
+  const { seoulOpenApiKey } = await getRuntimeApiKeys();
+  return seoulOpenApiKey || null;
 }
 
 function toNumber(value: string | number | undefined) {
@@ -160,7 +159,7 @@ export async function GET(request: NextRequest) {
     return noStoreJson({ population: cached.payload });
   }
 
-  const apiKey = getSeoulOpenApiKey();
+  const apiKey = await getSeoulOpenApiKey();
 
   if (!apiKey) {
     return noStoreJson(
@@ -170,11 +169,23 @@ export async function GET(request: NextRequest) {
   }
 
   const url = new URL(
-    `http://openapi.seoul.go.kr:8088/${encodeURIComponent(
+    `https://openapi.seoul.go.kr:8088/${encodeURIComponent(
       apiKey,
     )}/json/citydata_ppltn/1/5/${encodeURIComponent(area.areaName)}`,
   );
-  const response = await fetch(url, { cache: "no-store" });
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(SEOUL_CITYDATA_TIMEOUT_MS),
+    });
+  } catch {
+    return noStoreJson(
+      { error: "Seoul citydata request failed" },
+      { status: 502 },
+    );
+  }
 
   if (!response.ok) {
     return noStoreJson(
@@ -183,7 +194,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const payload = (await response.json()) as unknown;
+  let payload: unknown;
+
+  try {
+    payload = await response.json();
+  } catch {
+    return noStoreJson(
+      { error: "Seoul citydata request failed" },
+      { status: 502 },
+    );
+  }
+
   const row = findCitydataRow(payload);
 
   if (!row) {

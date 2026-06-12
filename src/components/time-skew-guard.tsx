@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./time-skew-guard.module.css";
 
 const DISMISS_STORAGE_KEY = "platelets:hide-time-skew-warning";
@@ -35,23 +36,23 @@ type WarningState = {
   thresholdMs: number;
 };
 
-function formatDateTime(value: string | number) {
-  return new Intl.DateTimeFormat("ko-KR", {
+function formatDateTime(value: string | number, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeZone: "Asia/Seoul",
     timeStyle: "medium",
   }).format(new Date(value));
 }
 
-function formatSeconds(value: number) {
-  return (Math.abs(value) / 1000).toLocaleString("ko-KR", {
+function formatSeconds(value: number, locale: string) {
+  return (Math.abs(value) / 1000).toLocaleString(locale, {
     maximumFractionDigits: 2,
     minimumFractionDigits: 0,
   });
 }
 
-function formatMilliseconds(value: number) {
-  return Math.round(value).toLocaleString("ko-KR");
+function formatMilliseconds(value: number, locale: string) {
+  return Math.round(value).toLocaleString(locale);
 }
 
 function getTimestamp(value: string | undefined, fallback: number) {
@@ -82,7 +83,8 @@ function saveDismissed() {
   } catch {}
 }
 
-export function TimeSkewGuard() {
+export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
+  const t = (key: string) => uiText(dictionary, key);
   const [warning, setWarning] = useState<WarningState | null>(null);
   const [suppressFutureWarnings, setSuppressFutureWarnings] = useState(false);
 
@@ -193,9 +195,9 @@ export function TimeSkewGuard() {
         role="dialog"
       >
         <div className={styles.header}>
-          <h2 id="time-skew-title">시간 동기화 경고</h2>
+          <h2 id="time-skew-title">{t("시간 동기화 경고")}</h2>
           <button
-            aria-label="시간 경고 닫기"
+            aria-label={t("시간 경고 닫기")}
             className={styles.closeButton}
             onClick={closeWarning}
             type="button"
@@ -205,20 +207,26 @@ export function TimeSkewGuard() {
         </div>
         <p>
           {warning.showDiagnostics
-            ? "클라이언트-서버 또는 서버-NTP 시간 오차가"
-            : "클라이언트-서버 시간 오차가"}{" "}
-          {formatSeconds(warning.thresholdMs)}초 기준을 넘었습니다. 요청/응답
-          지연을 반영해 계산했으며, 이벤트 발생 시각과 갱신 기록이 다르게 보일
-          수 있습니다.
+            ? t("클라이언트-서버 또는 서버-NTP 시간 오차가")
+            : t("클라이언트-서버 시간 오차가")}{" "}
+          {formatSeconds(warning.thresholdMs, dictionary.formatLocale)}
+          {t(
+            "초 기준을 넘었습니다. 요청/응답 지연을 반영해 계산했으며, 이벤트 발생 시각과 갱신 기록이 다르게 보일 수 있습니다.",
+          )}
         </p>
         <dl className={styles.details}>
           <div>
-            <dt>클라이언트-서버</dt>
+            <dt>{t("클라이언트-서버")}</dt>
             <dd>
-              {formatSeconds(warning.clientServerDiffMs)}초
+              {formatSeconds(
+                warning.clientServerDiffMs,
+                dictionary.formatLocale,
+              )}
+              {t("초")}
               {warning.clientServerUncertaintyMs >= 1
-                ? ` (지연 여유 ±${formatMilliseconds(
+                ? ` (${t("지연 여유")} ±${formatMilliseconds(
                     warning.clientServerUncertaintyMs,
+                    dictionary.formatLocale,
                   )}ms)`
                 : ""}
             </dd>
@@ -226,36 +234,48 @@ export function TimeSkewGuard() {
           {warning.showDiagnostics ? (
             <>
               <div>
-                <dt>서버</dt>
-                <dd>{formatDateTime(warning.serverTime)}</dd>
-              </div>
-              <div>
-                <dt>클라이언트</dt>
-                <dd>{formatDateTime(warning.clientTime)}</dd>
-              </div>
-              <div>
-                <dt>요청 왕복</dt>
+                <dt>{t("서버")}</dt>
                 <dd>
-                  {formatMilliseconds(warning.clientServerRoundTripMs)}ms
+                  {formatDateTime(warning.serverTime, dictionary.formatLocale)}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("클라이언트")}</dt>
+                <dd>
+                  {formatDateTime(warning.clientTime, dictionary.formatLocale)}
+                </dd>
+              </div>
+              <div>
+                <dt>{t("요청 왕복")}</dt>
+                <dd>
+                  {formatMilliseconds(
+                    warning.clientServerRoundTripMs,
+                    dictionary.formatLocale,
+                  )}
+                  ms
                   {warning.serverProcessingMs >= 1
-                    ? `, 서버 처리 ${formatMilliseconds(
+                    ? `, ${t("서버 처리")} ${formatMilliseconds(
                         warning.serverProcessingMs,
+                        dictionary.formatLocale,
                       )}ms`
                     : ""}
                 </dd>
               </div>
               <div>
-                <dt>서버-NTP</dt>
+                <dt>{t("서버-NTP")}</dt>
                 <dd>
                   {warning.serverNtpOffsetMs === null
-                    ? "확인 불가"
-                    : `${formatSeconds(warning.serverNtpOffsetMs)}초`}
+                    ? t("확인 불가")
+                    : `${formatSeconds(
+                        warning.serverNtpOffsetMs,
+                        dictionary.formatLocale,
+                      )}${t("초")}`}
                 </dd>
               </div>
               <div>
                 <dt>NTP</dt>
                 <dd>
-                  {warning.ntpServer ?? warning.ntpError ?? "응답 없음"}
+                  {warning.ntpServer ?? warning.ntpError ?? t("응답 없음")}
                   {warning.ntpRoundTripDelayMs !== null
                     ? `, RTT ${Math.round(warning.ntpRoundTripDelayMs)}ms`
                     : ""}
@@ -273,14 +293,14 @@ export function TimeSkewGuard() {
               }
               type="checkbox"
             />
-            다시 보지 않기
+            {t("다시 보지 않기")}
           </label>
           <button
             className={styles.actionButton}
             onClick={closeWarning}
             type="button"
           >
-            확인
+            {t("확인")}
           </button>
         </div>
       </section>

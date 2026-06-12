@@ -1,9 +1,8 @@
-export function getPublicDataApiKey() {
-  const key =
-    process.env.PUBLIC_DATA_API_KEY ??
-    process.env.DATA_GO_KR_API_KEY ??
-    process.env.DATA_GO_KR_SERVICE_KEY ??
-    null;
+import { getRuntimeApiKeys } from "@/lib/runtime-config";
+
+export async function getPublicDataApiKey() {
+  const { publicDataApiKey } = await getRuntimeApiKeys();
+  const key = publicDataApiKey || null;
 
   if (!key) {
     return null;

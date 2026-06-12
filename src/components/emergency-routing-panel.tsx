@@ -2,6 +2,7 @@
 
 import { Ambulance, Flame, LoaderCircle, Route, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./map-shell.module.css";
 
 type Coordinate = {
@@ -80,35 +81,48 @@ function minutes(seconds: number) {
   return Math.max(1, Math.round(seconds / 60));
 }
 
-function routeProviderLabel(route: EmergencyRouteResult) {
+function routeProviderLabel(
+  route: EmergencyRouteResult,
+  t: (key: string) => string,
+) {
   if (route.provider === "kakao") {
-    return route.traffic?.status === "live" ? "카카오 교통 반영" : "카카오맵";
+    return route.traffic?.status === "live"
+      ? t("카카오 교통 반영")
+      : t("카카오맵");
   }
 
-  return route.traffic?.status === "live" ? "자체 A* + ITS 교통" : "자체 A*";
+  return route.traffic?.status === "live"
+    ? t("자체 A* + ITS 교통")
+    : t("자체 A*");
 }
 
-function routeTrafficText(route: EmergencyRouteResult) {
+function routeTrafficText(
+  route: EmergencyRouteResult,
+  t: (key: string) => string,
+) {
   if (!route.traffic) {
     return null;
   }
 
   if (route.traffic.status === "unconfigured") {
-    return "ITS 교통 API 키 미설정";
+    return t("ITS 교통 API 키 미설정");
   }
 
   return route.traffic.message;
 }
 
 export function EmergencyRoutingPanel({
+  dictionary,
   onClose,
   onRoute,
   origin,
 }: {
+  dictionary: AppDictionary;
   onClose: () => void;
   onRoute: (route: EmergencyRouteResult) => void;
   origin: Coordinate;
 }) {
+  const t = (key: string) => uiText(dictionary, key);
   const [incidentType, setIncidentType] = useState<"ambulance" | "fire">(
     "ambulance",
   );
@@ -144,13 +158,13 @@ export function EmergencyRoutingPanel({
       const payload = (await response.json()) as RecommendationResponse;
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "응급기관 추천에 실패했습니다.");
+        throw new Error(payload.error ?? t("응급기관 추천에 실패했습니다."));
       }
 
       setDispatchStation(payload.dispatchStation);
       setResults(payload.hospitals);
       if (payload.hospitals.length === 0) {
-        setError("조건을 충족하는 응급의료기관 데이터가 없습니다.");
+        setError(t("조건을 충족하는 응급의료기관 데이터가 없습니다."));
       }
     } catch (requestError) {
       setError(
@@ -186,7 +200,7 @@ export function EmergencyRoutingPanel({
       };
 
       if (!response.ok || !payload.route) {
-        throw new Error(payload.error ?? "이송 경로 계산에 실패했습니다.");
+        throw new Error(payload.error ?? t("이송 경로 계산에 실패했습니다."));
       }
 
       setActiveRoute(payload.route);
@@ -209,11 +223,11 @@ export function EmergencyRoutingPanel({
     >
       <header className={styles.emergencyPanelHeader}>
         <div>
-          <span>도로 이동시간 기반</span>
-          <h2 id="emergency-routing-title">응급 출동·이송 추천</h2>
+          <span>{t("도로 이동시간 기반")}</span>
+          <h2 id="emergency-routing-title">{t("응급 출동·이송 추천")}</h2>
         </div>
         <button
-          aria-label="응급 이송 패널 닫기"
+          aria-label={t("응급 이송 패널 닫기")}
           onClick={onClose}
           type="button"
         >
@@ -227,60 +241,61 @@ export function EmergencyRoutingPanel({
           onClick={() => setIncidentType("ambulance")}
           type="button"
         >
-          <Ambulance aria-hidden="true" size={17} /> 구급
+          <Ambulance aria-hidden="true" size={17} /> {t("구급")}
         </button>
         <button
           aria-pressed={incidentType === "fire"}
           onClick={() => setIncidentType("fire")}
           type="button"
         >
-          <Flame aria-hidden="true" size={17} /> 화재
+          <Flame aria-hidden="true" size={17} /> {t("화재")}
         </button>
       </div>
 
       <div className={styles.emergencyFields}>
         <label>
-          환자 유형
+          {t("환자 유형")}
           <select
             onChange={(event) => setPatientType(event.target.value)}
             value={patientType}
           >
-            <option value="none">미선택</option>
-            <option value="infant">영유아·소아</option>
-            <option value="adult">성인</option>
-            <option value="elderly">고령자</option>
-            <option value="pregnant">임산부</option>
+            <option value="none">{t("미선택")}</option>
+            <option value="infant">{t("영유아·소아")}</option>
+            <option value="adult">{t("성인")}</option>
+            <option value="elderly">{t("고령자")}</option>
+            <option value="pregnant">{t("임산부")}</option>
           </select>
         </label>
         <label>
-          증상·상태
+          {t("증상·상태")}
           <select
             onChange={(event) => setSymptom(event.target.value)}
             value={symptom}
           >
             {SYMPTOMS.map(([value, label]) => (
               <option key={value} value={value}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          경로 계산
+          {t("경로 계산")}
           <select
             onChange={(event) =>
               setProvider(event.target.value === "kakao" ? "kakao" : "astar")
             }
             value={provider}
           >
-            <option value="astar">자체 A* (OSM 도로망)</option>
-            <option value="kakao">카카오맵 길찾기</option>
+            <option value="astar">{t("자체 A* (OSM 도로망)")}</option>
+            <option value="kakao">{t("카카오맵 길찾기")}</option>
           </select>
         </label>
       </div>
 
       <p className={styles.emergencyOrigin}>
-        사고 지점 {origin.latitude.toFixed(5)}, {origin.longitude.toFixed(5)}
+        {t("사고 지점")} {origin.latitude.toFixed(5)},{" "}
+        {origin.longitude.toFixed(5)}
       </p>
       <button
         className={styles.emergencyRecommendButton}
@@ -297,23 +312,23 @@ export function EmergencyRoutingPanel({
         ) : (
           <Route aria-hidden="true" size={17} />
         )}
-        {isLoading ? "후보와 도로시간 계산 중" : "추천 병원 계산"}
+        {isLoading ? t("후보와 도로시간 계산 중") : t("추천 병원 계산")}
       </button>
 
       {dispatchStation ? (
         <p className={styles.dispatchStation}>
-          출동 후보: {dispatchStation.name} ·{" "}
+          {t("출동 후보:")} {dispatchStation.name} ·{" "}
           {(dispatchStation.distanceMeters / 1000).toFixed(1)}km
         </p>
       ) : null}
       {error ? <p className={styles.emergencyError}>{error}</p> : null}
       {activeRoute ? (
         <p className={styles.emergencyRouteSummary}>
-          {routeProviderLabel(activeRoute)} 경로 ·{" "}
-          {minutes(activeRoute.durationSeconds)}분 ·{" "}
-          {(activeRoute.distanceMeters / 1000).toFixed(1)}km
-          {routeTrafficText(activeRoute) ? (
-            <> · {routeTrafficText(activeRoute)}</>
+          {routeProviderLabel(activeRoute, t)} {t("경로 ·")}{" "}
+          {minutes(activeRoute.durationSeconds)}
+          {t("분 ·")} {(activeRoute.distanceMeters / 1000).toFixed(1)}km
+          {routeTrafficText(activeRoute, t) ? (
+            <> · {routeTrafficText(activeRoute, t)}</>
           ) : null}
         </p>
       ) : null}
@@ -324,11 +339,14 @@ export function EmergencyRoutingPanel({
             <li key={hospital.id}>
               <div className={styles.hospitalResultHeader}>
                 <strong>{hospital.name}</strong>
-                <b>{hospital.score.toFixed(1)}점</b>
+                <b>
+                  {hospital.score.toFixed(1)}
+                  {t("점")}
+                </b>
               </div>
               <p>
-                {hospital.category} · {minutes(hospital.durationSeconds)}분 ·{" "}
-                {(hospital.distanceMeters / 1000).toFixed(1)}km
+                {hospital.category} · {minutes(hospital.durationSeconds)}
+                {t("분 ·")} {(hospital.distanceMeters / 1000).toFixed(1)}km
               </p>
               <small>{hospital.reasons.join(" · ")}</small>
               <button
@@ -337,8 +355,8 @@ export function EmergencyRoutingPanel({
                 type="button"
               >
                 {routingHospitalId === hospital.id
-                  ? "경로 계산 중"
-                  : "이 병원으로 경로 보기"}
+                  ? t("경로 계산 중")
+                  : t("이 병원으로 경로 보기")}
               </button>
             </li>
           ))}

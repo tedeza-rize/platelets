@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { getAccessSessionRole, SESSION_COOKIE_NAME } from "@/lib/auth-sessions";
 import { noStoreJson } from "@/lib/http";
 
 export type AccessRole = "admin" | "sudo";
@@ -9,15 +9,6 @@ const ACCESS_ROLE_LEVEL = {
   admin: 1,
   sudo: 2,
 } as const satisfies Record<AccessRole, number>;
-
-function configuredToken(role: AccessRole) {
-  const value =
-    role === "sudo"
-      ? process.env.PLATELETS_SUDO_TOKEN
-      : process.env.PLATELETS_ADMIN_TOKEN;
-
-  return value?.trim() ?? "";
-}
 
 function requestToken(request: Request) {
   const explicitToken = request.headers.get(ACCESS_TOKEN_HEADER)?.trim();
@@ -31,40 +22,28 @@ function requestToken(request: Request) {
 
   return authorization.startsWith(bearerPrefix)
     ? authorization.slice(bearerPrefix.length).trim()
-    : "";
+    : requestCookie(request, SESSION_COOKIE_NAME);
 }
 
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
+function requestCookie(request: Request, name: string) {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const cookies = cookieHeader.split(";").map((part) => part.trim());
+  const prefix = `${name}=`;
+  const cookie = cookies.find((part) => part.startsWith(prefix));
 
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
-  }
-
-  return timingSafeEqual(leftBuffer, rightBuffer);
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
 }
 
-export function getRequestAccessRole(request: Request): AccessRole | null {
+export async function getRequestAccessRole(
+  request: Request,
+): Promise<AccessRole | null> {
   const token = requestToken(request);
 
   if (!token) {
     return null;
   }
 
-  const sudoToken = configuredToken("sudo");
-
-  if (sudoToken && safeEqual(token, sudoToken)) {
-    return "sudo";
-  }
-
-  const adminToken = configuredToken("admin");
-
-  if (adminToken && safeEqual(token, adminToken)) {
-    return "admin";
-  }
-
-  return null;
+  return getAccessSessionRole(token);
 }
 
 export function canAccessRole(
@@ -77,20 +56,11 @@ export function canAccessRole(
   );
 }
 
-export function requireAccessRole(request: Request, requiredRole: AccessRole) {
-  const hasRequiredToken =
-    requiredRole === "sudo"
-      ? Boolean(configuredToken("sudo"))
-      : Boolean(configuredToken("admin") || configuredToken("sudo"));
-
-  if (!hasRequiredToken) {
-    return noStoreJson(
-      { error: `${requiredRole} access token is not configured.` },
-      { status: 503 },
-    );
-  }
-
-  const actualRole = getRequestAccessRole(request);
+export async function requireAccessRole(
+  request: Request,
+  requiredRole: AccessRole,
+) {
+  const actualRole = await getRequestAccessRole(request);
 
   if (!actualRole) {
     return noStoreJson(
