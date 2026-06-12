@@ -33,10 +33,8 @@ test("redirects first-run deployments to the setup wizard", async ({
   ).toBeVisible();
   await page.getByLabel("Full name").fill("Setup Sudo");
   await page.getByLabel("Email address").fill("sudo@example.com");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill("strong-sudo-password");
-  await page.getByLabel("Confirm password").fill("strong-sudo-password");
+  await page.getByLabel("Password", { exact: true }).fill("StrongSudoPass1!");
+  await page.getByLabel("Confirm password").fill("StrongSudoPass1!");
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(
@@ -44,10 +42,8 @@ test("redirects first-run deployments to the setup wizard", async ({
   ).toBeVisible();
   await page.getByLabel("Full name").fill("Setup Admin");
   await page.getByLabel("Email address").fill("admin@example.com");
-  await page
-    .getByLabel("Password", { exact: true })
-    .fill("strong-admin-password");
-  await page.getByLabel("Confirm password").fill("strong-admin-password");
+  await page.getByLabel("Password", { exact: true }).fill("StrongAdminPass1!");
+  await page.getByLabel("Confirm password").fill("StrongAdminPass1!");
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.getByRole("heading", { name: "API keys" })).toBeVisible();
