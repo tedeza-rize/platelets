@@ -1,4 +1,8 @@
 import {
+  listBigData119OperationalSummaries,
+  summarizeOperationalLoadForRiskArea,
+} from "@/lib/disaster-response/bigdata119-operational-data";
+import {
   type FireSafetyRegionalStat,
   listFireSafetyRegionalStats,
   summarizeStatsForRiskArea,
@@ -6,6 +10,7 @@ import {
 import { distanceMeters } from "@/lib/disaster-response/geo";
 import { BASE_RISK_AREAS } from "@/lib/disaster-response/mock-data";
 import type {
+  BigData119OperationalSummary,
   Incident,
   RiskArea,
   RiskLevel,
@@ -20,6 +25,7 @@ type MappedPoint = EmergencyPointMarker & {
 type RiskInfrastructureContext = {
   fireSafetyTargetCounts: Map<string, number>;
   fireWaterSourceCounts: Map<string, number>;
+  operationalSummaries: BigData119OperationalSummary[];
   regionalStats: FireSafetyRegionalStat[];
 };
 
@@ -73,6 +79,7 @@ export class RiskPredictionService {
         ...fireWaterSources,
         ...busanFireWaterSources,
       ]),
+      operationalSummaries: listBigData119OperationalSummaries(),
       regionalStats: listFireSafetyRegionalStats(),
     };
   }
@@ -97,6 +104,12 @@ export class RiskPredictionService {
       const regionalStat = infrastructure
         ? summarizeStatsForRiskArea(area, infrastructure.regionalStats)
         : null;
+      const operationalLoad = infrastructure
+        ? summarizeOperationalLoadForRiskArea(
+            area,
+            infrastructure.operationalSummaries,
+          )
+        : null;
       const fireSafetyTargetScore = Math.min(18, fireSafetyTargetCount * 3);
       const fireWaterCoverageScore =
         fireWaterSourceCount > 0 ? -Math.min(6, fireWaterSourceCount) : 4;
@@ -116,6 +129,9 @@ export class RiskPredictionService {
             ? -2
             : 4
         : 0;
+      const operationalLoadScore = operationalLoad
+        ? Math.min(12, Math.round(Math.log1p(operationalLoad.rowCount) * 2.5))
+        : 0;
       const score = Math.min(
         100,
         Math.round(
@@ -128,6 +144,7 @@ export class RiskPredictionService {
             rescueLoadScore +
             casualtyScore +
             resourceCoverageScore +
+            operationalLoadScore +
             timeOfDayScore(now),
         ),
       );
@@ -144,6 +161,9 @@ export class RiskPredictionService {
         regionalStat
           ? `소방력 참고: 소방차 ${regionalStat.fireEngineCount.toLocaleString("ko-KR")}대, 구급차 ${regionalStat.ambulanceCount.toLocaleString("ko-KR")}대`
           : "소방력 통계 없음",
+        operationalLoad
+          ? `119 신고·출동 샘플 ${operationalLoad.rowCount.toLocaleString("ko-KR")}건 반영: ${operationalLoad.sourceLabels.join(", ")}`
+          : "119 신고·출동 운영 데이터 지역 매칭 없음",
         `시간대 가중치 +${timeOfDayScore(now)}`,
       ];
 

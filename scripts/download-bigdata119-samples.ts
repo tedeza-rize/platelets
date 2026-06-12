@@ -82,6 +82,30 @@ const PRODUCTS: ProductConfig[] = [
     pointDataset: false,
     sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9",
   },
+  {
+    goodsManagementSerial: "377",
+    outputFileName: "seoul-119-call-reception.csv",
+    pointDataset: false,
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=377",
+  },
+  {
+    goodsManagementSerial: "390",
+    outputFileName: "busan-ems-dispatches.csv",
+    pointDataset: false,
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=390",
+  },
+  {
+    goodsManagementSerial: "381",
+    outputFileName: "busan-rescue-dispatches.csv",
+    pointDataset: false,
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=381",
+  },
+  {
+    goodsManagementSerial: "296",
+    outputFileName: "jeonbuk-119-call-reception.csv",
+    pointDataset: false,
+    sourceUrl: "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=296",
+  },
 ];
 
 const APPROXIMATE_COORDINATES: Array<[string, number, number]> = [

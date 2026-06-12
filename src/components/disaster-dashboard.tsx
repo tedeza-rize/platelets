@@ -4,6 +4,8 @@ import {
   AlertTriangle,
   Ambulance,
   Building2,
+  Database,
+  Droplets,
   Flame,
   Hospital,
   Layers,
@@ -20,17 +22,24 @@ import type {
   MapGeoJSONFeature,
   MapLayerMouseEvent,
   Map as MapLibreMap,
+  Popup as MapLibrePopup,
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { BuildingSafetyProfile } from "@/lib/building-safety/types";
 import type {
+  BigData119MapPoint,
+  BigData119OperationalKind,
+  BigData119OperationalSummary,
+  BigData119PointKind,
+  BigData119SourceSummary,
   DispatchRecommendation,
   FireStation,
   Hospital as HospitalModel,
   HospitalRecommendation,
   Incident,
+  IncidentEvent,
   IncidentStatus,
   IncidentType,
   ResourceRecommendation,
@@ -48,6 +57,9 @@ type DashboardView =
 
 type DashboardSnapshot = {
   activeIncident: Incident | null;
+  bigData119OperationalSummaries: BigData119OperationalSummary[];
+  bigData119Points: BigData119MapPoint[];
+  bigData119Summaries: BigData119SourceSummary[];
   dispatchRecommendation: DispatchRecommendation | null;
   fireStations: FireStation[];
   hospitalRecommendations: HospitalRecommendation[];
@@ -63,6 +75,28 @@ type RecommendationResponse = {
   incident: Incident;
 };
 
+type DispatchRoute = {
+  baseDurationSeconds?: number;
+  coordinates: [number, number][];
+  distanceMeters: number;
+  durationSeconds: number;
+  provider: "astar" | "kakao";
+  traffic?: {
+    averageSpeedKph: number | null;
+    congestionLevel: "congested" | "moderate" | "smooth" | "unknown";
+    durationMultiplier: number;
+    message: string;
+    provider: "its" | "kakao" | "none";
+    sampleCount: number;
+    status: "live" | "unavailable" | "unconfigured";
+  };
+};
+
+type DispatchRouteResponse = {
+  error?: string;
+  route?: DispatchRoute;
+};
+
 type IncidentForm = {
   address: string;
   description: string;
@@ -72,6 +106,15 @@ type IncidentForm = {
   riskLevel: RiskLevel;
   title: string;
   type: IncidentType;
+};
+
+type IncidentTypeFilter = IncidentType | "all";
+type IncidentStatusFilter = IncidentStatus | "all";
+
+type IncidentDetailResponse = {
+  error?: string;
+  events?: IncidentEvent[];
+  incident?: Incident;
 };
 
 type DisasterDashboardProps = {
@@ -122,16 +165,40 @@ const THREE_DIMENSIONAL_PITCH = 58;
 const THREE_DIMENSIONAL_BEARING = -18;
 const BUILDING_QUERY_BOX_PIXELS = 18;
 const POI_QUERY_BOX_PIXELS = 26;
+const BUILDING_REPORT_ACTION_ATTRIBUTE = "data-building-report-action";
+const BUILDING_REPORT_ACTION_SELECTOR = `[${BUILDING_REPORT_ACTION_ATTRIBUTE}]`;
 const INCIDENTS_SOURCE_ID = "mvp-incidents";
 const FIRE_STATIONS_SOURCE_ID = "mvp-fire-stations";
 const HOSPITALS_SOURCE_ID = "mvp-hospitals";
 const RISK_AREAS_SOURCE_ID = "mvp-risk-areas";
 const ROUTE_SOURCE_ID = "mvp-dispatch-route";
+const BIGDATA119_SOURCE_ID = "mvp-bigdata119";
 const INCIDENT_LAYER_ID = "mvp-incident-points";
 const FIRE_STATION_LAYER_ID = "mvp-fire-station-points";
 const HOSPITAL_LAYER_ID = "mvp-hospital-points";
 const RISK_AREA_LAYER_ID = "mvp-risk-area-circles";
 const ROUTE_LAYER_ID = "mvp-dispatch-route-line";
+const BIGDATA119_TARGET_LAYER_ID = "mvp-bigdata119-fire-safety-targets";
+const BIGDATA119_WATER_LAYER_ID = "mvp-bigdata119-fire-water-sources";
+const BIGDATA119_LABEL_LAYER_ID = "mvp-bigdata119-labels";
+
+const BIGDATA119_KIND_LABEL: Record<BigData119PointKind, string> = {
+  "fire-safety-target": "특정소방대상물",
+  "fire-water-source": "소방용수",
+};
+const BIGDATA119_OPERATIONAL_KIND_LABEL: Record<
+  BigData119OperationalKind,
+  string
+> = {
+  "call-reception": "119 신고접수",
+  "ems-dispatch": "구급출동",
+  "rescue-dispatch": "구조출동",
+};
+
+const BIGDATA119_KIND_COLOR: Record<BigData119PointKind, string> = {
+  "fire-safety-target": "#0ea5e9",
+  "fire-water-source": "#2563eb",
+};
 
 const EMPTY_FEATURE_COLLECTION = {
   features: [],
@@ -155,6 +222,13 @@ const INCIDENT_STATUS_LABEL: Record<IncidentStatus, string> = {
   closed: "종료",
   dispatched: "출동",
   reported: "접수",
+};
+
+const INCIDENT_EVENT_LABEL: Record<IncidentEvent["type"], string> = {
+  created: "등록",
+  deleted: "삭제",
+  status: "상태 변경",
+  updated: "수정",
 };
 
 const VECTOR_PALETTE = {
@@ -530,12 +604,16 @@ function riskColor(level: RiskLevel) {
   return "#059669";
 }
 
-function incidentsData(incidents: Incident[]) {
+function incidentsData(
+  incidents: Incident[],
+  selectedIncidentId: string | null,
+) {
   return featureCollection(
     incidents.map((incident) =>
       pointFeature(incident.id, incident.longitude, incident.latitude, {
         id: incident.id,
         riskLevel: incident.riskLevel,
+        selected: incident.id === selectedIncidentId,
         title: incident.title,
         type: incident.type,
       }),
@@ -577,6 +655,27 @@ function riskAreasData(riskAreas: RiskArea[]) {
         riskScore: area.riskScore,
       }),
     ),
+  );
+}
+
+function bigData119Data(
+  points: BigData119MapPoint[],
+  visibleKinds: Record<BigData119PointKind, boolean>,
+) {
+  return featureCollection(
+    points
+      .filter((point) => visibleKinds[point.kind])
+      .map((point) =>
+        pointFeature(point.id, point.longitude, point.latitude, {
+          category: point.category,
+          id: point.id,
+          isSample: point.isSample,
+          kind: point.kind,
+          label: BIGDATA119_KIND_LABEL[point.kind],
+          name: point.name,
+          sourceId: point.sourceId,
+        }),
+      ),
   );
 }
 
@@ -622,6 +721,7 @@ function reportLocationData(location: ReportLocation | null) {
 function routeData(
   incident: Incident | null,
   recommendation: DispatchRecommendation | null,
+  dispatchRoute: DispatchRoute | null,
 ) {
   if (!incident || !recommendation) {
     return EMPTY_FEATURE_COLLECTION;
@@ -630,12 +730,15 @@ function routeData(
   return featureCollection([
     lineFeature(
       `route-${recommendation.station.id}-${incident.id}`,
-      [
-        [recommendation.station.longitude, recommendation.station.latitude],
-        [incident.longitude, incident.latitude],
-      ],
+      dispatchRoute?.coordinates.length
+        ? dispatchRoute.coordinates
+        : [
+            [recommendation.station.longitude, recommendation.station.latitude],
+            [incident.longitude, incident.latitude],
+          ],
       {
         incidentId: incident.id,
+        provider: dispatchRoute?.provider ?? "fallback",
         stationId: recommendation.station.id,
       },
     ),
@@ -740,6 +843,76 @@ function buildAddressFromProperties(
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+function buildingDisplayName(
+  buildingProperties: BuildingFeatureProperties | null,
+  poiProperties: BuildingFeatureProperties | null,
+  safetyProfile: BuildingSafetyProfile | null,
+) {
+  return (
+    safetyProfile?.name ??
+    propertyText(poiProperties, ["name:ko", "name", "name_en"]) ??
+    propertyText(buildingProperties, ["name:ko", "name", "name_en"])
+  );
+}
+
+function buildingDisplayAddress(
+  buildingProperties: BuildingFeatureProperties | null,
+  poiProperties: BuildingFeatureProperties | null,
+  safetyProfile: BuildingSafetyProfile | null,
+) {
+  return (
+    safetyProfile?.address ??
+    buildAddressFromProperties(buildingProperties) ??
+    buildAddressFromProperties(poiProperties)
+  );
+}
+
+function createReportLocation(
+  coordinates: [number, number],
+  address?: string | null,
+  fallbackLabel = "지도 선택 위치",
+): ReportLocation {
+  const latitude = Number(coordinates[1].toFixed(6));
+  const longitude = Number(coordinates[0].toFixed(6));
+
+  return {
+    address:
+      address ??
+      `${fallbackLabel} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+    latitude,
+    longitude,
+  };
+}
+
+function buildBuildingReportAddress(
+  buildingProperties: BuildingFeatureProperties | null,
+  poiProperties: BuildingFeatureProperties | null,
+  safetyProfile: BuildingSafetyProfile | null,
+  coordinates: [number, number],
+) {
+  const name = buildingDisplayName(
+    buildingProperties,
+    poiProperties,
+    safetyProfile,
+  );
+  const address = buildingDisplayAddress(
+    buildingProperties,
+    poiProperties,
+    safetyProfile,
+  );
+  const fallback = createReportLocation(
+    coordinates,
+    null,
+    "건물 선택 위치",
+  ).address;
+
+  if (name && address) {
+    return `${name} (${address})`;
+  }
+
+  return name ?? address ?? fallback;
+}
+
 function buildExternalMapSearchUrl(provider: "kakao" | "naver", query: string) {
   const encoded = encodeURIComponent(query);
 
@@ -754,10 +927,11 @@ function buildBuildingPopupHtml(
   coordinates: [number, number],
   safetyProfile: BuildingSafetyProfile | null,
 ) {
-  const name =
-    safetyProfile?.name ??
-    propertyText(poiProperties, ["name:ko", "name", "name_en"]) ??
-    propertyText(buildingProperties, ["name:ko", "name", "name_en"]);
+  const name = buildingDisplayName(
+    buildingProperties,
+    poiProperties,
+    safetyProfile,
+  );
   const buildingType = formatBuildingClass(
     propertyText(buildingProperties, ["building", "type", "class"]),
   );
@@ -771,10 +945,11 @@ function buildBuildingPopupHtml(
     "building:levels",
     "levels",
   ]);
-  const address =
-    safetyProfile?.address ??
-    buildAddressFromProperties(buildingProperties) ??
-    buildAddressFromProperties(poiProperties);
+  const address = buildingDisplayAddress(
+    buildingProperties,
+    poiProperties,
+    safetyProfile,
+  );
   const coordinateLabel = `${coordinates[1].toFixed(5)}, ${coordinates[0].toFixed(5)}`;
   const rows = [
     ["주소", address],
@@ -799,15 +974,57 @@ function buildBuildingPopupHtml(
       ? "샘플 안전 프로필"
       : (poiType ?? buildingType ?? "공개 지도 건물 데이터");
   const searchQuery = name ?? address ?? coordinateLabel;
+  const sectionText = safetyProfile?.section.length
+    ? safetyProfile.section
+        .map(
+          (level) =>
+            `${level.floor} ${level.use}${
+              level.riskNote ? `(${level.riskNote})` : ""
+            }`,
+        )
+        .join(" · ")
+    : null;
+  const evacuationRouteText = safetyProfile
+    ? safetyProfile.floors
+        .flatMap((floor) =>
+          floor.evacuationRoutes.map(
+            (route) =>
+              `${route.floor} ${route.from}→${route.to}${
+                route.estimatedDistanceMeters
+                  ? ` ${route.estimatedDistanceMeters}m`
+                  : ""
+              }`,
+          ),
+        )
+        .slice(0, 4)
+        .join(" · ")
+    : null;
+  const sourceNotesText = safetyProfile?.sourceNotes.length
+    ? safetyProfile.sourceNotes.join(" ")
+    : null;
+  const sourceLabel = safetyProfile?.sourceUrl
+    ? `<a href="${escapeHtml(
+        safetyProfile.sourceUrl,
+      )}" target="_blank" rel="noreferrer">${escapeHtml(
+        safetyProfile.sourceLabel,
+      )}</a>`
+    : escapeHtml(safetyProfile?.sourceLabel ?? "");
   const profileHtml = safetyProfile
     ? `<section class="${styles.popupSafety}">
-        <strong>건물 안전 프로필</strong>
+        <strong>건물 단면도·비상구 프로필</strong>
         <p>${escapeHtml(
           safetyProfile.dataStatus === "sample"
-            ? "발표용 샘플 도면 정보입니다. 실제 비상구/단면도는 시설 관리 데이터 연동 후 교체해야 합니다."
+            ? "발표용 샘플 도면 정보입니다. 실제 비상구/단면도는 승인된 시설·플랫폼 데이터 연동 후 교체해야 합니다."
             : "검증된 건물 안전 데이터입니다.",
         )}</p>
         <dl class="${styles.popupDetails}">
+          ${
+            sectionText
+              ? `<div class="${styles.popupRow}"><dt>단면 요약</dt><dd>${escapeHtml(
+                  sectionText,
+                )}</dd></div>`
+              : ""
+          }
           <div class="${styles.popupRow}"><dt>비상구</dt><dd>${escapeHtml(
             safetyProfile.exits
               .map((exit) => `${exit.floor} ${exit.label}(${exit.direction})`)
@@ -816,6 +1033,13 @@ function buildBuildingPopupHtml(
           <div class="${styles.popupRow}"><dt>대피 장소</dt><dd>${escapeHtml(
             safetyProfile.nearestAssemblyPoint,
           )}</dd></div>
+          ${
+            evacuationRouteText
+              ? `<div class="${styles.popupRow}"><dt>피난 경로</dt><dd>${escapeHtml(
+                  evacuationRouteText,
+                )}</dd></div>`
+              : ""
+          }
           <div class="${styles.popupRow}"><dt>층별 구조</dt><dd>${escapeHtml(
             safetyProfile.floors
               .map(
@@ -828,9 +1052,14 @@ function buildBuildingPopupHtml(
               )
               .join(" · "),
           )}</dd></div>
-          <div class="${styles.popupRow}"><dt>출처</dt><dd>${escapeHtml(
-            safetyProfile.sourceLabel,
-          )}</dd></div>
+          <div class="${styles.popupRow}"><dt>출처</dt><dd>${sourceLabel}</dd></div>
+          ${
+            sourceNotesText
+              ? `<div class="${styles.popupRow}"><dt>검증 메모</dt><dd>${escapeHtml(
+                  sourceNotesText,
+                )}</dd></div>`
+              : ""
+          }
         </dl>
       </section>`
     : `<section class="${styles.popupSafety}">
@@ -846,6 +1075,7 @@ function buildBuildingPopupHtml(
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     ${profileHtml}
     <div class="${styles.popupActions}">
+      <button ${BUILDING_REPORT_ACTION_ATTRIBUTE}="true" type="button">이 위치 신고</button>
       <a href="${buildExternalMapSearchUrl(
         "naver",
         searchQuery,
@@ -856,6 +1086,30 @@ function buildBuildingPopupHtml(
       )}" target="_blank" rel="noreferrer">카카오맵</a>
     </div>
   </article>`;
+}
+
+function dispatchRouteProviderLabel(route: DispatchRoute) {
+  if (route.provider === "kakao") {
+    return route.traffic?.status === "live" ? "카카오 교통 반영" : "카카오";
+  }
+
+  return route.traffic?.status === "live" ? "자체 A* + ITS 교통" : "자체 A*";
+}
+
+function dispatchRouteTrafficStatus(route: DispatchRoute) {
+  if (!route.traffic) {
+    return "";
+  }
+
+  if (route.traffic.status === "live") {
+    return ` · ${route.traffic.message}`;
+  }
+
+  if (route.traffic.status === "unconfigured") {
+    return " · ITS 교통 API 키 미설정";
+  }
+
+  return ` · ${route.traffic.message}`;
 }
 
 function buildUserLocationPopupHtml(location: UserLocation) {
@@ -912,6 +1166,48 @@ function buildReportLocationPopupHtml(location: ReportLocation) {
   </article>`;
 }
 
+function buildBigData119PopupHtml(point: BigData119MapPoint) {
+  const coordinateLabel = `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
+  const rows = [
+    ["유형", BIGDATA119_KIND_LABEL[point.kind]],
+    ["분류", point.category],
+    ["주소", point.address],
+    ["지역", [point.city, point.district].filter(Boolean).join(" ")],
+    ["관할", [point.stationName, point.centerName].filter(Boolean).join(" / ")],
+    ["상태", point.status],
+    ["좌표", coordinateLabel],
+    [
+      "데이터",
+      point.isSample
+        ? "소방안전 빅데이터 플랫폼 샘플"
+        : "소방안전 빅데이터 플랫폼 CSV",
+    ],
+  ].filter((row): row is [string, string] => Boolean(row[1]));
+  const rowsHtml = rows
+    .map(
+      ([label, value]) =>
+        `<div class="${styles.popupRow}"><dt>${escapeHtml(
+          label,
+        )}</dt><dd>${escapeHtml(value)}</dd></div>`,
+    )
+    .join("");
+
+  return `<article class="${styles.popup}">
+    <div class="${styles.popupHeader}">
+      <strong>${escapeHtml(point.name)}</strong>
+      <span>${escapeHtml(point.sourceLabel)}</span>
+    </div>
+    <dl class="${styles.popupDetails}">${rowsHtml}</dl>
+    <div class="${styles.popupActions}">
+      <a href="${point.sourceUrl}" target="_blank" rel="noreferrer">데이터 출처</a>
+      <a href="${buildExternalMapSearchUrl(
+        "naver",
+        point.address || point.name || coordinateLabel,
+      )}" target="_blank" rel="noreferrer">네이버 지도</a>
+    </div>
+  </article>`;
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
 
@@ -940,6 +1236,19 @@ function localDateTimeToIso(value: string) {
   const date = new Date(value);
 
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function incidentFormValue(incident: Incident): IncidentForm {
+  return {
+    address: incident.address,
+    description: incident.description,
+    latitude: incident.latitude.toFixed(6),
+    longitude: incident.longitude.toFixed(6),
+    occurredAt: localDateTimeInputValue(new Date(incident.occurredAt)),
+    riskLevel: incident.riskLevel,
+    title: incident.title,
+    type: incident.type,
+  };
 }
 
 function distanceText(value: number) {
@@ -979,6 +1288,12 @@ function addDashboardLayers(map: MapLibreMap) {
   }
   if (!map.getSource(INCIDENTS_SOURCE_ID)) {
     map.addSource(INCIDENTS_SOURCE_ID, {
+      data: EMPTY_FEATURE_COLLECTION,
+      type: "geojson",
+    });
+  }
+  if (!map.getSource(BIGDATA119_SOURCE_ID)) {
+    map.addSource(BIGDATA119_SOURCE_ID, {
       data: EMPTY_FEATURE_COLLECTION,
       type: "geojson",
     });
@@ -1075,12 +1390,71 @@ function addDashboardLayers(map: MapLibreMap) {
           "#f59e0b",
           "#16a34a",
         ],
-        "circle-radius": 10,
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-width": 3,
+        "circle-radius": ["case", ["==", ["get", "selected"], true], 15, 10],
+        "circle-stroke-color": [
+          "case",
+          ["==", ["get", "selected"], true],
+          "#111827",
+          "#ffffff",
+        ],
+        "circle-stroke-width": [
+          "case",
+          ["==", ["get", "selected"], true],
+          4,
+          3,
+        ],
       },
       source: INCIDENTS_SOURCE_ID,
       type: "circle",
+    });
+  }
+  if (!map.getLayer(BIGDATA119_TARGET_LAYER_ID)) {
+    map.addLayer({
+      filter: ["==", ["get", "kind"], "fire-safety-target"],
+      id: BIGDATA119_TARGET_LAYER_ID,
+      paint: {
+        "circle-color": BIGDATA119_KIND_COLOR["fire-safety-target"],
+        "circle-opacity": 0.88,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 14, 7],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+      source: BIGDATA119_SOURCE_ID,
+      type: "circle",
+    });
+  }
+  if (!map.getLayer(BIGDATA119_WATER_LAYER_ID)) {
+    map.addLayer({
+      filter: ["==", ["get", "kind"], "fire-water-source"],
+      id: BIGDATA119_WATER_LAYER_ID,
+      paint: {
+        "circle-color": BIGDATA119_KIND_COLOR["fire-water-source"],
+        "circle-opacity": 0.88,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 7, 4, 14, 7],
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 2,
+      },
+      source: BIGDATA119_SOURCE_ID,
+      type: "circle",
+    });
+  }
+  if (!map.getLayer(BIGDATA119_LABEL_LAYER_ID)) {
+    map.addLayer({
+      layout: {
+        "text-field": ["get", "label"],
+        "text-font": ["Noto Sans Regular"],
+        "text-offset": [0, 1.15],
+        "text-size": 11,
+      },
+      minzoom: 12,
+      paint: {
+        "text-color": "#0f172a",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.4,
+      },
+      source: BIGDATA119_SOURCE_ID,
+      type: "symbol",
+      id: BIGDATA119_LABEL_LAYER_ID,
     });
   }
   if (!map.getLayer(REPORT_LOCATION_HALO_LAYER_ID)) {
@@ -1185,6 +1559,28 @@ function setSourceData(map: MapLibreMap, sourceId: string, data: GeoJsonData) {
   }
 }
 
+function suppressPopupContextMenu(popup: MapLibrePopup | null) {
+  const element = popup?.getElement();
+  const blockContextMenu = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  element?.addEventListener("contextmenu", blockContextMenu, {
+    capture: true,
+  });
+  element?.addEventListener("auxclick", blockContextMenu, { capture: true });
+  element?.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (event.button === 2) {
+        blockContextMenu(event);
+      }
+    },
+    { capture: true },
+  );
+}
+
 function featureId(feature: MapGeoJSONFeature | undefined) {
   const id = feature?.properties?.id;
 
@@ -1197,6 +1593,7 @@ function fitMapToSnapshot(map: MapLibreMap, snapshot: DashboardSnapshot) {
     ...snapshot.fireStations,
     ...snapshot.hospitals,
     ...snapshot.riskAreas,
+    ...snapshot.bigData119Points,
   ]
     .map((item) => [item.longitude, item.latitude] as [number, number])
     .filter(([longitude, latitude]) =>
@@ -1237,18 +1634,45 @@ export function DisasterDashboard({
   const [reportLocation, setReportLocation] = useState<ReportLocation | null>(
     null,
   );
+  const [visibleBigDataKinds, setVisibleBigDataKinds] = useState<
+    Record<BigData119PointKind, boolean>
+  >({
+    "fire-safety-target": true,
+    "fire-water-source": true,
+  });
   const [view, setView] = useState<DashboardView>(initialView);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [activeIncident, setActiveIncident] = useState<Incident | null>(null);
+  const [activeIncidentEvents, setActiveIncidentEvents] = useState<
+    IncidentEvent[]
+  >([]);
   const [activeRiskArea, setActiveRiskArea] = useState<RiskArea | null>(null);
   const [dispatchRecommendation, setDispatchRecommendation] =
     useState<DispatchRecommendation | null>(null);
+  const [dispatchRoute, setDispatchRoute] = useState<DispatchRoute | null>(
+    null,
+  );
+  const [dispatchRouteStatus, setDispatchRouteStatus] = useState<string | null>(
+    null,
+  );
+  const [isDispatchRouteLoading, setIsDispatchRouteLoading] = useState(false);
   const [hospitalRecommendations, setHospitalRecommendations] = useState<
     HospitalRecommendation[]
   >([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+  const [isIncidentDeleting, setIsIncidentDeleting] = useState(false);
+  const [isIncidentSaving, setIsIncidentSaving] = useState(false);
+  const [incidentSearch, setIncidentSearch] = useState("");
+  const [incidentStatusFilter, setIncidentStatusFilter] =
+    useState<IncidentStatusFilter>("all");
+  const [incidentTypeFilter, setIncidentTypeFilter] =
+    useState<IncidentTypeFilter>("all");
+  const [editIncidentId, setEditIncidentId] = useState<string | null>(null);
+  const [editIncidentForm, setEditIncidentForm] = useState<IncidentForm | null>(
+    null,
+  );
   const [form, setForm] = useState<IncidentForm>({
     address: "서울특별시 중구 세종대로 110",
     description: "",
@@ -1262,6 +1686,7 @@ export function DisasterDashboard({
 
   const incidentsRef = useRef<Incident[]>([]);
   const riskAreasRef = useRef<RiskArea[]>([]);
+  const bigData119PointsRef = useRef<BigData119MapPoint[]>([]);
   const userLocationRef = useRef<UserLocation | null>(null);
   const reportLocationRef = useRef<ReportLocation | null>(null);
   const didFitInitialSnapshotRef = useRef(false);
@@ -1285,9 +1710,12 @@ export function DisasterDashboard({
       setSnapshot(payload);
       setActiveIncident((current) => current ?? payload.activeIncident);
       setDispatchRecommendation(payload.dispatchRecommendation);
+      setDispatchRoute(null);
+      setDispatchRouteStatus(null);
       setHospitalRecommendations(payload.hospitalRecommendations);
       incidentsRef.current = payload.incidents;
       riskAreasRef.current = payload.riskAreas;
+      bigData119PointsRef.current = payload.bigData119Points;
       setNotice(null);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
@@ -1319,13 +1747,98 @@ export function DisasterDashboard({
     }
 
     setDispatchRecommendation(payload.dispatchRecommendation);
+    setDispatchRoute(null);
+    setDispatchRouteStatus(null);
     setHospitalRecommendations(payload.hospitalRecommendations);
+    const detailResponse = await fetch(
+      `/api/disaster/incidents/${encodeURIComponent(incident.id)}`,
+      { cache: "no-store" },
+    );
+    const detailPayload = (await detailResponse
+      .json()
+      .catch(() => null)) as IncidentDetailResponse | null;
+    setActiveIncidentEvents(
+      detailResponse.ok && detailPayload?.events ? detailPayload.events : [],
+    );
     mapRef.current?.flyTo({
       center: [incident.longitude, incident.latitude],
       essential: true,
       zoom: 13,
     });
   }, []);
+
+  useEffect(() => {
+    if (!activeIncident || !dispatchRecommendation) {
+      setDispatchRoute(null);
+      setDispatchRouteStatus(null);
+      setIsDispatchRouteLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 9_000);
+
+    setIsDispatchRouteLoading(true);
+    setDispatchRoute(null);
+    setDispatchRouteStatus("추천 소방서에서 사고지점까지 도로 경로 계산 중");
+
+    fetch("/api/routing/route", {
+      body: JSON.stringify({
+        destination: {
+          latitude: activeIncident.latitude,
+          longitude: activeIncident.longitude,
+        },
+        origin: {
+          latitude: dispatchRecommendation.station.latitude,
+          longitude: dispatchRecommendation.station.longitude,
+        },
+        provider: "astar",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as DispatchRouteResponse;
+
+        if (!response.ok || !payload.route) {
+          throw new Error(payload.error ?? "도로 경로 계산 실패");
+        }
+
+        setDispatchRoute(payload.route);
+        setDispatchRouteStatus(
+          `${dispatchRouteProviderLabel(payload.route)} 도로 경로 ${distanceText(
+            payload.route.distanceMeters,
+          )} · ${Math.max(
+            1,
+            Math.round(payload.route.durationSeconds / 60),
+          )}분${dispatchRouteTrafficStatus(payload.route)}`,
+        );
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          setDispatchRouteStatus(
+            "도로 경로 계산 시간 초과, 직선 예비 경로 표시",
+          );
+          return;
+        }
+
+        setDispatchRouteStatus(
+          `도로 경로 계산 실패, 직선 예비 경로 표시: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
+        setIsDispatchRouteLoading(false);
+      });
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [activeIncident, dispatchRecommendation]);
 
   const locateUser = useCallback(() => {
     if (!("geolocation" in navigator)) {
@@ -1383,6 +1896,7 @@ export function DisasterDashboard({
               .setLngLat([location.longitude, location.latitude])
               .setHTML(buildReportLocationPopupHtml(report))
               .addTo(map);
+            suppressPopupContextMenu(popupRef.current);
           });
         }
 
@@ -1411,6 +1925,38 @@ export function DisasterDashboard({
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
+
+  useEffect(() => {
+    if (!activeIncident) {
+      setActiveIncidentEvents([]);
+      return;
+    }
+
+    let disposed = false;
+    const incidentId = activeIncident.id;
+
+    async function loadIncidentEvents() {
+      const response = await fetch(
+        `/api/disaster/incidents/${encodeURIComponent(incidentId)}`,
+        { cache: "no-store" },
+      );
+      const payload = (await response
+        .json()
+        .catch(() => null)) as IncidentDetailResponse | null;
+
+      if (!disposed) {
+        setActiveIncidentEvents(
+          response.ok && payload?.events ? payload.events : [],
+        );
+      }
+    }
+
+    loadIncidentEvents();
+
+    return () => {
+      disposed = true;
+    };
+  }, [activeIncident]);
 
   useEffect(() => {
     isThreeDimensionalRef.current = isThreeDimensional;
@@ -1510,11 +2056,28 @@ export function DisasterDashboard({
         "top-right",
       );
 
+      function selectReportLocation(report: ReportLocation, message: string) {
+        reportLocationRef.current = report;
+        setReportLocation(report);
+        setForm((current) => ({
+          ...current,
+          address: report.address,
+          latitude: report.latitude.toFixed(6),
+          longitude: report.longitude.toFixed(6),
+        }));
+        setNotice(message);
+        setView("create");
+      }
+
       async function showBuildingPopup(
         buildingFeature: MapGeoJSONFeature | null,
         poiFeature: MapGeoJSONFeature | null,
         coordinates: [number, number],
       ) {
+        const buildingProperties =
+          (buildingFeature?.properties as BuildingFeatureProperties) ?? null;
+        const poiProperties =
+          (poiFeature?.properties as BuildingFeatureProperties) ?? null;
         const safetyProfile = await fetch(
           `/api/building-safety?latitude=${encodeURIComponent(
             String(coordinates[1]),
@@ -1527,6 +2090,19 @@ export function DisasterDashboard({
               payload?.profile ?? null,
           )
           .catch(() => null);
+        const report = createReportLocation(
+          coordinates,
+          buildBuildingReportAddress(
+            buildingProperties,
+            poiProperties,
+            safetyProfile,
+            coordinates,
+          ),
+        );
+        selectReportLocation(
+          report,
+          "건물 위치가 신고 예정 위치로 표시되었습니다. 건물 정보를 확인한 뒤 등록하세요.",
+        );
 
         popupRef.current?.remove();
         popupRef.current = new maplibre.Popup({
@@ -1537,14 +2113,27 @@ export function DisasterDashboard({
           .setLngLat(coordinates)
           .setHTML(
             buildBuildingPopupHtml(
-              (buildingFeature?.properties as BuildingFeatureProperties) ??
-                null,
-              (poiFeature?.properties as BuildingFeatureProperties) ?? null,
+              buildingProperties,
+              poiProperties,
               coordinates,
               safetyProfile,
             ),
           )
           .addTo(map);
+
+        suppressPopupContextMenu(popupRef.current);
+        popupRef.current
+          .getElement()
+          ?.querySelector<HTMLButtonElement>(BUILDING_REPORT_ACTION_SELECTOR)
+          ?.addEventListener("click", (buttonEvent) => {
+            buttonEvent.preventDefault();
+            buttonEvent.stopPropagation();
+            selectReportLocation(
+              report,
+              "건물 위치를 신고 예정 위치로 지정했습니다. 내용을 확인한 뒤 등록하세요.",
+            );
+            showReportLocationPopup(report);
+          });
       }
 
       function showUserLocationPopup(location: UserLocation) {
@@ -1557,6 +2146,7 @@ export function DisasterDashboard({
           .setLngLat([location.longitude, location.latitude])
           .setHTML(buildUserLocationPopupHtml(location))
           .addTo(map);
+        suppressPopupContextMenu(popupRef.current);
       }
 
       function showReportLocationPopup(location: ReportLocation) {
@@ -1569,10 +2159,29 @@ export function DisasterDashboard({
           .setLngLat([location.longitude, location.latitude])
           .setHTML(buildReportLocationPopupHtml(location))
           .addTo(map);
+        suppressPopupContextMenu(popupRef.current);
+      }
+
+      function showBigData119Popup(point: BigData119MapPoint) {
+        popupRef.current?.remove();
+        popupRef.current = new maplibre.Popup({
+          closeButton: true,
+          maxWidth: "340px",
+          offset: 12,
+        })
+          .setLngLat([point.longitude, point.latitude])
+          .setHTML(buildBigData119PopupHtml(point))
+          .addTo(map);
+        suppressPopupContextMenu(popupRef.current);
       }
 
       map.on("load", () => {
         addDashboardLayers(map);
+        setSourceData(
+          map,
+          BIGDATA119_SOURCE_ID,
+          bigData119Data(bigData119PointsRef.current, visibleBigDataKinds),
+        );
         setSourceData(
           map,
           USER_LOCATION_SOURCE_ID,
@@ -1614,19 +2223,27 @@ export function DisasterDashboard({
             REPORT_LOCATION_HALO_LAYER_ID,
             INCIDENT_LAYER_ID,
             RISK_AREA_LAYER_ID,
+            BIGDATA119_TARGET_LAYER_ID,
+            BIGDATA119_WATER_LAYER_ID,
+            BIGDATA119_LABEL_LAYER_ID,
             USER_LOCATION_POINT_LAYER_ID,
           ].filter((layerId) => map.getLayer(layerId)),
         });
 
-        if (features.length > 0) {
-          const feature = features[0];
+        const feature = features[0];
+        const riskFeature =
+          features.find((current) => current.layer.id === RISK_AREA_LAYER_ID) ??
+          null;
 
+        if (feature) {
           if (feature.layer.id === USER_LOCATION_POINT_LAYER_ID) {
             const location = userLocationRef.current;
 
             if (location) {
               showUserLocationPopup(location);
             }
+
+            return;
           }
 
           if (
@@ -1641,9 +2258,36 @@ export function DisasterDashboard({
             if (location) {
               showReportLocationPopup(location);
             }
+
+            return;
           }
 
-          return;
+          if (
+            [INCIDENT_LAYER_ID, RISK_AREA_LAYER_ID].includes(feature.layer.id)
+          ) {
+            if (feature.layer.id === INCIDENT_LAYER_ID) {
+              return;
+            }
+          }
+
+          if (
+            [
+              BIGDATA119_TARGET_LAYER_ID,
+              BIGDATA119_WATER_LAYER_ID,
+              BIGDATA119_LABEL_LAYER_ID,
+            ].includes(feature.layer.id)
+          ) {
+            const id = featureId(feature);
+            const point = bigData119PointsRef.current.find(
+              (item) => item.id === id,
+            );
+
+            if (point) {
+              showBigData119Popup(point);
+            }
+
+            return;
+          }
         }
 
         const buildingLayers = [
@@ -1691,28 +2335,29 @@ export function DisasterDashboard({
           }
         }
 
-        const latitude = event.lngLat.lat.toFixed(6);
-        const longitude = event.lngLat.lng.toFixed(6);
-        const report: ReportLocation = {
-          address: `지도 선택 위치 (${Number(latitude).toFixed(5)}, ${Number(
-            longitude,
-          ).toFixed(5)})`,
-          latitude: Number(latitude),
-          longitude: Number(longitude),
-        };
+        if (riskFeature) {
+          const id = featureId(riskFeature);
+          const area = riskAreasRef.current.find((item) => item.id === id);
 
-        reportLocationRef.current = report;
-        setReportLocation(report);
-        setForm((current) => ({
-          ...current,
-          address: report.address,
-          latitude,
-          longitude,
-        }));
-        setNotice(
+          if (area) {
+            popupRef.current?.remove();
+            reportLocationRef.current = null;
+            setReportLocation(null);
+            setActiveRiskArea(area);
+            setView("risk");
+            return;
+          }
+        }
+
+        const report = createReportLocation([
+          event.lngLat.lng,
+          event.lngLat.lat,
+        ]);
+
+        selectReportLocation(
+          report,
           "지도에서 사고 위치가 선택되었습니다. 내용을 확인한 뒤 등록하세요.",
         );
-        setView("create");
         showReportLocationPopup(report);
       });
       for (const layerId of [
@@ -1721,6 +2366,9 @@ export function DisasterDashboard({
         REPORT_LOCATION_HALO_LAYER_ID,
         INCIDENT_LAYER_ID,
         RISK_AREA_LAYER_ID,
+        BIGDATA119_TARGET_LAYER_ID,
+        BIGDATA119_WATER_LAYER_ID,
+        BIGDATA119_LABEL_LAYER_ID,
         USER_LOCATION_POINT_LAYER_ID,
         POI_LABEL_LAYER_ID,
         BUILDING_3D_LAYER_ID,
@@ -1744,7 +2392,7 @@ export function DisasterDashboard({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [loadRecommendations]);
+  }, [loadRecommendations, visibleBigDataKinds]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1755,7 +2403,17 @@ export function DisasterDashboard({
 
     incidentsRef.current = snapshot.incidents;
     riskAreasRef.current = snapshot.riskAreas;
-    setSourceData(map, INCIDENTS_SOURCE_ID, incidentsData(snapshot.incidents));
+    bigData119PointsRef.current = snapshot.bigData119Points;
+    setSourceData(
+      map,
+      INCIDENTS_SOURCE_ID,
+      incidentsData(snapshot.incidents, activeIncident?.id ?? null),
+    );
+    setSourceData(
+      map,
+      BIGDATA119_SOURCE_ID,
+      bigData119Data(snapshot.bigData119Points, visibleBigDataKinds),
+    );
     setSourceData(
       map,
       FIRE_STATIONS_SOURCE_ID,
@@ -1766,25 +2424,40 @@ export function DisasterDashboard({
     setSourceData(
       map,
       ROUTE_SOURCE_ID,
-      routeData(activeIncident, dispatchRecommendation),
+      routeData(activeIncident, dispatchRecommendation, dispatchRoute),
     );
 
     if (!didFitInitialSnapshotRef.current) {
       didFitInitialSnapshotRef.current = true;
       fitMapToSnapshot(map, snapshot);
     }
-  }, [activeIncident, dispatchRecommendation, isMapReady, snapshot]);
+  }, [
+    activeIncident,
+    dispatchRecommendation,
+    dispatchRoute,
+    isMapReady,
+    snapshot,
+    visibleBigDataKinds,
+  ]);
 
   const summary = useMemo(() => {
     const incidents = snapshot?.incidents ?? [];
     const highRiskAreas =
       snapshot?.riskAreas.filter((area) => area.riskLevel === "high").length ??
       0;
+    const bigData119Points = snapshot?.bigData119Points ?? [];
+    const bigData119OperationalRows =
+      snapshot?.bigData119OperationalSummaries.reduce(
+        (sum, source) => sum + source.rowCount,
+        0,
+      ) ?? 0;
 
     return {
       activeIncidents: incidents.filter(
         (incident) => incident.status !== "closed",
       ).length,
+      bigData119OperationalRows,
+      bigData119Points: bigData119Points.length,
       fireStations: snapshot?.fireStations.length ?? 0,
       highRiskAreas,
       hospitals: snapshot?.hospitals.length ?? 0,
@@ -1863,9 +2536,135 @@ export function DisasterDashboard({
     }
   }
 
+  function startIncidentEdit(incident: Incident) {
+    setEditIncidentId(incident.id);
+    setEditIncidentForm(incidentFormValue(incident));
+    setView("incidents");
+  }
+
+  function cancelIncidentEdit() {
+    setEditIncidentId(null);
+    setEditIncidentForm(null);
+  }
+
+  async function saveIncidentEdit(event: React.FormEvent) {
+    event.preventDefault();
+
+    if (!editIncidentId || !editIncidentForm) {
+      return;
+    }
+
+    setIsIncidentSaving(true);
+    setNotice("사고 정보를 수정하는 중입니다.");
+
+    try {
+      const response = await fetch(
+        `/api/disaster/incidents/${encodeURIComponent(editIncidentId)}`,
+        {
+          body: JSON.stringify({
+            ...editIncidentForm,
+            latitude: Number(editIncidentForm.latitude),
+            longitude: Number(editIncidentForm.longitude),
+            occurredAt: localDateTimeToIso(editIncidentForm.occurredAt),
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "PATCH",
+        },
+      );
+      const payload = (await response.json()) as IncidentDetailResponse;
+
+      if (!response.ok || !payload.incident) {
+        throw new Error(payload.error ?? "사고 정보 수정에 실패했습니다.");
+      }
+
+      setEditIncidentId(null);
+      setEditIncidentForm(null);
+      setActiveIncident(payload.incident);
+      setActiveIncidentEvents(payload.events ?? []);
+      await loadSnapshot();
+      await loadRecommendations(payload.incident);
+      setNotice("사고 정보가 수정되었습니다.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsIncidentSaving(false);
+    }
+  }
+
+  async function deleteActiveIncident() {
+    if (!activeIncident) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `"${activeIncident.title}" 사고를 삭제할까요? 삭제한 사고는 목록과 지도에서 제거됩니다.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsIncidentDeleting(true);
+    setNotice("사고를 삭제하는 중입니다.");
+
+    try {
+      const response = await fetch(
+        `/api/disaster/incidents/${encodeURIComponent(activeIncident.id)}`,
+        { method: "DELETE" },
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        deleted?: boolean;
+        error?: string;
+      } | null;
+
+      if (!response.ok || !payload?.deleted) {
+        throw new Error(payload?.error ?? "사고 삭제에 실패했습니다.");
+      }
+
+      popupRef.current?.remove();
+      setActiveIncident(null);
+      setActiveIncidentEvents([]);
+      setDispatchRecommendation(null);
+      setHospitalRecommendations([]);
+      cancelIncidentEdit();
+      await loadSnapshot();
+      setNotice("사고가 삭제되었습니다.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsIncidentDeleting(false);
+    }
+  }
+
   const riskAreas = snapshot?.riskAreas ?? [];
   const incidents = snapshot?.incidents ?? [];
   const recommendations = snapshot?.resourceRecommendations ?? [];
+  const filteredIncidents = useMemo(() => {
+    const query = incidentSearch.trim().toLowerCase();
+
+    return incidents.filter((incident) => {
+      const matchesType =
+        incidentTypeFilter === "all" || incident.type === incidentTypeFilter;
+      const matchesStatus =
+        incidentStatusFilter === "all" ||
+        incident.status === incidentStatusFilter;
+      const matchesQuery =
+        !query ||
+        [
+          incident.title,
+          incident.address,
+          incident.description,
+          INCIDENT_TYPE_LABEL[incident.type],
+          RISK_LEVEL_LABEL[incident.riskLevel],
+          INCIDENT_STATUS_LABEL[incident.status],
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+
+      return matchesType && matchesStatus && matchesQuery;
+    });
+  }, [incidentSearch, incidentStatusFilter, incidentTypeFilter, incidents]);
 
   return (
     <div className={styles.page}>
@@ -1934,6 +2733,42 @@ export function DisasterDashboard({
               <LocateFixed aria-hidden="true" size={15} />
               {isLocating ? "확인 중" : "내 위치"}
             </button>
+            <button
+              aria-pressed={visibleBigDataKinds["fire-safety-target"]}
+              className={
+                visibleBigDataKinds["fire-safety-target"]
+                  ? styles.mapToggleActive
+                  : styles.mapToggle
+              }
+              onClick={() =>
+                setVisibleBigDataKinds((current) => ({
+                  ...current,
+                  "fire-safety-target": !current["fire-safety-target"],
+                }))
+              }
+              title="소방안전 빅데이터 특정소방대상물 표시"
+              type="button"
+            >
+              대상물
+            </button>
+            <button
+              aria-pressed={visibleBigDataKinds["fire-water-source"]}
+              className={
+                visibleBigDataKinds["fire-water-source"]
+                  ? styles.mapToggleActive
+                  : styles.mapToggle
+              }
+              onClick={() =>
+                setVisibleBigDataKinds((current) => ({
+                  ...current,
+                  "fire-water-source": !current["fire-water-source"],
+                }))
+              }
+              title="소방안전 빅데이터 소방용수 표시"
+              type="button"
+            >
+              소방용수
+            </button>
           </div>
           <div className={styles.mapLegend}>
             <span>
@@ -1947,6 +2782,12 @@ export function DisasterDashboard({
             </span>
             <span>
               <i className={styles.legendRisk} /> 위험도
+            </span>
+            <span>
+              <i className={styles.legendBigDataTarget} /> 특정소방대상물
+            </span>
+            <span>
+              <i className={styles.legendBigDataWater} /> 소방용수
             </span>
           </div>
         </section>
@@ -1973,9 +2814,124 @@ export function DisasterDashboard({
               <span>{summary.highRiskAreas}</span>
               <small>고위험 지역</small>
             </article>
+            <article className={styles.metric}>
+              <Database aria-hidden="true" size={18} />
+              <span>{summary.bigData119Points}</span>
+              <small>빅데이터 포인트</small>
+            </article>
+            <article className={styles.metric}>
+              <Route aria-hidden="true" size={18} />
+              <span>{summary.bigData119OperationalRows}</span>
+              <small>신고·출동 행</small>
+            </article>
           </section>
 
           {notice ? <output className={styles.notice}>{notice}</output> : null}
+
+          {snapshot?.bigData119Summaries.length ? (
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <span className={styles.kicker}>소방안전 빅데이터 활용</span>
+                <strong>
+                  플랫폼 CSV {snapshot.bigData119Summaries.length}종 지도 반영
+                </strong>
+              </div>
+              <div className={styles.dataSourceGrid}>
+                {snapshot.bigData119Summaries.map((source) => (
+                  <a
+                    className={styles.dataSourceItem}
+                    href={source.sourceUrl}
+                    key={source.sourceId}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {source.kind === "fire-water-source" ? (
+                      <Droplets aria-hidden="true" size={16} />
+                    ) : (
+                      <Building2 aria-hidden="true" size={16} />
+                    )}
+                    <div>
+                      <strong>{source.sourceLabel}</strong>
+                      <span>
+                        {source.mappedCount.toLocaleString("ko-KR")}개 좌표 ·{" "}
+                        {source.regions.slice(0, 2).join(", ") ||
+                          "지역 정보 없음"}
+                        {source.regions.length > 2 ? " 외" : ""} ·{" "}
+                        {source.isSample ? "샘플" : "승인 CSV"}
+                      </span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {snapshot?.bigData119OperationalSummaries.length ? (
+            <section className={styles.section}>
+              <div className={styles.sectionHeader}>
+                <span className={styles.kicker}>119 신고·출동 데이터</span>
+                <strong>
+                  운영 CSV {snapshot.bigData119OperationalSummaries.length}종
+                  위험도 반영
+                </strong>
+              </div>
+              <div className={styles.dataSourceGrid}>
+                {snapshot.bigData119OperationalSummaries.map((source) => (
+                  <a
+                    className={styles.dataSourceItem}
+                    href={source.sourceUrl}
+                    key={source.sourceId}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {source.kind === "ems-dispatch" ? (
+                      <Ambulance aria-hidden="true" size={16} />
+                    ) : source.kind === "rescue-dispatch" ? (
+                      <Truck aria-hidden="true" size={16} />
+                    ) : (
+                      <AlertTriangle aria-hidden="true" size={16} />
+                    )}
+                    <div>
+                      <strong>{source.sourceLabel}</strong>
+                      <span>
+                        {BIGDATA119_OPERATIONAL_KIND_LABEL[source.kind]} ·{" "}
+                        {source.rowCount.toLocaleString("ko-KR")}행 ·{" "}
+                        {source.regions.slice(0, 2).join(", ") ||
+                          "지역 정보 없음"}
+                        {source.regions.length > 2 ? " 외" : ""} ·{" "}
+                        {source.isSample ? "샘플" : "승인 CSV"}
+                      </span>
+                      <span>
+                        {source.incidentTypeHints.slice(0, 2).join(", ") ||
+                          "유형 정보 없음"}{" "}
+                        · {source.timeHints[0] ?? "시간 정보 없음"}
+                        {source.averageDispatchDistanceMeters
+                          ? ` · 평균 거리 ${distanceText(
+                              source.averageDispatchDistanceMeters,
+                            )}`
+                          : ""}
+                      </span>
+                      {source.areaLoads.length ? (
+                        <span>
+                          위험권역 매칭:{" "}
+                          {source.areaLoads
+                            .slice(0, 2)
+                            .map(
+                              (areaLoad) =>
+                                `${areaLoad.areaName} ${areaLoad.rowCount.toLocaleString(
+                                  "ko-KR",
+                                )}건`,
+                            )
+                            .join(", ")}
+                          {source.areaLoads.length > 2 ? " 외" : ""}
+                        </span>
+                      ) : null}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {(view === "dashboard" || view === "incidents") && activeIncident ? (
             <section className={styles.section}>
@@ -2010,7 +2966,7 @@ export function DisasterDashboard({
                 {activeIncident.status !== "dispatched" ? (
                   <button
                     className={styles.primaryButton}
-                    disabled={isStatusUpdating}
+                    disabled={isStatusUpdating || isIncidentDeleting}
                     onClick={() => updateIncidentStatus("dispatched")}
                     type="button"
                   >
@@ -2020,7 +2976,7 @@ export function DisasterDashboard({
                 {activeIncident.status !== "closed" ? (
                   <button
                     className={styles.dangerButton}
-                    disabled={isStatusUpdating}
+                    disabled={isStatusUpdating || isIncidentDeleting}
                     onClick={() => updateIncidentStatus("closed")}
                     type="button"
                   >
@@ -2030,14 +2986,194 @@ export function DisasterDashboard({
                 {activeIncident.status !== "reported" ? (
                   <button
                     className={styles.secondaryButton}
-                    disabled={isStatusUpdating}
+                    disabled={isStatusUpdating || isIncidentDeleting}
                     onClick={() => updateIncidentStatus("reported")}
                     type="button"
                   >
                     접수로 되돌리기
                   </button>
                 ) : null}
+                <button
+                  className={styles.secondaryButton}
+                  disabled={isIncidentSaving || isIncidentDeleting}
+                  onClick={() => startIncidentEdit(activeIncident)}
+                  type="button"
+                >
+                  수정
+                </button>
+                <button
+                  className={styles.dangerButton}
+                  disabled={isIncidentDeleting}
+                  onClick={deleteActiveIncident}
+                  type="button"
+                >
+                  삭제
+                </button>
               </div>
+              {editIncidentId === activeIncident.id && editIncidentForm ? (
+                <form className={styles.form} onSubmit={saveIncidentEdit}>
+                  <label>
+                    사고명
+                    <input
+                      onChange={(event) =>
+                        setEditIncidentForm((current) =>
+                          current
+                            ? { ...current, title: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={editIncidentForm.title}
+                    />
+                  </label>
+                  <div className={styles.formGrid}>
+                    <label>
+                      유형
+                      <select
+                        onChange={(event) =>
+                          setEditIncidentForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  type: event.target.value as IncidentType,
+                                }
+                              : current,
+                          )
+                        }
+                        value={editIncidentForm.type}
+                      >
+                        <option value="fire">화재</option>
+                        <option value="medical">구급</option>
+                        <option value="rescue">구조</option>
+                        <option value="traffic">교통사고</option>
+                      </select>
+                    </label>
+                    <label>
+                      위험도
+                      <select
+                        onChange={(event) =>
+                          setEditIncidentForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  riskLevel: event.target.value as RiskLevel,
+                                }
+                              : current,
+                          )
+                        }
+                        value={editIncidentForm.riskLevel}
+                      >
+                        <option value="low">낮음</option>
+                        <option value="medium">보통</option>
+                        <option value="high">높음</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className={styles.formGrid}>
+                    <label>
+                      위도
+                      <input
+                        inputMode="decimal"
+                        onChange={(event) =>
+                          setEditIncidentForm((current) =>
+                            current
+                              ? { ...current, latitude: event.target.value }
+                              : current,
+                          )
+                        }
+                        value={editIncidentForm.latitude}
+                      />
+                    </label>
+                    <label>
+                      경도
+                      <input
+                        inputMode="decimal"
+                        onChange={(event) =>
+                          setEditIncidentForm((current) =>
+                            current
+                              ? { ...current, longitude: event.target.value }
+                              : current,
+                          )
+                        }
+                        value={editIncidentForm.longitude}
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    발생시각
+                    <input
+                      onChange={(event) =>
+                        setEditIncidentForm((current) =>
+                          current
+                            ? { ...current, occurredAt: event.target.value }
+                            : current,
+                        )
+                      }
+                      type="datetime-local"
+                      value={editIncidentForm.occurredAt}
+                    />
+                  </label>
+                  <label>
+                    주소
+                    <input
+                      onChange={(event) =>
+                        setEditIncidentForm((current) =>
+                          current
+                            ? { ...current, address: event.target.value }
+                            : current,
+                        )
+                      }
+                      value={editIncidentForm.address}
+                    />
+                  </label>
+                  <label>
+                    설명
+                    <textarea
+                      onChange={(event) =>
+                        setEditIncidentForm((current) =>
+                          current
+                            ? { ...current, description: event.target.value }
+                            : current,
+                        )
+                      }
+                      rows={3}
+                      value={editIncidentForm.description}
+                    />
+                  </label>
+                  <div className={styles.statusActions}>
+                    <button
+                      className={styles.primaryButton}
+                      disabled={isIncidentSaving}
+                      type="submit"
+                    >
+                      저장
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={isIncidentSaving}
+                      onClick={cancelIncidentEdit}
+                      type="button"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </form>
+              ) : null}
+              {activeIncidentEvents.length > 0 ? (
+                <div className={styles.timeline}>
+                  {activeIncidentEvents.slice(0, 5).map((event) => (
+                    <article className={styles.timelineItem} key={event.id}>
+                      <strong>{INCIDENT_EVENT_LABEL[event.type]}</strong>
+                      <span>
+                        {event.message}
+                        {event.fromStatus && event.toStatus
+                          ? ` · ${INCIDENT_STATUS_LABEL[event.fromStatus]} -> ${INCIDENT_STATUS_LABEL[event.toStatus]}`
+                          : ""}
+                      </span>
+                      <small>{formatDateTime(event.createdAt)}</small>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -2058,6 +3194,18 @@ export function DisasterDashboard({
                 </span>
                 <span>{dispatchRecommendation.score}점</span>
               </div>
+              {dispatchRouteStatus ? (
+                <p className={styles.itemReasons}>
+                  {isDispatchRouteLoading ? "계산 중 · " : ""}
+                  {dispatchRouteStatus}
+                </p>
+              ) : null}
+              <div className={styles.criteriaGrid}>
+                <span>거리 기반 우선</span>
+                <span>예상 출동 시간</span>
+                <span>관할/인접 권역</span>
+                <span>보유 장비 가점</span>
+              </div>
               <ul className={styles.reasonList}>
                 {dispatchRecommendation.reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -2072,6 +3220,11 @@ export function DisasterDashboard({
               <div className={styles.sectionHeader}>
                 <span className={styles.kicker}>병원 추천</span>
                 <strong>사고 유형 기반 후보</strong>
+              </div>
+              <div className={styles.criteriaGrid}>
+                <span>응급실 운영</span>
+                <span>전문 진료 분야</span>
+                <span>거리/접근성</span>
               </div>
               <div className={styles.list}>
                 {hospitalRecommendations.map((recommendation) => (
@@ -2242,10 +3395,50 @@ export function DisasterDashboard({
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.kicker}>사고 목록</span>
-                <strong>{incidents.length.toLocaleString("ko-KR")}건</strong>
+                <strong>
+                  {filteredIncidents.length.toLocaleString("ko-KR")} /{" "}
+                  {incidents.length.toLocaleString("ko-KR")}건
+                </strong>
+              </div>
+              <div className={styles.filterBar}>
+                <input
+                  aria-label="사고 검색"
+                  onChange={(event) => setIncidentSearch(event.target.value)}
+                  placeholder="사고명, 주소, 설명 검색"
+                  value={incidentSearch}
+                />
+                <select
+                  aria-label="사고 유형 필터"
+                  onChange={(event) =>
+                    setIncidentTypeFilter(
+                      event.target.value as IncidentTypeFilter,
+                    )
+                  }
+                  value={incidentTypeFilter}
+                >
+                  <option value="all">전체 유형</option>
+                  <option value="fire">화재</option>
+                  <option value="medical">구급</option>
+                  <option value="rescue">구조</option>
+                  <option value="traffic">교통사고</option>
+                </select>
+                <select
+                  aria-label="사고 상태 필터"
+                  onChange={(event) =>
+                    setIncidentStatusFilter(
+                      event.target.value as IncidentStatusFilter,
+                    )
+                  }
+                  value={incidentStatusFilter}
+                >
+                  <option value="all">전체 상태</option>
+                  <option value="reported">접수</option>
+                  <option value="dispatched">출동</option>
+                  <option value="closed">종료</option>
+                </select>
               </div>
               <div className={styles.list}>
-                {incidents.map((incident) => (
+                {filteredIncidents.map((incident) => (
                   <button
                     className={
                       activeIncident?.id === incident.id
@@ -2268,6 +3461,11 @@ export function DisasterDashboard({
                     </small>
                   </button>
                 ))}
+                {filteredIncidents.length === 0 ? (
+                  <p className={styles.emptyState}>
+                    조건에 맞는 사고가 없습니다.
+                  </p>
+                ) : null}
               </div>
             </section>
           )}
@@ -2278,6 +3476,32 @@ export function DisasterDashboard({
                 <span className={styles.kicker}>위험도 예측</span>
                 <strong>규칙 기반 점수</strong>
               </div>
+              {activeRiskArea ? (
+                <article className={styles.analysisCard}>
+                  <div>
+                    <strong>{activeRiskArea.name}</strong>
+                    <span>
+                      {RISK_LEVEL_LABEL[activeRiskArea.riskLevel]} ·{" "}
+                      {activeRiskArea.riskScore}점
+                    </span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>기준 점수</dt>
+                      <dd>{activeRiskArea.baseScore}점</dd>
+                    </div>
+                    <div>
+                      <dt>최근 사고</dt>
+                      <dd>{activeRiskArea.recentIncidentCount}건</dd>
+                    </div>
+                  </dl>
+                  <ul className={styles.compactReasonList}>
+                    {activeRiskArea.factors.map((factor) => (
+                      <li key={factor}>{factor}</li>
+                    ))}
+                  </ul>
+                </article>
+              ) : null}
               <div className={styles.list}>
                 {riskAreas.map((area) => (
                   <button
@@ -2325,7 +3549,25 @@ export function DisasterDashboard({
                   >
                     <div>
                       <strong>{recommendation.areaName}</strong>
-                      <small>{recommendation.timeWindow}</small>
+                      <small>
+                        {recommendation.timeWindow} ·{" "}
+                        {RISK_LEVEL_LABEL[recommendation.priority]} 우선순위 ·{" "}
+                        위험도 {recommendation.riskScore}점
+                      </small>
+                    </div>
+                    <div className={styles.resourceCounts}>
+                      <span>
+                        <Truck size={15} /> 소방차{" "}
+                        {recommendation.recommendedFireEngines}대
+                      </span>
+                      <span>
+                        <Ambulance size={15} /> 구급차{" "}
+                        {recommendation.recommendedAmbulances}대
+                      </span>
+                      <span>
+                        <ShieldAlert size={15} /> 구조차{" "}
+                        {recommendation.recommendedRescueTrucks}대
+                      </span>
                     </div>
                     <p>{recommendation.message}</p>
                     <ul className={styles.compactReasonList}>
@@ -2333,11 +3575,6 @@ export function DisasterDashboard({
                         <li key={reason}>{reason}</li>
                       ))}
                     </ul>
-                    <span>
-                      <Ambulance size={15} /> 구급차{" "}
-                      {recommendation.recommendedAmbulances}대 · 소방차{" "}
-                      {recommendation.recommendedFireEngines}대
-                    </span>
                   </article>
                 ))}
               </div>

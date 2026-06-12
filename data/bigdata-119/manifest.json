@@ -1,5 +1,5 @@
 {
-  "downloadedAt": "2026-06-11T07:47:07.683Z",
+  "downloadedAt": "2026-06-12T01:09:46.653Z",
   "fullCsvDownloadNote": "The platform exposes full CSV files through its login/free-purchase flow. This script downloads public sample_info XLSX files and converts them to local CSV files for MVP/demo use.",
   "products": [
     {
@@ -145,6 +145,228 @@
       "rowCount": 10,
       "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C0000008&goods_nm=%EC%A0%84%EA%B5%AD+%EC%8B%9C%EA%B5%B0%EA%B5%AC%EB%B3%84+%ED%99%94%EC%9E%AC%ED%98%84%ED%99%A9+%EB%B0%8F+%EC%86%8C%EB%B0%A9%EB%A0%A5+%EC%A0%95%EB%B3%B4",
       "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=9"
+    },
+    {
+      "fileCount": 8,
+      "files": [
+        {
+          "byteSize": "412.66 MB",
+          "filename": "신고접수_2024.csv",
+          "goodsSerial": 6362,
+          "issued": "2025-07-21"
+        },
+        {
+          "byteSize": "438.29 MB",
+          "filename": "신고접수_2023.csv",
+          "goodsSerial": 5880,
+          "issued": "2023-06-17"
+        },
+        {
+          "byteSize": "441.92 MB",
+          "filename": "신고접수_2022.csv",
+          "goodsSerial": 5879,
+          "issued": "2022-06-17"
+        },
+        {
+          "byteSize": "420.95 MB",
+          "filename": "신고접수_2021.csv",
+          "goodsSerial": 5878,
+          "issued": "2022-06-17"
+        },
+        {
+          "byteSize": "387.70 MB",
+          "filename": "신고접수_2020.csv",
+          "goodsSerial": 5877,
+          "issued": "2022-06-17"
+        },
+        {
+          "byteSize": "415.74 MB",
+          "filename": "신고접수_2019.csv",
+          "goodsSerial": 5876,
+          "issued": "2022-06-17"
+        },
+        {
+          "byteSize": "440.87 MB",
+          "filename": "신고접수_2018.csv",
+          "goodsSerial": 5875,
+          "issued": "2022-06-17"
+        },
+        {
+          "byteSize": "447.59 MB",
+          "filename": "신고접수_2017.csv",
+          "goodsSerial": 5874,
+          "issued": "2022-06-17"
+        }
+      ],
+      "goodsId": "C1430101",
+      "goodsManagementSerial": "377",
+      "goodsName": "서울소방재난본부_119신고접수 현황",
+      "outputFileName": "seoul-119-call-reception.csv",
+      "rowCount": 100,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1430101&goods_nm=%EC%84%9C%EC%9A%B8%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_119%EC%8B%A0%EA%B3%A0%EC%A0%91%EC%88%98+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=377"
+    },
+    {
+      "fileCount": 4,
+      "files": [
+        {
+          "byteSize": "81.34 MB",
+          "filename": "부산소방재난본부_구급출동 현황_2023_부산.csv",
+          "goodsSerial": 7177,
+          "issued": "2025-12-24"
+        },
+        {
+          "byteSize": "75.65 MB",
+          "filename": "구급출동_2022.csv",
+          "goodsSerial": 5941,
+          "issued": "2022-06-24"
+        },
+        {
+          "byteSize": "197.60 MB",
+          "filename": "구급출동_2021_2019.csv",
+          "goodsSerial": 5940,
+          "issued": "2022-06-24"
+        },
+        {
+          "byteSize": "190.97 MB",
+          "filename": "구급출동_2018_2016.csv",
+          "goodsSerial": 5939,
+          "issued": "2022-06-24"
+        }
+      ],
+      "goodsId": "C1510101",
+      "goodsManagementSerial": "390",
+      "goodsName": "부산소방재난본부_구급출동 현황",
+      "outputFileName": "busan-ems-dispatches.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1510101&goods_nm=%EB%B6%80%EC%82%B0%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%EA%B5%AC%EA%B8%89%EC%B6%9C%EB%8F%99+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=390"
+    },
+    {
+      "fileCount": 4,
+      "files": [
+        {
+          "byteSize": "7.62 MB",
+          "filename": "부산소방재난본부_구조출동 현황_2024_부산.csv",
+          "goodsSerial": 7160,
+          "issued": "2025-12-15"
+        },
+        {
+          "byteSize": "7.45 MB",
+          "filename": "구조출동_2023.csv",
+          "goodsSerial": 5905,
+          "issued": "2023-06-24"
+        },
+        {
+          "byteSize": "8.19 MB",
+          "filename": "구조출동_2022.csv",
+          "goodsSerial": 5904,
+          "issued": "2022-06-24"
+        },
+        {
+          "byteSize": "92.02 MB",
+          "filename": "구조출동_2021.csv",
+          "goodsSerial": 5903,
+          "issued": "2022-06-24"
+        }
+      ],
+      "goodsId": "C1500101",
+      "goodsManagementSerial": "381",
+      "goodsName": "부산소방재난본부_구조출동 현황",
+      "outputFileName": "busan-rescue-dispatches.csv",
+      "rowCount": 10,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1500101&goods_nm=%EB%B6%80%EC%82%B0%EC%86%8C%EB%B0%A9%EC%9E%AC%EB%82%9C%EB%B3%B8%EB%B6%80_%EA%B5%AC%EC%A1%B0%EC%B6%9C%EB%8F%99+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=381"
+    },
+    {
+      "fileCount": 13,
+      "files": [
+        {
+          "byteSize": "119.38 MB",
+          "filename": "신고접수현황_2015.csv",
+          "goodsSerial": 3922,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "119.32 MB",
+          "filename": "신고접수현황_2016.csv",
+          "goodsSerial": 3921,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "151.49 MB",
+          "filename": "신고접수현황_2021.csv",
+          "goodsSerial": 3920,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "165.34 MB",
+          "filename": "신고접수현황_2022.csv",
+          "goodsSerial": 3919,
+          "issued": "2022-05-20"
+        },
+        {
+          "byteSize": "136.86 MB",
+          "filename": "신고접수현황_2019.csv",
+          "goodsSerial": 3918,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "131.06 MB",
+          "filename": "신고접수현황_2018.csv",
+          "goodsSerial": 3917,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "136.37 MB",
+          "filename": "신고접수현황_2017.csv",
+          "goodsSerial": 3916,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "152.11 MB",
+          "filename": "신고접수현황_2023.csv",
+          "goodsSerial": 3915,
+          "issued": "2023-05-20"
+        },
+        {
+          "byteSize": "136.20 MB",
+          "filename": "신고접수현황_2020.csv",
+          "goodsSerial": 3914,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "118.78 MB",
+          "filename": "신고접수현황_2014.csv",
+          "goodsSerial": 3913,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "132.47 MB",
+          "filename": "신고접수현황_2013.csv",
+          "goodsSerial": 3912,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "155.71 MB",
+          "filename": "신고접수현황_2012.csv",
+          "goodsSerial": 3911,
+          "issued": "2021-05-20"
+        },
+        {
+          "byteSize": "162.92 MB",
+          "filename": "신고접수현황_2011.csv",
+          "goodsSerial": 3910,
+          "issued": "2021-05-20"
+        }
+      ],
+      "goodsId": "C1130111",
+      "goodsManagementSerial": "296",
+      "goodsName": "전북특별자치도소방본부_119신고접수 현황",
+      "outputFileName": "jeonbuk-119-call-reception.csv",
+      "rowCount": 110,
+      "sampleUrl": "https://bigdata-119.kr/api/infoFileDown?info_file=sample_info&goods_id=C1130111&goods_nm=%EC%A0%84%EB%B6%81%ED%8A%B9%EB%B3%84%EC%9E%90%EC%B9%98%EB%8F%84%EC%86%8C%EB%B0%A9%EB%B3%B8%EB%B6%80_119%EC%8B%A0%EA%B3%A0%EC%A0%91%EC%88%98+%ED%98%84%ED%99%A9",
+      "sourceUrl": "https://bigdata-119.kr/goods/goodsInfo?goods_mng_sn=296"
     }
   ]
 }
