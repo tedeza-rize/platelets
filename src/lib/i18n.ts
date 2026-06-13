@@ -23,6 +23,11 @@ export type MapDictionary = {
     updateFailed: string;
     updating: string;
   };
+  dimensionButtonLabel: string;
+  dimensions: {
+    threeDimensional: string;
+    twoDimensional: string;
+  };
   providerButtonLabel: string;
   providerLegend: string;
   providerMenuLabel: string;
@@ -625,6 +630,11 @@ const dictionaries: Record<Locale, AppDictionary> = {
         updateFailed: "업데이트 실패",
         updating: "업데이트 중",
       },
+      dimensionButtonLabel: "지도 보기 방식: 현재 {dimension}",
+      dimensions: {
+        threeDimensional: "3D",
+        twoDimensional: "2D",
+      },
       providerButtonLabel: "{provider} 지도로 전환",
       providerLegend: "지도 제공자",
       providerMenuLabel: "지도 서비스 선택: 현재 {provider}",
@@ -679,6 +689,11 @@ const dictionaries: Record<Locale, AppDictionary> = {
         sourceMenuTitle: "Visible categories",
         updateFailed: "Update failed",
         updating: "Updating",
+      },
+      dimensionButtonLabel: "Map view mode: currently {dimension}",
+      dimensions: {
+        threeDimensional: "3D",
+        twoDimensional: "2D",
       },
       providerButtonLabel: "Switch to {provider} map",
       providerLegend: "Map provider",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Ambulance } from "lucide-react";
+import { Ambulance, Box } from "lucide-react";
 import type {
   MapGeoJSONFeature,
   MapLayerMouseEvent,
@@ -54,6 +54,7 @@ export function MapShell({
   const hazardsRef = useRef<mapCore.HazardEvent[]>([]);
   const seoulAreasRef = useRef<mapCore.SeoulAreasData | null>(null);
   const emergencyRouteRef = useRef<EmergencyRouteResult | null>(null);
+  const isThreeDimensionalRef = useRef(false);
   const pointRequestRef = useRef<{
     controller: AbortController;
     id: number;
@@ -61,7 +62,9 @@ export function MapShell({
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
-    mapCore.createMapStyle(initialProvider, vworldApiKey, mapSettings),
+    mapCore.createMapStyle(initialProvider, vworldApiKey, mapSettings, {
+      includeThreeDimensionalBuildings: true,
+    }),
   );
   const [provider, setProvider] =
     useState<mapCore.MapProvider>(initialProvider);
@@ -85,6 +88,7 @@ export function MapShell({
     useState<EmergencyRouteResult | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [autoFocusHazards, setAutoFocusHazards] = useState(true);
   const [sourceQuery, setSourceQuery] = useState("");
@@ -144,6 +148,9 @@ export function MapShell({
   const activeHazardImageUrl = mapCore.safeKmaImageUrl(
     activeHazard?.imageUrl ?? null,
   );
+  const selectedDimensionLabel = isThreeDimensional
+    ? dictionary.map.dimensions.threeDimensional
+    : dictionary.map.dimensions.twoDimensional;
 
   function openSourceSearch() {
     setIsSourceMenuOpen(true);
@@ -468,8 +475,17 @@ export function MapShell({
         attributionControl: {
           compact: true,
         },
+        bearing: isThreeDimensionalRef.current
+          ? mapCore.THREE_DIMENSIONAL_BEARING
+          : 0,
+        canvasContextAttributes: {
+          antialias: true,
+        },
         center: mapCore.MAP_CENTER,
         container: mapContainerRef.current,
+        pitch: isThreeDimensionalRef.current
+          ? mapCore.THREE_DIMENSIONAL_PITCH
+          : 0,
         style: initialStyleRef.current,
         zoom: mapCore.DEFAULT_ZOOM,
       });
@@ -478,7 +494,7 @@ export function MapShell({
 
       map.addControl(
         new maplibre.NavigationControl({
-          showCompass: false,
+          showCompass: true,
         }),
         "top-right",
       );
@@ -704,6 +720,16 @@ export function MapShell({
   }, [dictionary, focusHazard]);
 
   useEffect(() => {
+    isThreeDimensionalRef.current = isThreeDimensional;
+
+    if (!mapRef.current || !isMapReady) {
+      return;
+    }
+
+    mapCore.syncThreeDimensionalView(mapRef.current, isThreeDimensional);
+  }, [isMapReady, isThreeDimensional]);
+
+  useEffect(() => {
     if (!mapRef.current) {
       return;
     }
@@ -717,6 +743,10 @@ export function MapShell({
         activeProvider,
         vworldApiKey,
         mapSettings,
+        {
+          includeThreeDimensionalBuildings: true,
+          threeDimensionalVisible: isThreeDimensionalRef.current,
+        },
       );
       const syncOverlays = () => {
         map.resize();
@@ -731,6 +761,9 @@ export function MapShell({
           map,
           emergencyRouteRef.current,
         );
+        mapCore.syncThreeDimensionalView(map, isThreeDimensionalRef.current, {
+          animate: false,
+        });
       };
 
       if (isDisposed) {
@@ -837,6 +870,24 @@ export function MapShell({
           ref={mapContainerRef}
           role="application"
         />
+        <button
+          aria-label={dictionary.map.dimensionButtonLabel.replace(
+            "{dimension}",
+            selectedDimensionLabel,
+          )}
+          aria-pressed={isThreeDimensional}
+          className={
+            isThreeDimensional
+              ? styles.dimensionButtonActive
+              : styles.dimensionButton
+          }
+          onClick={() => setIsThreeDimensional((current) => !current)}
+          title={selectedDimensionLabel}
+          type="button"
+        >
+          <Box aria-hidden="true" size={15} strokeWidth={2.5} />
+          <span>{selectedDimensionLabel}</span>
+        </button>
         <button
           className={styles.emergencyLauncher}
           onClick={openEmergencyPanel}
