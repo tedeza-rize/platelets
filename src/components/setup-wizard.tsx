@@ -1114,7 +1114,7 @@ export function SetupWizard({
                             {checkText(check.detailKey, check.detailValues)}
                           </p>
                           {check.id === "sqlite" &&
-                            !check.ok &&
+                            status?.environment.databaseExists &&
                             status?.environment.databaseCanDelete && (
                               <button
                                 className={styles.checkActionButton}

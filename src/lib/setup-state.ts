@@ -348,10 +348,6 @@ export async function completeSetup(payload: SetupPayload) {
     throw new Error("Setup is already complete.");
   }
 
-  if (databaseFileExists()) {
-    throw new Error("SQLite database file already exists.");
-  }
-
   if (!payload.licenseAccepted) {
     throw new Error("License agreement must be accepted.");
   }
@@ -405,7 +401,7 @@ function canDeleteDatabaseFile(databasePath: string) {
 }
 
 async function removeSetupDatabaseFile(targetPath: string) {
-  const maxAttempts = 6;
+  const maxAttempts = 10;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
@@ -416,7 +412,9 @@ async function removeSetupDatabaseFile(targetPath: string) {
         throw error;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(50 * 2 ** attempt, 500)),
+      );
     }
   }
 }
@@ -435,11 +433,15 @@ export async function deleteSetupDatabaseFile() {
     return;
   }
 
+  await closeDatabase();
+
+  if (!fs.existsSync(databasePath)) {
+    return;
+  }
+
   if (!canDeleteDatabaseFile(databasePath)) {
     throw new Error("SQLite database file cannot be deleted.");
   }
-
-  await closeDatabase().catch(() => undefined);
 
   for (const targetPath of [
     `${databasePath}-wal`,
@@ -458,7 +460,12 @@ export async function getSetupEnvironmentStatus(
   const writableDataDirectory =
     checkReadableWritableDataDirectory(dataDirectory);
   const hasDatabase = databaseFileExists();
-  const databaseCanDelete = hasDatabase && canDeleteDatabaseFile(databasePath);
+  const setupState = hasDatabase
+    ? await readSetupStateFromDatabaseFile()
+    : null;
+  const setupComplete = Boolean(setupState?.completedAt);
+  const databaseCanDelete =
+    hasDatabase && !setupComplete && canDeleteDatabaseFile(databasePath);
   const timeStatus = await getServerTimeStatusForServers(
     Array.from(DEFAULT_NTP_SERVERS),
     { serverReceivedAt: options.serverReceivedAt },
@@ -491,7 +498,7 @@ export async function getSetupEnvironmentStatus(
         : "environment.sqlite.absent",
       detailValues: hasDatabase ? { path: databasePath } : undefined,
       id: "sqlite",
-      ok: !hasDatabase,
+      ok: !hasDatabase || !setupComplete,
       titleKey: "environment.sqlite.title",
     },
     {
