@@ -5,7 +5,7 @@
 - Next.js 16.2.7 App Router with React 19
 - Node.js route handlers for imports, SQLite, routing, and AI calls
 - MapLibre GL client rendering with VWorld or OpenFreeMap styles
-- SQLite database at `data/points.sqlite`
+- SQLite database at `data/points.sqlite` through synchronous `better-sqlite3`
 - Biome for linting and formatting
 
 Read the relevant local Next.js documentation in `node_modules/next/dist/docs/`

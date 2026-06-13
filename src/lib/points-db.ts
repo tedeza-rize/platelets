@@ -1,8 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
-import sqlite3 from "sqlite3";
 import type { DatasetUpdateProgress } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
+import {
+  allSqlite as all,
+  closeSqliteDatabase,
+  getSqlite as get,
+  openSqliteDatabase,
+  runSqlite as run,
+  type SqliteDatabase,
+} from "@/lib/sqlite";
 
 export type EmergencyPointInput = {
   address: string;
@@ -211,8 +218,6 @@ export type AssemblyProtestUpdateResult = {
   sourceCount: number;
 };
 
-type SqliteDatabase = sqlite3.Database;
-
 type PointRow = {
   address: string;
   category: string;
@@ -384,43 +389,7 @@ export function databaseFileExists() {
   return fs.existsSync(databasePath);
 }
 
-function run(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<void>((resolve, reject) => {
-    db.run(sql, params, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
-}
-
-function all<T>(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<T[]>((resolve, reject) => {
-    db.all(sql, params, (error, rows: T[]) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(rows);
-    });
-  });
-}
-
-function get<T>(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<T | undefined>((resolve, reject) => {
-    db.get(sql, params, (error, row: T | undefined) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(row);
-    });
-  });
-}
-
-async function withWriteTransaction<T>(
+export async function withDatabaseWriteTransaction<T>(
   operation: (db: SqliteDatabase) => Promise<T>,
 ) {
   const previousTransaction = writeTransactionQueue;
@@ -635,16 +604,18 @@ async function initializeDatabase(db: SqliteDatabase) {
 
 export async function getDatabase() {
   if (!databasePromise) {
-    databasePromise = new Promise<SqliteDatabase>((resolve, reject) => {
+    databasePromise = (async () => {
       fs.mkdirSync(dataDirectory, { recursive: true });
-      const db = new sqlite3.Database(databasePath, (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        initializeDatabase(db).then(() => resolve(db), reject);
-      });
-    });
+      const db = openSqliteDatabase(databasePath);
+
+      try {
+        await initializeDatabase(db);
+        return db;
+      } catch (error) {
+        await closeSqliteDatabase(db).catch(() => undefined);
+        throw error;
+      }
+    })();
   }
 
   return databasePromise;
@@ -666,16 +637,7 @@ export async function closeDatabase() {
     return;
   }
 
-  await new Promise<void>((resolve, reject) => {
-    db.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
+  await closeSqliteDatabase(db);
 }
 
 function mapPointRow(row: PointRow): EmergencyPoint {
@@ -1386,7 +1348,7 @@ export async function replaceAssemblyProtestsForDate(params: {
   protests: AssemblyProtestInput[];
   sourceIds: string[];
 }) {
-  await withWriteTransaction(async (db) => {
+  await withDatabaseWriteTransaction(async (db) => {
     if (params.sourceIds.length > 0) {
       await run(
         db,
@@ -1641,7 +1603,7 @@ export async function upsertHazardEvents(params: {
   events: HazardEventInput[];
   fetchedAt: string;
 }) {
-  await withWriteTransaction(async (db) => {
+  await withDatabaseWriteTransaction(async (db) => {
     for (const event of params.events) {
       await run(
         db,
@@ -1717,7 +1679,7 @@ export async function getKmaEarthquakeUsage() {
 export async function consumeKakaoLocalQuota() {
   const now = new Date();
   const nowIso = now.toISOString();
-  await withWriteTransaction(async (db) => {
+  await withDatabaseWriteTransaction(async (db) => {
     const existing = await getKakaoLocalUsageWindowRow(db);
     const shouldReset =
       existing?.window_ends_at && now >= new Date(existing.window_ends_at);
@@ -1769,7 +1731,7 @@ export async function consumeKakaoLocalQuota() {
 export async function consumeKmaEarthquakeQuota(requestCount = 1) {
   const now = new Date();
   const nowIso = now.toISOString();
-  await withWriteTransaction(async (db) => {
+  await withDatabaseWriteTransaction(async (db) => {
     const existing = await getKmaEarthquakeUsageWindowRow(db);
     const shouldReset =
       existing?.window_ends_at && now >= new Date(existing.window_ends_at);
@@ -1959,7 +1921,7 @@ export async function replaceDataset(params: {
 }) {
   const definition = DATASET_SOURCES[params.source];
 
-  await withWriteTransaction(async (db) => {
+  await withDatabaseWriteTransaction(async (db) => {
     await run(db, "DELETE FROM points WHERE source = ?", [params.source]);
     await run(db, "DELETE FROM dataset_import_progress WHERE source = ?", [
       params.source,

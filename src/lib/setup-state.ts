@@ -1,8 +1,6 @@
-import { execFile } from "node:child_process";
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { promisify } from "node:util";
 import { isPasswordValid } from "@/lib/password-policy";
 import {
   closeDatabase,
@@ -19,6 +17,11 @@ import {
   protectSecret,
   revealSecret,
 } from "@/lib/secret-box";
+import {
+  closeSqliteDatabase,
+  getSqlite,
+  openSqliteDatabase,
+} from "@/lib/sqlite";
 import {
   DEFAULT_NTP_SERVERS,
   getServerTimeStatusForServers,
@@ -110,8 +113,6 @@ const EMPTY_API_KEYS: SetupApiKeys = {
   seoulOpenApiKey: "",
   vworldApiKey: "",
 };
-
-const execFileAsync = promisify(execFile);
 
 function cleanText(value: unknown, maxLength: number) {
   return String(value ?? "")
@@ -237,48 +238,26 @@ function accountFromPayload(
 
 async function readSetupStateFromDatabaseFile() {
   const databasePath = getDatabaseFilePath();
-  const script = `
-const sqlite3 = require("sqlite3");
-const [databasePath, setupStateKey] = process.argv.slice(1);
-const db = new sqlite3.Database(databasePath, sqlite3.OPEN_READONLY, (openError) => {
-  if (openError) {
-    console.log("null");
-    return;
+
+  if (!fs.existsSync(databasePath)) {
+    return null;
   }
 
-  db.get(
-    "SELECT value_json FROM app_settings WHERE key = ?",
-    [setupStateKey],
-    (queryError, row) => {
-      db.close(() => {
-        if (queryError || !row) {
-          console.log("null");
-          return;
-        }
-
-        console.log(JSON.stringify({ valueJson: row.value_json }));
-      });
-    },
-  );
-});
-`;
-
   try {
-    const { stdout } = await execFileAsync(
-      process.execPath,
-      ["-e", script, databasePath, SETUP_STATE_KEY],
-      { cwd: process.cwd(), timeout: 5000 },
-    );
-    const output = stdout.trim();
+    const db = openSqliteDatabase(databasePath, { readonly: true });
 
-    if (!output || output === "null") {
-      return null;
+    try {
+      const row = await getSqlite<{ value_json: string }>(
+        db,
+        "SELECT value_json FROM app_settings WHERE key = ?",
+        [SETUP_STATE_KEY],
+      );
+      return row?.value_json
+        ? (JSON.parse(row.value_json) as SetupState)
+        : null;
+    } finally {
+      await closeSqliteDatabase(db);
     }
-
-    const payload = JSON.parse(output) as { valueJson?: string };
-    return payload.valueJson
-      ? (JSON.parse(payload.valueJson) as SetupState)
-      : null;
   } catch {
     return null;
   }
