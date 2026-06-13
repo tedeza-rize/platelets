@@ -535,6 +535,34 @@ export async function getDatabase() {
   return databasePromise;
 }
 
+export async function closeDatabase() {
+  if (!databasePromise) {
+    return;
+  }
+
+  const promise = databasePromise;
+  databasePromise = null;
+
+  let db: SqliteDatabase;
+
+  try {
+    db = await promise;
+  } catch {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    db.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
 function mapPointRow(row: PointRow): EmergencyPoint {
   return {
     address: row.address,

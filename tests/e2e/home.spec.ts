@@ -103,7 +103,18 @@ test("redirects first-run deployments to the setup wizard", async ({
     page.getByRole("heading", { name: "Server environment check" }),
   ).toBeVisible();
   await expect(
-    page.getByText("SQLite database", { exact: true }),
+    page.getByText("SQLite database file", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Time synchronization", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Server and browser time are synchronized."),
+  ).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(
+    page.getByText("The SQLite DB file can be created during installation."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 

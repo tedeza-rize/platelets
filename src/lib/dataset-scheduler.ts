@@ -5,11 +5,13 @@ import {
 } from "@/lib/dataset-sources";
 import { getOperationalSettings } from "@/lib/operational-settings";
 import {
+  databaseFileExists,
   getAppSetting,
   listDatasetStatuses,
   recordApiLog,
   setAppSetting,
 } from "@/lib/points-db";
+import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-state";
 
 export type DatasetSchedule = {
   enabled: boolean;
@@ -102,6 +104,10 @@ function lastAttemptAt(
 }
 
 export async function runDueDatasetUpdates() {
+  if (!databaseFileExists() || !(await isSetupCompleteFromDatabaseFile())) {
+    return;
+  }
+
   const [operationalSettings, settings, statuses] = await Promise.all([
     getOperationalSettings(),
     getDatasetScheduleSettings(),

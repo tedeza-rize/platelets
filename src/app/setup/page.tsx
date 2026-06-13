@@ -2,12 +2,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SetupWizard } from "@/components/setup-wizard";
 import { resolveLocale } from "@/lib/i18n";
-import { getSetupEnvironmentStatus, isSetupComplete } from "@/lib/setup-state";
+import {
+  getSetupEnvironmentStatus,
+  isSetupCompleteFromDatabaseFile,
+} from "@/lib/setup-state";
 
 export const dynamic = "force-dynamic";
 
 export default async function SetupPage() {
-  if (await isSetupComplete()) {
+  if (await isSetupCompleteFromDatabaseFile()) {
     redirect("/");
   }
 
@@ -18,7 +21,7 @@ export default async function SetupPage() {
     <SetupWizard
       initialLocale={locale}
       initialStatus={{
-        environment: getSetupEnvironmentStatus(),
+        environment: await getSetupEnvironmentStatus(),
         installed: false,
       }}
     />
