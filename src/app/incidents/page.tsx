@@ -1,4 +1,4 @@
-import { DisasterDashboard } from "@/components/disaster-dashboard";
+import { LazyDisasterDashboard } from "@/components/lazy-disaster-dashboard";
 import { getDisasterDashboardConfig } from "@/lib/disaster-dashboard-config";
 import { requireSetupComplete } from "@/lib/setup-redirect";
 
@@ -8,5 +8,5 @@ export default async function IncidentListPage() {
   await requireSetupComplete();
   const dashboardConfig = await getDisasterDashboardConfig();
 
-  return <DisasterDashboard initialView="incidents" {...dashboardConfig} />;
+  return <LazyDisasterDashboard initialView="incidents" {...dashboardConfig} />;
 }
