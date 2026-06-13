@@ -17,7 +17,9 @@ before changing framework code. Do not assume older Next.js behavior.
 | --- | --- |
 | `src/app/` | Pages and HTTP route handlers |
 | `src/components/` | Client UI, map controls, admin tools, and AI forms |
-| `src/lib/points-db.ts` | SQLite schema, queries, settings, logs, and import persistence |
+| `src/components/disaster-dashboard/` | Presentational widgets for the disaster dashboard, with data and actions supplied by the dashboard controller |
+| `src/lib/points-db.ts` | Public database facade, shared domain types, settings, logs, and import persistence |
+| `src/lib/points-db-modules/` | SQLite connection/schema ownership and focused point query repositories |
 | `src/lib/dataset-import.ts` | General public-data imports and geocoding |
 | `src/lib/medical-dataset-import.ts` | Childcare and NMC medical imports |
 | `src/lib/emergency-recommendation.ts` | Scenario weights and hospital scoring |
