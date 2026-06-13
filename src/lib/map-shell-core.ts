@@ -18,6 +18,8 @@ import {
 
 export type { MapProvider };
 
+export type MapDimension = "2d" | "3d";
+
 export type MapShellProps = {
   dictionary: AppDictionary;
   initialProvider: MapProvider;
@@ -84,6 +86,8 @@ export const SEOUL_CENTER: [number, number] = [37.5665, 126.978];
 export const MAP_CENTER: [number, number] = [SEOUL_CENTER[1], SEOUL_CENTER[0]];
 export const DEFAULT_ZOOM = 16;
 export const STYLE_LOAD_TIMEOUT_MS = 8000;
+export const THREE_DIMENSIONAL_PITCH = 55;
+export const THREE_DIMENSIONAL_BEARING = -18;
 export const POINTS_SOURCE_ID = "emergency-points";
 export const POINTS_HALO_LAYER_ID = "emergency-points-halo";
 export const POINTS_LAYER_ID = "emergency-points-hit-area";
@@ -132,8 +136,11 @@ export const POINT_ICON_SIZE: PropertyValueSpecification<number> = [
 ];
 export const VWORLD_BASE_SOURCE_ID = "vworld-base";
 export const VWORLD_TRAFFIC_SOURCE_ID = "vworld-traffic";
+export const VWORLD_3D_BUILDINGS_SOURCE_ID = "vworld-3d-buildings";
 export const OPENFREEMAP_SOURCE_ID = "openmaptiles";
 export const OSM_OFFICIAL_SOURCE_ID = "osm-shortbread";
+export const BUILDING_FOOTPRINT_LAYER_ID = "map-building-footprint";
+export const BUILDING_3D_LAYER_ID = "map-building-3d";
 export const SOURCE_COLORS: Record<DatasetSourceId, string> = {
   aeds: "#059669",
   "childcare-centers": "#db2777",
@@ -369,8 +376,102 @@ export const VECTOR_PALETTES: Record<MapProvider, VectorPalette> = {
   },
 };
 
+const BUILDING_HEIGHT_EXPRESSION = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  14,
+  0,
+  16,
+  [
+    "case",
+    ["has", "render_height"],
+    ["to-number", ["get", "render_height"], 12],
+    ["has", "height"],
+    ["to-number", ["get", "height"], 12],
+    ["has", "building:levels"],
+    ["*", ["to-number", ["get", "building:levels"], 4], 3],
+    12,
+  ],
+] as unknown as PropertyValueSpecification<number>;
+
+const BUILDING_BASE_HEIGHT_EXPRESSION = [
+  "case",
+  ["has", "render_min_height"],
+  ["to-number", ["get", "render_min_height"], 0],
+  ["has", "min_height"],
+  ["to-number", ["get", "min_height"], 0],
+  0,
+] as unknown as PropertyValueSpecification<number>;
+
+type BuildingLayerOptions = {
+  footprintLayerId?: string;
+  sourceId: string;
+  sourceLayer: string;
+  threeDimensionalLayerId?: string;
+  threeDimensionalVisible?: boolean;
+  vectorPalette: VectorPalette;
+};
+
+export type MapStyleOptions = {
+  includeThreeDimensionalBuildings?: boolean;
+  threeDimensionalVisible?: boolean;
+  buildingFootprintLayerId?: string;
+  buildingThreeDimensionalLayerId?: string;
+};
+
 export function localizedNameExpression() {
   return ["coalesce", ["get", "name:ko"], ["get", "name"], ["get", "name_en"]];
+}
+
+function createBuildingLayers({
+  footprintLayerId = BUILDING_FOOTPRINT_LAYER_ID,
+  sourceId,
+  sourceLayer,
+  threeDimensionalLayerId = BUILDING_3D_LAYER_ID,
+  threeDimensionalVisible = false,
+  vectorPalette,
+}: BuildingLayerOptions) {
+  return [
+    {
+      id: footprintLayerId,
+      layout: {
+        visibility: threeDimensionalVisible ? "none" : "visible",
+      },
+      minzoom: 14,
+      paint: {
+        "fill-color": vectorPalette.building,
+        "fill-opacity": 0.52,
+      },
+      source: sourceId,
+      "source-layer": sourceLayer,
+      type: "fill",
+    },
+    {
+      id: threeDimensionalLayerId,
+      layout: {
+        visibility: threeDimensionalVisible ? "visible" : "none",
+      },
+      minzoom: 14,
+      paint: {
+        "fill-extrusion-base": BUILDING_BASE_HEIGHT_EXPRESSION,
+        "fill-extrusion-color": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          14,
+          vectorPalette.building,
+          16,
+          "#c4beb3",
+        ],
+        "fill-extrusion-height": BUILDING_HEIGHT_EXPRESSION,
+        "fill-extrusion-opacity": 0.76,
+      },
+      source: sourceId,
+      "source-layer": sourceLayer,
+      type: "fill-extrusion",
+    },
+  ] as StyleSpecification["layers"];
 }
 
 export function createVworldTileUrl(path: string, vworldApiKey: string) {
@@ -384,16 +485,29 @@ export function createVworldRasterTileUrl(vworldApiKey: string) {
   return `https://api.vworld.kr/req/wmts/1.0.0/${vworldApiKey}/Base/{z}/{y}/{x}.png`;
 }
 
-export function createVworldVectorTileUrl(
-  layer: "poi" | "traffic",
-  vworldApiKey: string,
-) {
+export function createVworldVectorTileUrl(layer: string, vworldApiKey: string) {
   return `https://api.vworld.kr/req/wmts/vector/getTile/${vworldApiKey}/${layer}/{z}/{x}/{y}.pbf`;
+}
+
+function createVworldThreeDimensionalBuildingLayers(options: MapStyleOptions) {
+  if (!options.includeThreeDimensionalBuildings) {
+    return [];
+  }
+
+  return createBuildingLayers({
+    footprintLayerId: options.buildingFootprintLayerId,
+    sourceId: VWORLD_3D_BUILDINGS_SOURCE_ID,
+    sourceLayer: "building",
+    threeDimensionalLayerId: options.buildingThreeDimensionalLayerId,
+    threeDimensionalVisible: options.threeDimensionalVisible,
+    vectorPalette: VECTOR_PALETTES.vworld,
+  });
 }
 
 export function createVworldStyle(
   vworldApiKey: string,
   mapTileMode: MapTileMode = DEFAULT_MAP_RENDERING_SETTINGS.mapTileMode,
+  options: MapStyleOptions = {},
 ): StyleSpecification {
   if (!vworldApiKeyExists(vworldApiKey)) {
     return {
@@ -404,8 +518,18 @@ export function createVworldStyle(
           paint: { "background-color": VECTOR_PALETTES.vworld.background },
           type: "background",
         },
+        ...createVworldThreeDimensionalBuildingLayers(options),
       ],
-      sources: {},
+      sources: options.includeThreeDimensionalBuildings
+        ? {
+            [VWORLD_3D_BUILDINGS_SOURCE_ID]: {
+              attribution:
+                '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+              type: "vector",
+              url: "https://tiles.openfreemap.org/planet",
+            },
+          }
+        : {},
       version: 8,
     } as StyleSpecification;
   }
@@ -424,6 +548,7 @@ export function createVworldStyle(
           source: VWORLD_BASE_SOURCE_ID,
           type: "raster",
         },
+        ...createVworldThreeDimensionalBuildingLayers(options),
       ],
       sources: {
         [VWORLD_BASE_SOURCE_ID]: {
@@ -435,6 +560,16 @@ export function createVworldStyle(
           tiles: [createVworldRasterTileUrl(vworldApiKey)],
           type: "raster",
         },
+        ...(options.includeThreeDimensionalBuildings
+          ? {
+              [VWORLD_3D_BUILDINGS_SOURCE_ID]: {
+                attribution:
+                  '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+                type: "vector",
+                url: "https://tiles.openfreemap.org/planet",
+              },
+            }
+          : {}),
       },
       version: 8,
     } as StyleSpecification;
@@ -449,9 +584,57 @@ export function createVworldStyle(
         type: "background",
       },
       {
-        id: "vworld-base-raster",
+        id: "vworld-base-land",
+        paint: {
+          "fill-color": VECTOR_PALETTES.vworld.land,
+          "fill-opacity": 0.9,
+        },
         source: VWORLD_BASE_SOURCE_ID,
-        type: "raster",
+        "source-layer": "land",
+        type: "fill",
+      },
+      {
+        id: "vworld-base-water",
+        paint: {
+          "fill-color": VECTOR_PALETTES.vworld.water,
+          "fill-opacity": 0.88,
+        },
+        source: VWORLD_BASE_SOURCE_ID,
+        "source-layer": "water",
+        type: "fill",
+      },
+      {
+        id: "vworld-base-building",
+        minzoom: 14,
+        paint: {
+          "fill-color": VECTOR_PALETTES.vworld.building,
+          "fill-opacity": 0.48,
+        },
+        source: VWORLD_BASE_SOURCE_ID,
+        "source-layer": "building",
+        type: "fill",
+      },
+      {
+        id: "vworld-base-road-casing",
+        minzoom: 7,
+        paint: {
+          "line-color": VECTOR_PALETTES.vworld.roadCasing,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.1, 16, 9],
+        },
+        source: VWORLD_BASE_SOURCE_ID,
+        "source-layer": "transportation",
+        type: "line",
+      },
+      {
+        id: "vworld-base-road",
+        minzoom: 7,
+        paint: {
+          "line-color": VECTOR_PALETTES.vworld.road,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.7, 16, 6],
+        },
+        source: VWORLD_BASE_SOURCE_ID,
+        "source-layer": "transportation",
+        type: "line",
       },
       ...VWORLD_TRAFFIC_LINE_LAYERS.map(
         ([sourceLayer, color, width], index) => ({
@@ -474,6 +657,7 @@ export function createVworldStyle(
           type: "line",
         }),
       ),
+      ...createVworldThreeDimensionalBuildingLayers(options),
     ],
     sources: {
       [VWORLD_BASE_SOURCE_ID]: {
@@ -481,11 +665,8 @@ export function createVworldStyle(
           '<a href="https://www.vworld.kr" target="_blank">&copy; VWorld</a>',
         maxzoom: 19,
         minzoom: 6,
-        tileSize: 256,
-        tiles: [
-          createVworldTileUrl("{key}/Base/{z}/{x}/{y}.png", vworldApiKey),
-        ],
-        type: "raster",
+        tiles: [createVworldVectorTileUrl("base", vworldApiKey)],
+        type: "vector",
       },
       [VWORLD_TRAFFIC_SOURCE_ID]: {
         maxzoom: 19,
@@ -493,6 +674,16 @@ export function createVworldStyle(
         tiles: [createVworldVectorTileUrl("traffic", vworldApiKey)],
         type: "vector",
       },
+      ...(options.includeThreeDimensionalBuildings
+        ? {
+            [VWORLD_3D_BUILDINGS_SOURCE_ID]: {
+              attribution:
+                '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+              type: "vector",
+              url: "https://tiles.openfreemap.org/planet",
+            },
+          }
+        : {}),
     },
     version: 8,
   } as StyleSpecification;
@@ -502,7 +693,9 @@ export function vworldApiKeyExists(vworldApiKey: string) {
   return vworldApiKey.length > 0;
 }
 
-export function createOsmOfficialStyle(): StyleSpecification {
+export function createOsmOfficialStyle(
+  options: MapStyleOptions = {},
+): StyleSpecification {
   const palette = VECTOR_PALETTES.osm;
 
   return {
@@ -555,17 +748,14 @@ export function createOsmOfficialStyle(): StyleSpecification {
         "source-layer": "water_polygons",
         type: "fill",
       },
-      {
-        id: "buildings",
-        minzoom: 14,
-        paint: {
-          "fill-color": palette.building,
-          "fill-opacity": 0.72,
-        },
-        source: OSM_OFFICIAL_SOURCE_ID,
-        "source-layer": "buildings",
-        type: "fill",
-      },
+      ...createBuildingLayers({
+        footprintLayerId: options.buildingFootprintLayerId,
+        sourceId: OSM_OFFICIAL_SOURCE_ID,
+        sourceLayer: "buildings",
+        threeDimensionalLayerId: options.buildingThreeDimensionalLayerId,
+        threeDimensionalVisible: options.threeDimensionalVisible,
+        vectorPalette: palette,
+      }),
       {
         id: "street-polygons",
         minzoom: 13,
@@ -688,9 +878,10 @@ export function createOsmOfficialStyle(): StyleSpecification {
 
 export function createOsmStyle(
   osmTileSource: OsmTileSource = DEFAULT_MAP_RENDERING_SETTINGS.osmTileSource,
+  options: MapStyleOptions = {},
 ): StyleSpecification {
   if (osmTileSource === "official") {
-    return createOsmOfficialStyle();
+    return createOsmOfficialStyle(options);
   }
 
   const palette = VECTOR_PALETTES.osm;
@@ -777,17 +968,14 @@ export function createOsmStyle(
         "source-layer": "waterway",
         type: "line",
       },
-      {
-        id: "building",
-        minzoom: 14,
-        paint: {
-          "fill-color": palette.building,
-          "fill-opacity": 0.72,
-        },
-        source: OPENFREEMAP_SOURCE_ID,
-        "source-layer": "building",
-        type: "fill",
-      },
+      ...createBuildingLayers({
+        footprintLayerId: options.buildingFootprintLayerId,
+        sourceId: OPENFREEMAP_SOURCE_ID,
+        sourceLayer: "building",
+        threeDimensionalLayerId: options.buildingThreeDimensionalLayerId,
+        threeDimensionalVisible: options.threeDimensionalVisible,
+        vectorPalette: palette,
+      }),
       {
         id: "road-casing",
         minzoom: 7,
@@ -893,6 +1081,7 @@ export function createMapStyle(
   provider: MapProvider,
   vworldApiKey: string,
   settings: Partial<MapRenderingSettings> = {},
+  options: MapStyleOptions = {},
 ): StyleSpecification {
   const mapTileMode =
     settings.mapTileMode ?? DEFAULT_MAP_RENDERING_SETTINGS.mapTileMode;
@@ -900,8 +1089,52 @@ export function createMapStyle(
     settings.osmTileSource ?? DEFAULT_MAP_RENDERING_SETTINGS.osmTileSource;
 
   return provider === "vworld"
-    ? createVworldStyle(vworldApiKey, mapTileMode)
-    : createOsmStyle(osmTileSource);
+    ? createVworldStyle(vworldApiKey, mapTileMode, options)
+    : createOsmStyle(osmTileSource, options);
+}
+
+export function syncThreeDimensionalView(
+  map: MapLibreMap,
+  enabled: boolean,
+  options: {
+    animate?: boolean;
+    footprintLayerId?: string;
+    threeDimensionalLayerId?: string;
+  } = {},
+) {
+  const {
+    animate = true,
+    footprintLayerId = BUILDING_FOOTPRINT_LAYER_ID,
+    threeDimensionalLayerId = BUILDING_3D_LAYER_ID,
+  } = options;
+
+  if (map.getLayer(threeDimensionalLayerId)) {
+    map.setLayoutProperty(
+      threeDimensionalLayerId,
+      "visibility",
+      enabled ? "visible" : "none",
+    );
+  }
+
+  if (map.getLayer(footprintLayerId)) {
+    map.setLayoutProperty(
+      footprintLayerId,
+      "visibility",
+      enabled ? "none" : "visible",
+    );
+  }
+
+  const camera = {
+    bearing: enabled ? THREE_DIMENSIONAL_BEARING : 0,
+    pitch: enabled ? THREE_DIMENSIONAL_PITCH : 0,
+  };
+
+  if (animate) {
+    map.easeTo({ ...camera, duration: 520 });
+    return;
+  }
+
+  map.jumpTo(camera);
 }
 
 export function isSourceVisible(

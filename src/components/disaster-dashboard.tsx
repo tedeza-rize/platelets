@@ -760,7 +760,12 @@ function createDashboardMapStyle(
   vworldApiKey: string,
 ): StyleSpecification {
   if (settings.mapProvider === "vworld") {
-    return createVworldStyle(vworldApiKey, settings.mapTileMode);
+    return createVworldStyle(vworldApiKey, settings.mapTileMode, {
+      buildingFootprintLayerId: BUILDING_FOOTPRINT_LAYER_ID,
+      buildingThreeDimensionalLayerId: BUILDING_3D_LAYER_ID,
+      includeThreeDimensionalBuildings: true,
+      threeDimensionalVisible: true,
+    });
   }
 
   return settings.osmTileSource === "official"

@@ -25,7 +25,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "vworld-map-tiles",
     license: "브이월드 이용약관 및 오픈API 이용정책 준수",
     notes:
-      "브이월드 API 키는 설치 설정 DB 또는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로 주입한다. 벡터 모드는 https://api.vworld.kr/req/wmts/vector/... 타일을, 레스터 모드는 https://api.vworld.kr/req/wmts/1.0.0/... 타일을 사용하며 지도 attribution을 유지한다.",
+      "브이월드 API 키는 설치 설정 DB 또는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로 주입한다. 레스터 모드는 https://api.vworld.kr/req/wmts/1.0.0/... 타일을 사용한다. 벡터 모드는 기본 지도 소스를 https://api.vworld.kr/req/wmts/vector/getTile/... 벡터 타일로 유지하며, 네이티브 MapLibre용 브이월드 3D 건물 타일이 없을 때 3D 모드는 OpenFreeMap/OpenStreetMap 건물 extrusion을 함께 사용할 수 있다. 지도 attribution을 유지한다.",
     provider: "공간정보산업진흥원 / 브이월드",
     sourceName: "브이월드 WMTS 배경지도, 교통, POI 벡터 타일",
     sourceUrl: "https://www.vworld.kr/",
