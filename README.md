@@ -152,6 +152,35 @@ gh pr merge --merge --delete-branch
 The AI and MCP payloads intentionally contain bounded summaries rather than
 raw provider records.
 
+## Assembly And Protest Data
+
+Platelets can crawl daily public assembly/protest notices from all 18
+provincial police agency websites into SQLite. Use the sudo-protected crawl
+endpoint for a single KST date:
+
+```bash
+POST /api/assembly-protests/crawl
+{ "date": "2026-06-13", "enrichLocations": true }
+```
+
+The crawl stores source agency, date, time range, location, movement scope,
+reported crowd size, and latitude/longitude when confidently resolved.
+Location text is parsed from the board body and supported PDF/HWP/HWPX
+attachments. Coordinate enrichment uses bounded map/geocoding calls after the
+board crawl; the LLM path is limited to a forced `geocode_place` map tool call
+rather than whole-page crawling or schedule extraction.
+The crawl response includes per-source success/failure and geocoded-row counts.
+For LLM workflows, the local MCP server exposes `geocode_place` so a model can
+resolve one parsed Korean place query through the map/geocoding boundary, plus
+`list_assembly_protests` for raw-free daily schedule context.
+
+Read normalized public rows without raw provider text:
+
+```bash
+GET /api/assembly-protests?date=2026-06-13
+GET /api/assembly-protests?date=2026-06-13&agency=seoul
+```
+
 ## Disaster Response MVP
 
 - Dashboard: `/dashboard`

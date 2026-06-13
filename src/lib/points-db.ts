@@ -171,6 +171,46 @@ export type HazardEventUpdateResult = {
   }>;
 };
 
+export type AssemblyProtestInput = {
+  agency: string;
+  crowdSize: number | null;
+  date: string;
+  detailUrl: string | null;
+  endsAt: string | null;
+  latitude: number | null;
+  location: string;
+  locationScope: string | null;
+  longitude: number | null;
+  raw: Record<string, unknown>;
+  sourceId: string;
+  sourceRecordId: string;
+  sourceTitle: string;
+  sourceUrl: string;
+  startsAt: string | null;
+};
+
+export type AssemblyProtest = AssemblyProtestInput & {
+  fetchedAt: string;
+  id: number;
+};
+
+export type AssemblyProtestUpdateResult = {
+  date: string;
+  failedSourceCount: number;
+  fetchedAt: string;
+  geocodedCount: number;
+  importedCount: number;
+  sourceResults: Array<{
+    agency: string;
+    error?: string;
+    geocodedCount: number;
+    importedCount: number;
+    sourceId: string;
+    status: "failure" | "success";
+  }>;
+  sourceCount: number;
+};
+
 type SqliteDatabase = sqlite3.Database;
 
 type PointRow = {
@@ -271,6 +311,26 @@ type HazardEventRow = {
   occurred_at: string | null;
   raw_json: string;
   title: string;
+};
+
+type AssemblyProtestRow = {
+  agency: string;
+  crowd_size: number | null;
+  date: string;
+  detail_url: string | null;
+  ends_at: string | null;
+  fetched_at: string;
+  id: number;
+  latitude: number | null;
+  location: string;
+  location_scope: string | null;
+  longitude: number | null;
+  raw_json: string;
+  source_id: string;
+  source_record_id: string;
+  source_title: string;
+  source_url: string;
+  starts_at: string | null;
 };
 
 const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
@@ -494,6 +554,31 @@ async function initializeDatabase(db: SqliteDatabase) {
   );
   await run(
     db,
+    `CREATE TABLE IF NOT EXISTS assembly_protests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_id TEXT NOT NULL,
+      source_record_id TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      detail_url TEXT,
+      agency TEXT NOT NULL,
+      date TEXT NOT NULL,
+      source_title TEXT NOT NULL,
+      starts_at TEXT,
+      ends_at TEXT,
+      location TEXT NOT NULL,
+      location_scope TEXT,
+      latitude REAL,
+      longitude REAL,
+      crowd_size INTEGER,
+      raw_json TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(source_id, source_record_id, date)
+    )`,
+  );
+  await run(
+    db,
     "CREATE INDEX IF NOT EXISTS points_source_idx ON points(source)",
   );
   await run(
@@ -515,6 +600,14 @@ async function initializeDatabase(db: SqliteDatabase) {
   await run(
     db,
     "CREATE INDEX IF NOT EXISTS hazard_events_coordinates_idx ON hazard_events(latitude, longitude)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS assembly_protests_date_idx ON assembly_protests(date, agency)",
+  );
+  await run(
+    db,
+    "CREATE INDEX IF NOT EXISTS assembly_protests_coordinates_idx ON assembly_protests(latitude, longitude)",
   );
 }
 
@@ -783,6 +876,28 @@ function mapHazardEventRow(row: HazardEventRow): HazardEvent {
     occurredAt: row.occurred_at,
     raw: JSON.parse(row.raw_json) as Record<string, string>,
     title: row.title,
+  };
+}
+
+function mapAssemblyProtestRow(row: AssemblyProtestRow): AssemblyProtest {
+  return {
+    agency: row.agency,
+    crowdSize: row.crowd_size,
+    date: row.date,
+    detailUrl: row.detail_url,
+    endsAt: row.ends_at,
+    fetchedAt: row.fetched_at,
+    id: row.id,
+    latitude: row.latitude,
+    location: row.location,
+    locationScope: row.location_scope,
+    longitude: row.longitude,
+    raw: JSON.parse(row.raw_json) as Record<string, unknown>,
+    sourceId: row.source_id,
+    sourceRecordId: row.source_record_id,
+    sourceTitle: row.source_title,
+    sourceUrl: row.source_url,
+    startsAt: row.starts_at,
   };
 }
 
@@ -1197,6 +1312,111 @@ export async function listHazardEvents(options: { limit?: number } = {}) {
   );
 
   return rows.map(mapHazardEventRow);
+}
+
+export async function listAssemblyProtests(
+  options: { date?: string; limit?: number } = {},
+) {
+  const db = await getDatabase();
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  const limit = Math.min(Math.max(options.limit ?? 500, 1), 2_000);
+
+  if (options.date) {
+    conditions.push("date = ?");
+    params.push(options.date);
+  }
+
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = await all<AssemblyProtestRow>(
+    db,
+    `SELECT *
+      FROM assembly_protests
+      ${where}
+      ORDER BY date DESC, COALESCE(starts_at, ends_at, fetched_at), agency, id
+      LIMIT ?`,
+    [...params, limit],
+  );
+
+  return rows.map(mapAssemblyProtestRow);
+}
+
+export async function replaceAssemblyProtestsForDate(params: {
+  date: string;
+  fetchedAt: string;
+  protests: AssemblyProtestInput[];
+  sourceIds: string[];
+}) {
+  await withWriteTransaction(async (db) => {
+    if (params.sourceIds.length > 0) {
+      await run(
+        db,
+        `DELETE FROM assembly_protests
+          WHERE date = ?
+            AND source_id IN (${params.sourceIds.map(() => "?").join(",")})`,
+        [params.date, ...params.sourceIds],
+      );
+    }
+
+    for (const protest of params.protests) {
+      await run(
+        db,
+        `INSERT INTO assembly_protests (
+          source_id,
+          source_record_id,
+          source_url,
+          detail_url,
+          agency,
+          date,
+          source_title,
+          starts_at,
+          ends_at,
+          location,
+          location_scope,
+          latitude,
+          longitude,
+          crowd_size,
+          raw_json,
+          fetched_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(source_id, source_record_id, date) DO UPDATE SET
+          source_url = excluded.source_url,
+          detail_url = excluded.detail_url,
+          agency = excluded.agency,
+          source_title = excluded.source_title,
+          starts_at = excluded.starts_at,
+          ends_at = excluded.ends_at,
+          location = excluded.location,
+          location_scope = excluded.location_scope,
+          latitude = excluded.latitude,
+          longitude = excluded.longitude,
+          crowd_size = excluded.crowd_size,
+          raw_json = excluded.raw_json,
+          fetched_at = excluded.fetched_at,
+          updated_at = CURRENT_TIMESTAMP`,
+        [
+          protest.sourceId,
+          protest.sourceRecordId,
+          protest.sourceUrl,
+          protest.detailUrl,
+          protest.agency,
+          protest.date,
+          protest.sourceTitle,
+          protest.startsAt,
+          protest.endsAt,
+          protest.location,
+          protest.locationScope,
+          protest.latitude,
+          protest.longitude,
+          protest.crowdSize,
+          JSON.stringify(protest.raw),
+          params.fetchedAt,
+        ],
+      );
+    }
+  });
 }
 
 export async function recordApiLog(input: ApiLogInput) {
