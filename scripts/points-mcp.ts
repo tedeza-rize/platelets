@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 import { z } from "zod/v4";
 
 const DATASET_SOURCE_IDS = [
@@ -133,14 +133,20 @@ const POINT_COLUMNS = `
   u.fetched_at
 `;
 const projectRoot = process.cwd();
-const databasePath = path.join(projectRoot, "data", "points.sqlite");
+const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
+const dataDirectory = configuredDataDirectory
+  ? path.isAbsolute(configuredDataDirectory)
+    ? configuredDataDirectory
+    : path.join(projectRoot, configuredDataDirectory)
+  : path.join(projectRoot, "data");
+const databasePath = path.join(dataDirectory, "points.sqlite");
 const forecastDocPath = path.join(
   projectRoot,
   "docs",
   "AI_FORECAST_AND_RESPONSE.md",
 );
 
-type SqliteDatabase = sqlite3.Database;
+type SqliteDatabase = Database.Database;
 
 type PointRow = {
   address: string;
@@ -332,48 +338,24 @@ type KakaoLocalSearchResponse = {
   };
 };
 
-function getDatabase(): Promise<SqliteDatabase> {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(
-      databasePath,
-      sqlite3.OPEN_READONLY,
-      (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(db);
-      },
-    );
+async function getDatabase(): Promise<SqliteDatabase> {
+  return new Database(databasePath, {
+    fileMustExist: true,
+    readonly: true,
+    timeout: 5_000,
   });
 }
 
-function all<TRow>(
+async function all<TRow>(
   db: SqliteDatabase,
   sql: string,
   params: unknown[] = [],
 ): Promise<TRow[]> {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (error, rows: TRow[]) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(rows);
-    });
-  });
+  return db.prepare(sql).all(...params) as TRow[];
 }
 
-function closeDatabase(db: SqliteDatabase): Promise<void> {
-  return new Promise((resolve, reject) => {
-    db.close((error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve();
-    });
-  });
+async function closeDatabase(db: SqliteDatabase): Promise<void> {
+  db.close();
 }
 
 async function withDatabase<TResult>(
