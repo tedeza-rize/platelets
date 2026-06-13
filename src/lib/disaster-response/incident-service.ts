@@ -1,4 +1,5 @@
 import { assertKoreaCoordinate } from "@/lib/disaster-response/geo";
+import { publishIncidentChange } from "@/lib/disaster-response/incident-change-events";
 import { incidentRepository } from "@/lib/disaster-response/incident-repository";
 import type {
   CreateIncidentInput,
@@ -74,7 +75,7 @@ export class IncidentService {
     return incidentRepository.listIncidentEvents(id);
   }
 
-  createIncident(input: CreateIncidentInput) {
+  async createIncident(input: CreateIncidentInput) {
     if (!INCIDENT_TYPES.has(input.type)) {
       throw new Error("지원하지 않는 사고 유형입니다.");
     }
@@ -89,7 +90,7 @@ export class IncidentService {
     });
 
     const now = new Date().toISOString();
-    return incidentRepository.createIncident({
+    const incident = await incidentRepository.createIncident({
       address: boundedText(input.address, "좌표 기반 신고 위치", 240),
       createdAt: now,
       description: boundedText(
@@ -105,14 +106,23 @@ export class IncidentService {
       title: boundedText(input.title, "신규 사고 신고", 120),
       type: input.type,
     });
+    publishIncidentChange({ incidentId: incident.id, mutation: "created" });
+
+    return incident;
   }
 
-  updateIncidentStatus(id: string, status: IncidentStatus) {
+  async updateIncidentStatus(id: string, status: IncidentStatus) {
     if (!INCIDENT_STATUSES.has(status)) {
       throw new Error("지원하지 않는 사고 상태입니다.");
     }
 
-    return incidentRepository.updateIncidentStatus(id, status);
+    const incident = await incidentRepository.updateIncidentStatus(id, status);
+
+    if (incident) {
+      publishIncidentChange({ incidentId: id, mutation: "updated" });
+    }
+
+    return incident;
   }
 
   async updateIncident(id: string, input: UpdateIncidentInput) {
@@ -137,7 +147,7 @@ export class IncidentService {
     const longitude = input.longitude ?? current.longitude;
     assertKoreaCoordinate({ latitude, longitude });
 
-    return incidentRepository.updateIncident(id, {
+    const incident = await incidentRepository.updateIncident(id, {
       ...editableIncidentFields(current),
       address: boundedText(input.address, current.address, 240),
       description: boundedText(input.description, current.description, 1200),
@@ -148,10 +158,22 @@ export class IncidentService {
       title: boundedText(input.title, current.title, 120),
       type,
     });
+
+    if (incident) {
+      publishIncidentChange({ incidentId: id, mutation: "updated" });
+    }
+
+    return incident;
   }
 
-  deleteIncident(id: string) {
-    return incidentRepository.deleteIncident(id);
+  async deleteIncident(id: string) {
+    const deleted = await incidentRepository.deleteIncident(id);
+
+    if (deleted) {
+      publishIncidentChange({ incidentId: id, mutation: "deleted" });
+    }
+
+    return deleted;
   }
 }
 
