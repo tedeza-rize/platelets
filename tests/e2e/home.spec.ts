@@ -352,6 +352,31 @@ test("incident API records create, edit, and status history", async ({
   }
 });
 
+test("disaster report export returns an Excel-compatible workbook", async ({
+  request,
+}) => {
+  await ensureSetupComplete(request);
+
+  const response = await request.get("/api/disaster/reports?format=excel", {
+    headers: {
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+  });
+
+  expect(response.ok()).toBeTruthy();
+  expect(response.headers()["content-type"]).toContain(
+    "application/vnd.ms-excel",
+  );
+  expect(response.headers()["content-disposition"]).toContain(
+    "platelets-disaster-report-",
+  );
+
+  const body = await response.text();
+  expect(body).toContain('<Worksheet ss:Name="Overview">');
+  expect(body).toContain('<Worksheet ss:Name="Incident history">');
+  expect(body).toContain('<Worksheet ss:Name="Resource placement">');
+});
+
 test("incident updates reach an open dashboard without a reload", async ({
   page,
   request,
