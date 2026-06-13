@@ -1,7 +1,8 @@
 import { updateHazardEvents } from "@/lib/hazard-events";
 import { getOperationalSettings } from "@/lib/operational-settings";
-import { recordApiLog } from "@/lib/points-db";
+import { databaseFileExists, recordApiLog } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
+import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-state";
 
 const SCHEDULER_TICK_MS = 60_000;
 
@@ -37,6 +38,10 @@ export function startHazardEventScheduler() {
     state.isRunning = true;
 
     try {
+      if (!databaseFileExists() || !(await isSetupCompleteFromDatabaseFile())) {
+        return;
+      }
+
       const settings = await getOperationalSettings();
       const now = Date.now();
 
