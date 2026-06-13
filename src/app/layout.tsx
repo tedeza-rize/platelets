@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { NotificationControl } from "@/components/notification-control";
+import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { TimeSkewGuard } from "@/components/time-skew-guard";
 import { getDictionary, resolveLocale } from "@/lib/i18n";
 
@@ -40,6 +41,7 @@ export default async function RootLayout({
     >
       <body>
         {children}
+        <ServiceWorkerRegistration />
         <NotificationControl dictionary={dictionary} />
         <TimeSkewGuard dictionary={dictionary} />
       </body>
