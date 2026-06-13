@@ -1,0 +1,68 @@
+.control {
+  position: fixed;
+  top: 76px;
+  right: 16px;
+  z-index: 40;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--control-border);
+  border-radius: 9px;
+  background: var(--dropdown-surface);
+  color: var(--text-strong);
+  box-shadow: var(--control-shadow);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.control:hover,
+.control:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+}
+
+.control:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.spinner {
+  animation: notification-spin 0.8s linear infinite;
+}
+
+@keyframes notification-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .control {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: 42px;
+    min-height: 42px;
+    padding: 0;
+  }
+
+  .control span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

@@ -43,6 +43,10 @@ OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
 PLATELETS_DATA_DIR=data
 PLATELETS_SECRET_KEY=
+PLATELETS_INCIDENT_WEBHOOK_URLS=
+WEB_PUSH_VAPID_PUBLIC_KEY=
+WEB_PUSH_VAPID_PRIVATE_KEY=
+WEB_PUSH_CONTACT=mailto:operations@example.com
 ```
 
 `PLATELETS_ADMIN_TOKEN` grants AI-query access. A sudo token also satisfies
@@ -55,6 +59,18 @@ credentials and encrypted API key configuration in SQLite, then sends the
 operator to the integrated disaster dashboard. `PLATELETS_DATA_DIR` can point
 deployments or tests at a different data directory. `PLATELETS_SECRET_KEY`
 overrides the local encryption key file used to protect stored setup secrets.
+
+High-risk incident creation can notify browser subscribers and up to five
+HTTPS webhook destinations. Generate one VAPID key pair for the deployment and
+store it in `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_VAPID_PRIVATE_KEY`; set
+`WEB_PUSH_CONTACT` to a monitored `mailto:` or HTTPS contact. Configure Slack,
+Discord, or compatible endpoints in the comma-separated
+`PLATELETS_INCIDENT_WEBHOOK_URLS`. Webhooks that resolve to loopback, link-local,
+or private-network addresses are rejected.
+
+```bash
+npx web-push generate-vapid-keys
+```
 
 ## Development
 
