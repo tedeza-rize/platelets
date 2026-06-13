@@ -332,6 +332,13 @@ const koUi = {
   "notification.incident.body": "{title} · {address}",
   "notification.incident.title": "긴급 재난 알림",
   "notification.incident.webhook": "[Platelets 긴급 사고] {title} · {address}",
+  "pwa.manifest.description": "현장 대응을 위한 Platelets 재난 지도",
+  "pwa.manifest.name": "Platelets 재난 대응 지도",
+  "pwa.offline.aria": "오프라인 안내",
+  "pwa.offline.description":
+    "네트워크가 불안정합니다. 최근에 열었던 화면과 기본 앱 구조는 계속 사용할 수 있지만, 실시간 사고·지도·경로 정보는 연결이 복구되면 다시 갱신됩니다.",
+  "pwa.offline.retry": "다시 연결 시도",
+  "pwa.offline.title": "오프라인 상태입니다",
   레스터: "레스터",
   벡터: "벡터",
   브이월드: "브이월드",
@@ -611,6 +618,14 @@ const enUi = {
   "notification.incident.title": "Emergency incident alert",
   "notification.incident.webhook":
     "[Platelets emergency incident] {title} · {address}",
+  "pwa.manifest.description":
+    "Platelets disaster map for field response operations",
+  "pwa.manifest.name": "Platelets Disaster Response Map",
+  "pwa.offline.aria": "Offline notice",
+  "pwa.offline.description":
+    "The network is unstable. Recently opened screens and the basic app shell remain available, but live incidents, maps, and routing will refresh when the connection returns.",
+  "pwa.offline.retry": "Try reconnecting",
+  "pwa.offline.title": "You are offline",
   레스터: "Raster",
   벡터: "Vector",
   브이월드: "VWorld",
