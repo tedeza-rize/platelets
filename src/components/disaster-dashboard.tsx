@@ -27,6 +27,8 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MapLegend } from "@/components/disaster-dashboard/map-legend";
+import { SummaryMetrics } from "@/components/disaster-dashboard/summary-metrics";
 import type { BuildingSafetyProfile } from "@/lib/building-safety/types";
 import type {
   BigData119MapPoint,
@@ -3035,61 +3037,84 @@ export function DisasterDashboard({
               소방용수
             </button>
           </div>
-          <div className={styles.mapLegend}>
-            <span>
-              <i className={styles.legendIncident} /> 사고
-            </span>
-            <span>
-              <i className={styles.legendStation} /> 소방서
-            </span>
-            <span>
-              <i className={styles.legendHospital} /> 병원
-            </span>
-            <span>
-              <i className={styles.legendRisk} /> 위험도
-            </span>
-            <span>
-              <i className={styles.legendBigDataTarget} /> 특정소방대상물
-            </span>
-            <span>
-              <i className={styles.legendBigDataWater} /> 소방용수
-            </span>
-          </div>
+          <MapLegend
+            items={[
+              {
+                id: "incident",
+                label: "사고",
+                markerClassName: styles.legendIncident,
+              },
+              {
+                id: "station",
+                label: "소방서",
+                markerClassName: styles.legendStation,
+              },
+              {
+                id: "hospital",
+                label: "병원",
+                markerClassName: styles.legendHospital,
+              },
+              {
+                id: "risk",
+                label: "위험도",
+                markerClassName: styles.legendRisk,
+              },
+              {
+                id: "fire-safety-target",
+                label: "특정소방대상물",
+                markerClassName: styles.legendBigDataTarget,
+              },
+              {
+                id: "fire-water-source",
+                label: "소방용수",
+                markerClassName: styles.legendBigDataWater,
+              },
+            ]}
+          />
         </section>
 
         <aside className={styles.panel}>
-          <section className={styles.summaryGrid} aria-label="운영 지표">
-            <article className={styles.metric}>
-              <AlertTriangle aria-hidden="true" size={18} />
-              <span>{summary.activeIncidents}</span>
-              <small>진행 사고</small>
-            </article>
-            <article className={styles.metric}>
-              <Flame aria-hidden="true" size={18} />
-              <span>{summary.fireStations}</span>
-              <small>소방 거점</small>
-            </article>
-            <article className={styles.metric}>
-              <Hospital aria-hidden="true" size={18} />
-              <span>{summary.hospitals}</span>
-              <small>응급 병원</small>
-            </article>
-            <article className={styles.metric}>
-              <Layers aria-hidden="true" size={18} />
-              <span>{summary.highRiskAreas}</span>
-              <small>고위험 지역</small>
-            </article>
-            <article className={styles.metric}>
-              <Database aria-hidden="true" size={18} />
-              <span>{summary.bigData119Points}</span>
-              <small>빅데이터 포인트</small>
-            </article>
-            <article className={styles.metric}>
-              <Route aria-hidden="true" size={18} />
-              <span>{summary.bigData119OperationalRows}</span>
-              <small>신고·출동 행</small>
-            </article>
-          </section>
+          <SummaryMetrics
+            ariaLabel="운영 지표"
+            items={[
+              {
+                icon: <AlertTriangle aria-hidden="true" size={18} />,
+                id: "active-incidents",
+                label: "진행 사고",
+                value: summary.activeIncidents,
+              },
+              {
+                icon: <Flame aria-hidden="true" size={18} />,
+                id: "fire-stations",
+                label: "소방 거점",
+                value: summary.fireStations,
+              },
+              {
+                icon: <Hospital aria-hidden="true" size={18} />,
+                id: "hospitals",
+                label: "응급 병원",
+                value: summary.hospitals,
+              },
+              {
+                icon: <Layers aria-hidden="true" size={18} />,
+                id: "high-risk-areas",
+                label: "고위험 지역",
+                value: summary.highRiskAreas,
+              },
+              {
+                icon: <Database aria-hidden="true" size={18} />,
+                id: "big-data-points",
+                label: "빅데이터 포인트",
+                value: summary.bigData119Points,
+              },
+              {
+                icon: <Route aria-hidden="true" size={18} />,
+                id: "operational-rows",
+                label: "신고·출동 행",
+                value: summary.bigData119OperationalRows,
+              },
+            ]}
+          />
 
           {notice ? <output className={styles.notice}>{notice}</output> : null}
 
