@@ -111,6 +111,72 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "주소 기반 공공 데이터의 위도/경도 보강",
   },
   {
+    id: "police-assembly-protests",
+    license:
+      "Public police website notice terms and each agency website policy apply.",
+    notes:
+      "Daily public board posts are crawled by date from provincial police agency websites. Raw board text stays server-side; public API responses expose normalized schedule, place, scope, crowd size, and coordinates when confidently resolved.",
+    provider: "Korean National Police Agency provincial police agencies",
+    sourceName: "Provincial police daily assembly and protest notices",
+    sourceUrl: "https://www.police.go.kr/",
+    sourceUrls: [
+      {
+        label: "서울경찰청 오늘의 집회/시위",
+        url: "https://smpa.go.kr/user/nd54882.do",
+      },
+      {
+        label: "Busan daily assembly/protest board",
+        url: "https://www.bspolice.go.kr/view.do?no=72",
+      },
+      {
+        label: "대구경찰청 오늘의 집회시위",
+        url: "https://www.dgpolice.go.kr/bbs/List.do?bbsId=d495f174",
+      },
+      {
+        label: "Daejeon Metropolitan Police Agency official website",
+        url: "https://www.djpolice.go.kr/",
+      },
+      {
+        label: "경기남부경찰청 오늘의 주요집회",
+        url: "https://www.ggpolice.go.kr/main/bbslist.do?bbsId=FD2",
+      },
+      {
+        label: "Incheon daily assembly/protest board",
+        url: "https://www.icpolice.go.kr/board/rg4_board/list.php?bbs_code=ic015",
+      },
+      {
+        label: "Gyeonggi Bukbu daily assembly board",
+        url: "https://www.ggbpolice.go.kr/main/cop/bbs/selectBoardList.do?bbsId=Assembly_main",
+      },
+      {
+        label: "Gyeongbuk daily assembly/protest board",
+        url: "https://www.gbpolice.go.kr/bbs/List.do?bbsId=8&sid=gbpolice",
+      },
+      {
+        label: "Gyeongnam daily assembly JSON-backed board",
+        url: "https://www.gnpolice.go.kr/gnpolice/page.do?MENU_ID=NF05",
+      },
+      {
+        label: "Sejong daily assembly/protest board",
+        url: "https://www.sjpolice.go.kr/SEO/SJ/main.php?bo=sjpol2&mxPn=02_02",
+      },
+      {
+        label: "Chungnam daily assembly board",
+        url: "https://www.cnpolice.go.kr/2014/main.php?mxPn=3_1_1",
+      },
+      {
+        label: "Jeonbuk assembly/protest notice board",
+        url: "https://www.jbpolice.go.kr/index.police?menuCd=DOM_000000202008000000",
+      },
+      {
+        label: "제주경찰청 오늘의집회",
+        url: "https://www.jjpolice.go.kr/jjpolice/notice/assembly.htm",
+      },
+    ],
+    usage:
+      "Date-based public-safety awareness for assembly and protest schedules, including time, place, area/scope, expected crowd size, and mapped coordinates when available.",
+  },
+  {
     id: "naver-kakao-map-links",
     license: "각 지도 서비스 링크/이용약관 준수",
     notes:
