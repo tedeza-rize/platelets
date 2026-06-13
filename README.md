@@ -209,6 +209,8 @@ GET /api/assembly-protests?date=2026-06-13&agency=seoul
 - Incident create: `/incidents/new`
 - Risk map: `/risk`
 - Resource recommendations: `/resources`
+- Excel-compatible report export:
+  `/api/disaster/reports?format=excel`
 
 The MVP uses `src/lib/disaster-response/` service classes. Incidents are stored
 in SQLite at `data/points.sqlite` in the `disaster_incidents` table; the app
@@ -222,6 +224,9 @@ Big Data Platform point data, 119 call/dispatch samples, and regional
 fire/force statistics when local CSV files are present. Resource placement
 recommendations derive fire engine, ambulance, and rescue truck counts from
 risk score, recent incidents, water-source coverage, and operational 119 load.
+The report export endpoint returns a no-store `.xls` workbook with overview,
+incident, incident-history, and resource-placement sheets for operator handoff
+or after-action review.
 
 ## Fire Safety Big Data Platform
 
