@@ -29,6 +29,7 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapLegend } from "@/components/disaster-dashboard/map-legend";
 import { SummaryMetrics } from "@/components/disaster-dashboard/summary-metrics";
+import { useIncidentEvents } from "@/components/disaster-dashboard/use-incident-events";
 import type { BuildingSafetyProfile } from "@/lib/building-safety/types";
 import type {
   BigData119MapPoint,
@@ -1970,7 +1971,12 @@ export function DisasterDashboard({
       }
 
       setSnapshot(payload);
-      setActiveIncident((current) => current ?? payload.activeIncident);
+      setActiveIncident((current) =>
+        current
+          ? (payload.incidents.find((incident) => incident.id === current.id) ??
+            null)
+          : payload.activeIncident,
+      );
       setDispatchRecommendation(payload.dispatchRecommendation);
       setDispatchRoute(null);
       setDispatchRouteStatus(null);
@@ -2183,6 +2189,8 @@ export function DisasterDashboard({
   useEffect(() => {
     loadSnapshot();
   }, [loadSnapshot]);
+
+  useIncidentEvents(loadSnapshot);
 
   useEffect(() => {
     setView(initialView);

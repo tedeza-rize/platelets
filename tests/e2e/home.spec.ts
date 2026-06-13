@@ -285,3 +285,51 @@ test("incident API records create, edit, and status history", async ({
     expect(deleted.ok()).toBeTruthy();
   }
 });
+
+test("incident updates reach an open dashboard without a reload", async ({
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
+  const observer = await page.context().newPage();
+  const eventStream = observer.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/disaster/events") &&
+      response.status() === 200,
+  );
+  await observer.goto("/incidents", { waitUntil: "domcontentloaded" });
+  await eventStream;
+
+  const title = `E2E real-time incident ${Date.now()}`;
+  const created = await request.post("/api/disaster/incidents", {
+    data: {
+      address: "Seoul City Hall",
+      description: "SSE synchronization test",
+      latitude: 37.5665,
+      longitude: 126.978,
+      occurredAt: new Date().toISOString(),
+      riskLevel: "medium",
+      title,
+      type: "fire",
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  const createdPayload = (await created.json()) as {
+    incident: { id: string };
+  };
+
+  try {
+    await expect(observer.getByText(title, { exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+  } finally {
+    const deleted = await request.delete(
+      `/api/disaster/incidents/${createdPayload.incident.id}`,
+    );
+    expect(deleted.ok()).toBeTruthy();
+    await expect(observer.getByText(title, { exact: true })).toBeHidden({
+      timeout: 10_000,
+    });
+    await observer.close();
+  }
+});
