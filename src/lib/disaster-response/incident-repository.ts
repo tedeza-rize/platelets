@@ -1,7 +1,4 @@
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import sqlite3 from "sqlite3";
 import { INITIAL_INCIDENTS } from "@/lib/disaster-response/mock-data";
 import type {
   Incident,
@@ -11,8 +8,13 @@ import type {
   IncidentType,
   RiskLevel,
 } from "@/lib/disaster-response/types";
-
-type SqliteDatabase = sqlite3.Database;
+import { withDatabaseWriteTransaction } from "@/lib/points-db";
+import {
+  allSqlite as all,
+  getSqlite as get,
+  runSqlite as run,
+  type SqliteDatabase,
+} from "@/lib/sqlite";
 
 type IncidentRow = {
   address: string;
@@ -59,82 +61,7 @@ export type IncidentRepository = {
   ): Promise<Incident | null>;
 };
 
-const dataDirectory = path.join(process.cwd(), "data");
-const databasePath = path.join(dataDirectory, "points.sqlite");
-
 let databasePromise: Promise<SqliteDatabase> | null = null;
-let writeTransactionQueue: Promise<void> = Promise.resolve();
-
-function run(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<void>((resolve, reject) => {
-    db.run(sql, params, (error) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-function all<T>(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<T[]>((resolve, reject) => {
-    db.all(sql, params, (error, rows: T[]) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve(rows);
-    });
-  });
-}
-
-function get<T>(db: SqliteDatabase, sql: string, params: unknown[] = []) {
-  return new Promise<T | undefined>((resolve, reject) => {
-    db.get(sql, params, (error, row: T | undefined) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-
-      resolve(row);
-    });
-  });
-}
-
-async function withWriteTransaction<T>(
-  operation: (db: SqliteDatabase) => Promise<T>,
-) {
-  const previousTransaction = writeTransactionQueue;
-  let releaseTransaction = () => {};
-  writeTransactionQueue = new Promise<void>((resolve) => {
-    releaseTransaction = resolve;
-  });
-
-  await previousTransaction;
-
-  const db = await getDatabase();
-  let transactionStarted = false;
-
-  try {
-    await run(db, "BEGIN IMMEDIATE");
-    transactionStarted = true;
-    const result = await operation(db);
-    await run(db, "COMMIT");
-    transactionStarted = false;
-    return result;
-  } catch (error) {
-    if (transactionStarted) {
-      await run(db, "ROLLBACK").catch(() => undefined);
-    }
-
-    throw error;
-  } finally {
-    releaseTransaction();
-  }
-}
 
 function asIncidentType(value: string): IncidentType {
   return value === "rescue" ||
@@ -348,27 +275,27 @@ async function initializeDatabase(db: SqliteDatabase) {
   await backfillInitialIncidentEvents(db);
 }
 
-async function getDatabase() {
+async function getIncidentDatabase() {
   if (!databasePromise) {
-    databasePromise = new Promise<SqliteDatabase>((resolve, reject) => {
-      fs.mkdirSync(dataDirectory, { recursive: true });
-      const db = new sqlite3.Database(databasePath, (error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        initializeDatabase(db).then(() => resolve(db), reject);
-      });
+    databasePromise = withDatabaseWriteTransaction(async (db) => {
+      await initializeDatabase(db);
+      return db;
     });
   }
 
   return databasePromise;
 }
 
+async function withIncidentWriteTransaction<T>(
+  operation: (db: SqliteDatabase) => Promise<T>,
+) {
+  await getIncidentDatabase();
+  return withDatabaseWriteTransaction(operation);
+}
+
 export class SqliteIncidentRepository implements IncidentRepository {
   async listIncidents() {
-    const db = await getDatabase();
+    const db = await getIncidentDatabase();
     const rows = await all<IncidentRow>(
       db,
       `SELECT *
@@ -380,7 +307,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   }
 
   async getIncident(id: string) {
-    const db = await getDatabase();
+    const db = await getIncidentDatabase();
     const row = await get<IncidentRow>(
       db,
       "SELECT * FROM disaster_incidents WHERE id = ?",
@@ -391,7 +318,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   }
 
   async listIncidentEvents(id: string) {
-    const db = await getDatabase();
+    const db = await getIncidentDatabase();
     const rows = await all<IncidentEventRow>(
       db,
       `SELECT *
@@ -405,7 +332,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   }
 
   async createIncident(input: Omit<Incident, "id">) {
-    return withWriteTransaction(async (db) => {
+    return withIncidentWriteTransaction(async (db) => {
       const row = await get<MaxIncidentIdRow>(
         db,
         `SELECT MAX(CAST(SUBSTR(id, 5) AS INTEGER)) AS max_id
@@ -442,7 +369,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   ) {
     const now = new Date().toISOString();
 
-    return withWriteTransaction(async (db) => {
+    return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
         "SELECT * FROM disaster_incidents WHERE id = ?",
@@ -501,7 +428,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   async updateIncidentStatus(id: string, status: IncidentStatus) {
     const now = new Date().toISOString();
 
-    return withWriteTransaction(async (db) => {
+    return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
         "SELECT * FROM disaster_incidents WHERE id = ?",
@@ -541,7 +468,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   async deleteIncident(id: string) {
     const now = new Date().toISOString();
 
-    return withWriteTransaction(async (db) => {
+    return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
         "SELECT * FROM disaster_incidents WHERE id = ?",
