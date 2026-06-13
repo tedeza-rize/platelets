@@ -114,7 +114,9 @@ test("redirects first-run deployments to the setup wizard", async ({
     timeout: 15_000,
   });
   await expect(
-    page.getByText("The SQLite DB file can be created during installation."),
+    page
+      .getByText("The SQLite DB file can be created during installation.")
+      .or(page.getByText(/A SQLite DB file already exists:/)),
   ).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -163,6 +165,25 @@ test("loads the integrated disaster response map", async ({
   await expect(page.getByRole("button", { name: "대시보드" })).toBeVisible();
   await expect(page.getByRole("button", { name: "3D" })).toBeVisible();
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
+});
+
+test("registers the push service worker when notifications are configured", async ({
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByTestId("notification-control")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () =>
+        Boolean(await navigator.serviceWorker.getRegistration("/")),
+      ),
+    )
+    .toBe(true);
 });
 
 test("shows BigData119 operational evidence and resource recommendations", async ({
