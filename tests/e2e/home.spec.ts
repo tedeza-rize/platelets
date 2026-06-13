@@ -186,6 +186,51 @@ test("registers the push service worker when notifications are configured", asyn
     .toBe(true);
 });
 
+test("exposes a PWA manifest and offline navigation fallback", async ({
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
+  const manifest = await request.get("/manifest.webmanifest");
+  expect(manifest.ok()).toBeTruthy();
+  const manifestPayload = (await manifest.json()) as {
+    display?: string;
+    icons?: Array<{ src: string }>;
+    start_url?: string;
+  };
+  expect(manifestPayload.display).toBe("standalone");
+  expect(manifestPayload.start_url).toBe("/");
+  expect(manifestPayload.icons?.some((icon) => icon.src === "/icon.svg")).toBe(
+    true,
+  );
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        return Boolean(await navigator.serviceWorker.getRegistration("/"));
+      }),
+    )
+    .toBe(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect
+    .poll(() =>
+      page.evaluate(() => Boolean(navigator.serviceWorker.controller)),
+    )
+    .toBe(true);
+
+  await page.context().setOffline(true);
+  try {
+    await page.goto("/offline-probe", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("heading", { name: "You are offline" }),
+    ).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await page.context().setOffline(false);
+  }
+});
+
 test("shows BigData119 operational evidence and resource recommendations", async ({
   page,
   request,

@@ -72,6 +72,11 @@ or private-network addresses are rejected.
 npx web-push generate-vapid-keys
 ```
 
+The app registers `/sw.js` as a PWA service worker. It precaches the dashboard
+shell, `/offline`, and same-origin static assets, then falls back to the offline
+notice for navigation when field connectivity drops. API responses remain
+network-only so stale emergency data is not silently presented as current.
+
 ## Development
 
 ```bash
