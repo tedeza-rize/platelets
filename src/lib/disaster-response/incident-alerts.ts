@@ -100,10 +100,20 @@ function webhookBody(url: URL, incident: Incident) {
     title: incident.title,
   });
 
-  return url.hostname.endsWith("discord.com") ||
-    url.hostname.endsWith("discordapp.com")
+  return isHostnameOrSubdomain(url.hostname, "discord.com") ||
+    isHostnameOrSubdomain(url.hostname, "discordapp.com")
     ? { content: text }
     : { text };
+}
+
+function isHostnameOrSubdomain(hostname: string, domain: string) {
+  const normalized = hostname.toLowerCase();
+  const normalizedDomain = domain.toLowerCase();
+
+  return (
+    normalized === normalizedDomain ||
+    normalized.endsWith(`.${normalizedDomain}`)
+  );
 }
 
 export async function sendIncidentWebhooks(
