@@ -53,7 +53,7 @@ import {
 import { createVworldStyle } from "@/lib/map-shell-core";
 import styles from "./disaster-dashboard.module.css";
 
-type DashboardView =
+export type DashboardView =
   | "dashboard"
   | "incidents"
   | "create"
@@ -74,7 +74,7 @@ type DashboardSnapshot = {
   riskAreas: RiskArea[];
 };
 
-type DisasterDashboardProps = {
+export type DisasterDashboardProps = {
   initialView?: DashboardView;
   mapSettings?: MapRenderingSettings;
   vworldApiKey?: string;
