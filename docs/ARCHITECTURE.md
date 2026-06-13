@@ -129,6 +129,25 @@ handlers and UI flows stable. Facility, route, and risk services can likewise
 be connected to public-safety big-data pipelines, Kakao/OSM route adapters, or
 ML model adapters.
 
+## Assembly And Protest Notices
+
+Daily public assembly/protest notices are stored separately from durable map
+points in `assembly_protests`. The sudo-only
+`POST /api/assembly-protests/crawl` route crawls all 18 provincial police
+agency websites for one KST date, replaces only successfully completed sources
+for that date, and returns per-source success/failure and geocoded-row counts.
+Public reads use `GET /api/assembly-protests?date=YYYY-MM-DD` and omit raw
+provider text.
+
+Board HTML and supported PDF/HWP/HWPX attachments are parsed before any model
+call. After deterministic parsing and direct map lookup, LLM usage is limited
+to a forced `geocode_place` map tool call; latitude/longitude persistence still
+requires a bounded map/geocoding result inside Korea coordinate bounds. The
+local MCP server also exposes a
+`geocode_place` map tool and `list_assembly_protests` read tool for LLM-assisted
+place-to-coordinate resolution and raw-free daily schedule context without
+turning the board crawl itself over to a model.
+
 ## AI And MCP
 
 `/api/ai/query` requires admin access and uses the official `openai` SDK. The

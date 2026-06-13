@@ -22,6 +22,29 @@ const DATASET_SOURCE_IDS = [
   "universities",
 ] as const;
 type DatasetSourceId = (typeof DATASET_SOURCE_IDS)[number];
+
+const ASSEMBLY_SOURCE_IDS = [
+  "seoul",
+  "busan",
+  "daegu",
+  "incheon",
+  "gwangju",
+  "daejeon",
+  "ulsan",
+  "sejong",
+  "gyeonggi-south",
+  "gyeonggi-north",
+  "gangwon",
+  "chungbuk",
+  "chungnam",
+  "jeonbuk",
+  "jeonnam",
+  "gyeongbuk",
+  "gyeongnam",
+  "jeju",
+] as const;
+type AssemblyPoliceAgency = (typeof ASSEMBLY_SOURCE_IDS)[number];
+
 type DatasetSourceType =
   | "aed"
   | "childcare"
@@ -150,6 +173,25 @@ type DatasetStatusRow = {
   updated_at: string | null;
 };
 
+type AssemblyProtestRow = {
+  agency: string;
+  crowd_size: number | null;
+  date: string;
+  detail_url: string | null;
+  ends_at: string | null;
+  fetched_at: string;
+  id: number;
+  latitude: number | null;
+  location: string;
+  location_scope: string | null;
+  longitude: number | null;
+  source_id: AssemblyPoliceAgency;
+  source_record_id: string;
+  source_title: string;
+  source_url: string;
+  starts_at: string | null;
+};
+
 type Coordinate = {
   latitude: number;
   longitude: number;
@@ -182,6 +224,25 @@ type PointSummary = {
   source: DatasetSourceId;
   sourceRecordId: string;
   sourceUpdatedAt: string | null;
+};
+
+type AssemblyProtestSummary = {
+  agency: string;
+  crowdSize: number | null;
+  date: string;
+  detailUrl: string | null;
+  endsAt: string | null;
+  fetchedAt: string;
+  id: number;
+  latitude: number | null;
+  location: string;
+  locationScope: string | null;
+  longitude: number | null;
+  sourceId: AssemblyPoliceAgency;
+  sourceRecordId: string;
+  sourceTitle: string;
+  sourceUrl: string;
+  startsAt: string | null;
 };
 
 type MappedPoint = Omit<PointSummary, "latitude" | "longitude"> & Coordinate;
@@ -247,6 +308,28 @@ type KakaoDirectionsResponse = {
       priority?: string;
     };
   }>;
+};
+
+type KakaoLocalSearchKind = "address" | "keyword";
+
+type KakaoLocalSearchResponse = {
+  documents?: Array<{
+    address?: {
+      address_name?: string;
+    } | null;
+    address_name?: string;
+    place_name?: string;
+    road_address?: {
+      address_name?: string;
+    } | null;
+    x?: string;
+    y?: string;
+  }>;
+  errorType?: string;
+  message?: string;
+  meta?: {
+    total_count?: number;
+  };
 };
 
 function getDatabase(): Promise<SqliteDatabase> {
@@ -323,6 +406,29 @@ function pointFromRow(row: PointRow): PointSummary {
     source: row.source,
     sourceRecordId: row.source_record_id,
     sourceUpdatedAt: row.source_updated_at,
+  };
+}
+
+function assemblyProtestFromRow(
+  row: AssemblyProtestRow,
+): AssemblyProtestSummary {
+  return {
+    agency: row.agency,
+    crowdSize: row.crowd_size,
+    date: row.date,
+    detailUrl: row.detail_url,
+    endsAt: row.ends_at,
+    fetchedAt: row.fetched_at,
+    id: row.id,
+    latitude: row.latitude,
+    location: row.location,
+    locationScope: row.location_scope,
+    longitude: row.longitude,
+    sourceId: row.source_id,
+    sourceRecordId: row.source_record_id,
+    sourceTitle: row.source_title,
+    sourceUrl: row.source_url,
+    startsAt: row.starts_at,
   };
 }
 
@@ -439,6 +545,68 @@ async function datasetStatuses() {
   });
 }
 
+async function listAssemblyProtestsForMcp(options: {
+  date: string;
+  limit?: number;
+  mappedOnly?: boolean;
+  sourceId?: AssemblyPoliceAgency;
+}) {
+  const conditions = ["date = ?"];
+  const params: unknown[] = [options.date];
+  const limit = clamp(options.limit ?? 500, 1, 2_000);
+
+  if (options.sourceId) {
+    conditions.push("source_id = ?");
+    params.push(options.sourceId);
+  }
+
+  if (options.mappedOnly) {
+    conditions.push("latitude IS NOT NULL");
+    conditions.push("longitude IS NOT NULL");
+  }
+
+  try {
+    return await withDatabase(async (db) => {
+      const rows = await all<AssemblyProtestRow>(
+        db,
+        `SELECT
+          id,
+          source_id,
+          source_record_id,
+          source_url,
+          detail_url,
+          agency,
+          date,
+          source_title,
+          starts_at,
+          ends_at,
+          location,
+          location_scope,
+          latitude,
+          longitude,
+          crowd_size,
+          fetched_at
+        FROM assembly_protests
+        WHERE ${conditions.join(" AND ")}
+        ORDER BY COALESCE(starts_at, ends_at, fetched_at), agency, id
+        LIMIT ?`,
+        [...params, limit],
+      );
+
+      return rows.map(assemblyProtestFromRow);
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("no such table: assembly_protests")
+    ) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
 function toRadians(value: number) {
   return (value * Math.PI) / 180;
 }
@@ -454,6 +622,15 @@ function distanceMeters(from: Coordinate, to: Coordinate) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
 
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function isWithinKoreaCoordinates(coordinates: Coordinate) {
+  return (
+    coordinates.latitude >= 32 &&
+    coordinates.latitude <= 39 &&
+    coordinates.longitude >= 124 &&
+    coordinates.longitude <= 132
+  );
 }
 
 async function nearestPoints(options: {
@@ -767,6 +944,82 @@ function kakaoRestApiKey() {
   );
 }
 
+function kakaoLocalEndpoint(kind: KakaoLocalSearchKind) {
+  return kind === "address"
+    ? "https://dapi.kakao.com/v2/local/search/address.json"
+    : "https://dapi.kakao.com/v2/local/search/keyword.json";
+}
+
+async function kakaoLocalCoordinate(params: {
+  query: string;
+  searchMode: "address" | "both" | "keyword";
+}) {
+  const restApiKey = kakaoRestApiKey();
+  const query = params.query.trim().slice(0, 160);
+
+  if (!query) {
+    return { error: "query-required", result: null };
+  }
+
+  if (!restApiKey) {
+    return { error: "kakao-rest-api-key-missing", result: null };
+  }
+
+  const searchKinds: KakaoLocalSearchKind[] =
+    params.searchMode === "both" ? ["keyword", "address"] : [params.searchMode];
+
+  for (const kind of searchKinds) {
+    const url = new URL(kakaoLocalEndpoint(kind));
+    url.searchParams.set("query", query);
+    url.searchParams.set("size", "1");
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `KakaoAK ${restApiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      return {
+        error: `Kakao Local failed with HTTP ${response.status}`,
+        result: null,
+      };
+    }
+
+    const payload = (await response.json()) as KakaoLocalSearchResponse;
+    const first = payload.documents?.[0];
+    const longitude = Number(first?.x);
+    const latitude = Number(first?.y);
+    const coordinates = { latitude, longitude };
+
+    if (
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      isWithinKoreaCoordinates(coordinates)
+    ) {
+      return {
+        error: null,
+        result: {
+          latitude,
+          longitude,
+          matchedAddress:
+            first?.road_address?.address_name ??
+            first?.address?.address_name ??
+            first?.address_name ??
+            first?.place_name ??
+            null,
+          query,
+          searchKind: kind,
+          source: `kakao-local-${kind}`,
+        },
+      };
+    }
+  }
+
+  return { error: "no-coordinate-result-inside-korea", result: null };
+}
+
 function isKakaoDirectionSummary(
   route: KakaoDirectionResult,
 ): route is KakaoDirectionSummary {
@@ -931,6 +1184,54 @@ server.registerTool(
     asToolResult({
       points: await searchPointSummaries(args.query, args.limit),
       query: args.query,
+    }),
+);
+
+server.registerTool(
+  "geocode_place",
+  {
+    description:
+      "Resolve one Korean place, landmark, station exit, plaza, or address query to coordinates using Kakao Local. Returns no raw provider payload.",
+    inputSchema: {
+      query: z.string().min(1).max(160),
+      searchMode: z
+        .enum(["both", "keyword", "address"])
+        .optional()
+        .default("both"),
+    },
+    title: "Geocode Place",
+  },
+  async (args) =>
+    asToolResult({
+      geocoding: await kakaoLocalCoordinate({
+        query: args.query,
+        searchMode: args.searchMode,
+      }),
+    }),
+);
+
+server.registerTool(
+  "list_assembly_protests",
+  {
+    description:
+      "List normalized daily assembly/protest rows imported from provincial police notices. Raw board text is never returned.",
+    inputSchema: {
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      limit: z.number().int().min(1).max(2000).optional().default(500),
+      mappedOnly: z.boolean().optional().default(false),
+      sourceId: z.enum(ASSEMBLY_SOURCE_IDS).optional(),
+    },
+    title: "List Assembly Protests",
+  },
+  async (args) =>
+    asToolResult({
+      date: args.date,
+      protests: await listAssemblyProtestsForMcp({
+        date: args.date,
+        limit: args.limit,
+        mappedOnly: args.mappedOnly,
+        sourceId: args.sourceId,
+      }),
     }),
 );
 

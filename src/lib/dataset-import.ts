@@ -5,6 +5,7 @@ import { parse } from "csv-parse/sync";
 import { XMLParser } from "fast-xml-parser";
 import type { DatasetProgressReporter } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
+import { geocodeAddress } from "@/lib/geocoding";
 import {
   importChildcareCenters,
   importEmergencyMedicalInstitutions,
@@ -13,7 +14,6 @@ import {
 } from "@/lib/medical-dataset-import";
 import {
   clearDatasetImportProgress,
-  consumeKakaoLocalQuota,
   type DatasetImportCheckpoint,
   type DatasetImportMode,
   type DatasetUpdateResult,
@@ -27,7 +27,6 @@ import {
   setDatasetUpdateProgress,
 } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
-import { getRuntimeApiKeys } from "@/lib/runtime-config";
 import { parseFirstWorksheetRows } from "@/lib/xlsx-lite";
 
 type CsvRecord = Record<string, unknown>;
@@ -56,27 +55,6 @@ type BigData119FireWaterSource =
 type BigData119PointSource =
   | BigData119FireSafetyTargetSource
   | BigData119FireWaterSource;
-
-type KakaoAddressSearchResponse = {
-  documents?: Array<{
-    address?: {
-      address_name?: string;
-    } | null;
-    address_name?: string;
-    road_address?: {
-      address_name?: string;
-    } | null;
-    x?: string;
-    y?: string;
-  }>;
-  meta?: {
-    is_end?: boolean;
-    pageable_count?: number;
-    total_count?: number;
-  };
-  errorType?: string;
-  message?: string;
-};
 
 const CSV_ENCODING = "euc-kr";
 const AED_NUM_OF_ROWS = 10_000;
@@ -509,11 +487,6 @@ async function downloadCsv(source: DatasetSourceId) {
   }
 
   throw lastError;
-}
-
-async function getKakaoRestApiKey() {
-  const { kakaoRestApiKey } = await getRuntimeApiKeys();
-  return kakaoRestApiKey || null;
 }
 
 function parseCsv(csv: string) {
@@ -1096,117 +1069,6 @@ function compactRecord(record: CsvRecord) {
   return Object.fromEntries(
     Object.entries(record).map(([key, value]) => [key, text(value)]),
   );
-}
-
-async function geocodeAddress(address: string) {
-  const restApiKey = await getKakaoRestApiKey();
-
-  if (!address) {
-    return null;
-  }
-
-  if (!restApiKey) {
-    await recordApiLog({
-      action: "geocode",
-      category: "geocoding",
-      level: "warn",
-      message: "Kakao Local geocoding skipped because REST API key is missing.",
-      metadata: { address },
-      status: "skipped",
-    });
-    return null;
-  }
-
-  await consumeKakaoLocalQuota();
-
-  const url = new URL("https://dapi.kakao.com/v2/local/search/address.json");
-  url.searchParams.set("query", address);
-  url.searchParams.set("size", "1");
-
-  try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      headers: {
-        Accept: "application/json",
-        Authorization: `KakaoAK ${restApiKey}`,
-      },
-    });
-
-    if (!response.ok) {
-      await recordApiLog({
-        action: "geocode",
-        category: "geocoding",
-        level: "error",
-        message: `Kakao Local geocoding failed with HTTP ${response.status}.`,
-        metadata: {
-          address,
-          kakaoHint:
-            response.status === 401 || response.status === 403
-              ? "Check KAKAO_REST_API_KEY and Kakao Map/Local API activation for the app."
-              : null,
-          statusCode: response.status,
-          usedHeaders: ["Authorization: KakaoAK"],
-        },
-        requestCount: 1,
-        status: "failure",
-      });
-      return null;
-    }
-
-    const payload = (await response.json()) as KakaoAddressSearchResponse;
-    const firstAddress = payload.documents?.[0];
-    const longitude = Number(firstAddress?.x);
-    const latitude = Number(firstAddress?.y);
-
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      await recordApiLog({
-        action: "geocode",
-        category: "geocoding",
-        level: "warn",
-        message: "Kakao Local geocoding returned no coordinate result.",
-        metadata: {
-          address,
-          errorMessage: payload.message,
-          errorType: payload.errorType,
-          totalCount: payload.meta?.total_count,
-        },
-        requestCount: 1,
-        status: "skipped",
-      });
-      return null;
-    }
-
-    await recordApiLog({
-      action: "geocode",
-      category: "geocoding",
-      level: "info",
-      message: "Kakao Local geocoding returned a coordinate result.",
-      metadata: {
-        address,
-        latitude,
-        longitude,
-        matchedAddress:
-          firstAddress?.road_address?.address_name ??
-          firstAddress?.address?.address_name ??
-          firstAddress?.address_name,
-      },
-      requestCount: 1,
-      status: "success",
-    });
-
-    return { latitude, longitude };
-  } catch (error) {
-    await recordApiLog({
-      action: "geocode",
-      category: "geocoding",
-      level: "error",
-      message: error instanceof Error ? error.message : String(error),
-      metadata: { address },
-      requestCount: 1,
-      status: "failure",
-    });
-    throw error;
-  }
 }
 
 function countGeocoded(points: EmergencyPointInput[]) {
