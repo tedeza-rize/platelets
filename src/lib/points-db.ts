@@ -346,6 +346,28 @@ const databasePath = path.join(dataDirectory, "points.sqlite");
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
 const KAKAO_LOCAL_DAILY_LIMIT = 100_000;
+const POINT_ORDER_CLAUSES = {
+  marker: "p.source, p.id",
+  name: "p.source, p.name",
+  proximity:
+    "((p.latitude - ?) * (p.latitude - ?) + (p.longitude - ?) * (p.longitude - ?)), p.id",
+} as const;
+const POINT_WHERE_CLAUSES = {
+  boundsLatitude: "p.latitude BETWEEN ? AND ?",
+  boundsLongitude: "p.longitude BETWEEN ? AND ?",
+  mappedLatitude: "p.latitude IS NOT NULL",
+  mappedLongitude: "p.longitude IS NOT NULL",
+  source: "p.source = ?",
+} as const;
+const API_LOG_WHERE_CLAUSES = {
+  category: "category = ?",
+  source: "source = ?",
+} as const;
+const ASSEMBLY_PROTEST_WHERE_CLAUSES = {
+  date: "date = ?",
+} as const;
+
+type PointOrderClauseId = keyof typeof POINT_ORDER_CLAUSES;
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeTransactionQueue: Promise<void> = Promise.resolve();
@@ -918,6 +940,25 @@ function nextKstMidnight(value: Date) {
   return new Date(Date.UTC(year, month - 1, day + 1, -9, 0, 0));
 }
 
+function buildSqlPlaceholders(count: number, separator = ",") {
+  if (!Number.isSafeInteger(count) || count < 1) {
+    return "?";
+  }
+
+  return Array.from({ length: count }, () => "?").join(separator);
+}
+
+function buildWhitelistedWhereClause(
+  ids: readonly string[],
+  clauses: Readonly<Record<string, string>>,
+) {
+  const selected = ids.flatMap((id) =>
+    Object.hasOwn(clauses, id) ? [clauses[id]] : [],
+  );
+
+  return selected.length > 0 ? `WHERE ${selected.join(" AND ")}` : "";
+}
+
 async function getKakaoLocalUsageWindowRow(db: SqliteDatabase) {
   return get<ApiUsageWindowRow>(
     db,
@@ -935,40 +976,45 @@ async function getKmaEarthquakeUsageWindowRow(db: SqliteDatabase) {
 }
 
 function buildPointWhereClause(options: PointSearchOptions) {
-  const conditions: string[] = [];
+  const conditions: Array<keyof typeof POINT_WHERE_CLAUSES> = [];
   const params: unknown[] = [];
 
   if (options.source) {
-    conditions.push("p.source = ?");
+    conditions.push("source");
     params.push(options.source);
   }
 
   if (!options.includeUnmapped) {
-    conditions.push("p.latitude IS NOT NULL");
-    conditions.push("p.longitude IS NOT NULL");
+    conditions.push("mappedLatitude");
+    conditions.push("mappedLongitude");
   }
 
   if (options.bounds) {
-    conditions.push("p.latitude BETWEEN ? AND ?");
-    conditions.push("p.longitude BETWEEN ? AND ?");
+    conditions.push("boundsLatitude");
+    conditions.push("boundsLongitude");
     params.push(options.bounds.minLatitude, options.bounds.maxLatitude);
     params.push(options.bounds.minLongitude, options.bounds.maxLongitude);
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = buildWhitelistedWhereClause(conditions, POINT_WHERE_CLAUSES);
 
   return { params, where };
 }
 
-function buildPointOrderClause(options: PointSearchOptions, fallback: string) {
+function getPointOrderClause(id: PointOrderClauseId) {
+  return POINT_ORDER_CLAUSES[id] ?? POINT_ORDER_CLAUSES.name;
+}
+
+function buildPointOrderClause(
+  options: PointSearchOptions,
+  fallback: Exclude<PointOrderClauseId, "proximity">,
+) {
   if (!options.center) {
-    return { orderBy: fallback, orderParams: [] };
+    return { orderBy: getPointOrderClause(fallback), orderParams: [] };
   }
 
   return {
-    orderBy:
-      "((p.latitude - ?) * (p.latitude - ?) + (p.longitude - ?) * (p.longitude - ?)), p.id",
+    orderBy: getPointOrderClause("proximity"),
     orderParams: [
       options.center.latitude,
       options.center.latitude,
@@ -981,10 +1027,7 @@ function buildPointOrderClause(options: PointSearchOptions, fallback: string) {
 export async function listPointSummaries(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(
-    options,
-    "p.source, p.name",
-  );
+  const { orderBy, orderParams } = buildPointOrderClause(options, "name");
   const limit = clampPointLimit(options.limit, 100_000, 100_000);
   const rows = await all<PointRow>(
     db,
@@ -1054,10 +1097,7 @@ export async function searchPointSummaries(query: string, limit = 20) {
 export async function listPointMarkers(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(
-    options,
-    "p.source, p.id",
-  );
+  const { orderBy, orderParams } = buildPointOrderClause(options, "marker");
   const limit = clampPointLimit(options.limit, 100_000, 100_000);
   const rows = await all<PointRow>(
     db,
@@ -1088,10 +1128,7 @@ export async function listPointMarkers(options: PointSearchOptions = {}) {
 export async function listPoints(options: PointSearchOptions = {}) {
   const db = await getDatabase();
   const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(
-    options,
-    "p.source, p.name",
-  );
+  const { orderBy, orderParams } = buildPointOrderClause(options, "name");
   const limit = clampPointLimit(options.limit);
   const rows = await all<PointRow>(
     db,
@@ -1274,22 +1311,21 @@ export async function listApiLogs(
   } = {},
 ) {
   const db = await getDatabase();
-  const conditions: string[] = [];
+  const conditions: Array<keyof typeof API_LOG_WHERE_CLAUSES> = [];
   const params: unknown[] = [];
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
 
   if (options.category) {
-    conditions.push("category = ?");
+    conditions.push("category");
     params.push(options.category);
   }
 
   if (options.source) {
-    conditions.push("source = ?");
+    conditions.push("source");
     params.push(options.source);
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = buildWhitelistedWhereClause(conditions, API_LOG_WHERE_CLAUSES);
   const rows = await all<ApiLogRow>(
     db,
     `SELECT * FROM api_logs ${where} ORDER BY event_at DESC, id DESC LIMIT ?`,
@@ -1318,17 +1354,19 @@ export async function listAssemblyProtests(
   options: { date?: string; limit?: number } = {},
 ) {
   const db = await getDatabase();
-  const conditions: string[] = [];
+  const conditions: Array<keyof typeof ASSEMBLY_PROTEST_WHERE_CLAUSES> = [];
   const params: unknown[] = [];
   const limit = Math.min(Math.max(options.limit ?? 500, 1), 2_000);
 
   if (options.date) {
-    conditions.push("date = ?");
+    conditions.push("date");
     params.push(options.date);
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = buildWhitelistedWhereClause(
+    conditions,
+    ASSEMBLY_PROTEST_WHERE_CLAUSES,
+  );
   const rows = await all<AssemblyProtestRow>(
     db,
     `SELECT *
@@ -1354,7 +1392,7 @@ export async function replaceAssemblyProtestsForDate(params: {
         db,
         `DELETE FROM assembly_protests
           WHERE date = ?
-            AND source_id IN (${params.sourceIds.map(() => "?").join(",")})`,
+            AND source_id IN (${buildSqlPlaceholders(params.sourceIds.length)})`,
         [params.date, ...params.sourceIds],
       );
     }
@@ -1499,7 +1537,7 @@ export async function getAdminUpdateCooldowns(
   const rows = await all<AdminUpdateCooldownRow>(
     db,
     `SELECT * FROM admin_update_cooldowns
-      WHERE action IN (${actions.map(() => "?").join(",")})`,
+      WHERE action IN (${buildSqlPlaceholders(actions.length)})`,
     actions,
   );
   const byAction = new Map(rows.map((row) => [row.action, row]));
@@ -1940,10 +1978,7 @@ export async function replaceDataset(params: {
         startIndex + insertBatchSize,
       );
       const placeholders = batch
-        .map(
-          () =>
-            `(${Array.from({ length: insertColumns }, () => "?").join(", ")})`,
-        )
+        .map(() => `(${buildSqlPlaceholders(insertColumns, ", ")})`)
         .join(", ");
       const values = batch.flatMap((point) => [
         point.source,

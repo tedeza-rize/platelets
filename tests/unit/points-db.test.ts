@@ -89,3 +89,20 @@ test("findNearestPoints clamps very large radiuses to 100km", async () => {
     ["inside"],
   );
 });
+
+test("listPoints binds source filters instead of treating them as SQL", async () => {
+  await replaceDataset({
+    failedCount: 0,
+    fetchedAt: "2026-06-12T00:00:00.000Z",
+    geocodedCount: 1,
+    points: [point({ name: "bound-source" })],
+    skippedCount: 0,
+    source: "hospitals",
+  });
+
+  const results = await pointsDb.listPoints({
+    source: "hospitals' OR 1 = 1 --" as EmergencyPointInput["source"],
+  });
+
+  assert.deepEqual(results, []);
+});
