@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { NotificationControl } from "@/components/notification-control";
 import { TimeSkewGuard } from "@/components/time-skew-guard";
 import { getDictionary, resolveLocale } from "@/lib/i18n";
 
@@ -39,6 +40,7 @@ export default async function RootLayout({
     >
       <body>
         {children}
+        <NotificationControl dictionary={dictionary} />
         <TimeSkewGuard dictionary={dictionary} />
       </body>
     </html>

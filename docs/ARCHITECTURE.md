@@ -70,6 +70,12 @@ coalesces notifications before refreshing its public snapshot. Deployments with
 multiple application processes require a shared event broker to extend this
 single-process delivery model.
 
+High-risk incident creation schedules post-response alert delivery. Browser
+Push subscriptions are stored in SQLite without VAPID private keys, while the
+private key remains environment-only. Webhook destinations are deployment
+configuration, capped at five, restricted to HTTPS, checked against private DNS
+results, and called without following redirects.
+
 ## Map Rendering
 
 `MapShell` owns the MapLibre instance and synchronizes independent GeoJSON

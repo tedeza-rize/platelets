@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { dispatchIncidentAlerts } from "@/lib/disaster-response/incident-alerts";
 import { incidentService } from "@/lib/disaster-response/incident-service";
 import type {
   CreateIncidentInput,
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
       type: incidentType(payload.type),
     };
     const incident = await incidentService.createIncident(input);
+    after(() => dispatchIncidentAlerts(incident));
 
     return noStoreJson({ incident }, { status: 201 });
   } catch (error) {
