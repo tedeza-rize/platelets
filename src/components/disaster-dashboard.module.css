@@ -3,7 +3,10 @@
   height: 100dvh;
   min-height: 100dvh;
   grid-template-rows: 62px minmax(0, 1fr);
-  background: var(--background);
+  background:
+    radial-gradient(circle at 10% 0%, rgb(225 29 72 / 11%), transparent 28%),
+    radial-gradient(circle at 88% 10%, rgb(37 99 235 / 12%), transparent 30%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans);
   overflow: hidden;
@@ -67,9 +70,10 @@
   align-items: center;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--dropdown-surface);
-  box-shadow: 0 8px 26px rgb(24 32 28 / 7%);
+  border-bottom: 1px solid var(--premium-glass-border);
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(20px) saturate(1.18);
+  box-shadow: 0 12px 34px rgb(24 32 28 / 10%);
   padding: 0 20px;
 }
 
@@ -88,7 +92,7 @@
   height: 34px;
   place-items: center;
   border-radius: 10px;
-  background: #e11d48;
+  background: var(--brand-gradient);
   color: #ffffff;
   box-shadow: 0 8px 18px rgb(225 29 72 / 26%);
 }
@@ -118,6 +122,12 @@
   font-size: 0.88rem;
   font-weight: 800;
   padding: 0 12px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .navButton {
@@ -131,12 +141,21 @@
   background: var(--control-surface);
   color: var(--text-strong);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .refreshButton {
   border-color: var(--control-border);
   background: var(--control-selected);
   color: var(--text-strong);
+}
+
+.refreshButton:hover,
+.refreshButton:focus-visible {
+  border-color: var(--focus-ring);
+  box-shadow: var(--control-shadow);
+  outline: 0;
+  transform: translateY(-1px);
 }
 
 .refreshButton:disabled {
@@ -159,6 +178,17 @@
   overflow: hidden;
 }
 
+.mapPane::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 12%), transparent 26%),
+    radial-gradient(circle at 20% 18%, rgb(14 165 233 / 14%), transparent 24%);
+  content: "";
+}
+
 .map {
   width: 100%;
   height: 100%;
@@ -168,7 +198,7 @@
   position: absolute;
   top: 16px;
   left: 16px;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -183,14 +213,19 @@
   justify-content: center;
   gap: 6px;
   border: 1px solid var(--control-border);
-  border-radius: 6px;
-  background: var(--control-selected);
+  border-radius: 999px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(18px) saturate(1.12);
   color: var(--text-strong);
   cursor: pointer;
   font-size: 0.8rem;
   font-weight: 850;
   padding: 0 10px;
   box-shadow: var(--control-shadow);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .mapToggleActive {
@@ -205,6 +240,7 @@
 .mapToggleActive:focus-visible {
   border-color: var(--focus-ring);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .mapToggle:disabled {
@@ -216,13 +252,14 @@
   position: absolute;
   left: 16px;
   bottom: 16px;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  border: 1px solid var(--notice-border);
-  border-radius: 8px;
-  background: var(--notice-surface);
+  border: 1px solid var(--premium-glass-border);
+  border-radius: 16px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(18px) saturate(1.15);
   color: var(--text-strong);
   padding: 8px;
   box-shadow: var(--notice-shadow);
@@ -273,8 +310,10 @@
   min-height: 0;
   align-content: start;
   gap: 12px;
-  border-left: 1px solid var(--border);
-  background: var(--background);
+  border-left: 1px solid var(--premium-glass-border);
+  background:
+    var(--premium-panel-glow),
+    linear-gradient(180deg, var(--premium-glass-surface), var(--background));
   overscroll-behavior: contain;
   overflow-y: auto;
   padding: 14px;
@@ -289,11 +328,12 @@
 
 .metric,
 .section {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--dropdown-surface);
+  border: 1px solid var(--premium-glass-border);
+  border-radius: 18px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(18px) saturate(1.12);
   color: var(--text-strong);
-  box-shadow: var(--control-shadow);
+  box-shadow: var(--premium-glass-shadow);
 }
 
 .metric {
@@ -301,6 +341,15 @@
   min-width: 0;
   gap: 4px;
   padding: 12px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.metric:hover {
+  border-color: var(--focus-ring);
+  transform: translateY(-2px);
 }
 
 .metric svg {
@@ -439,12 +488,18 @@
   background: var(--control-surface);
   color: var(--text-strong);
   padding: 10px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .dataSourceItem:hover,
 .dataSourceItem:focus-visible {
   border-color: var(--focus-ring);
+  box-shadow: var(--control-shadow);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .dataSourceItem svg {
@@ -562,9 +617,13 @@
 .resourceItem {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--control-surface);
   color: var(--text-strong);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .listItem {
@@ -621,7 +680,9 @@
 .listButtonActive:hover,
 .listButtonActive:focus-visible {
   border-color: var(--focus-ring);
+  box-shadow: var(--control-shadow);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .listButton span,
@@ -680,6 +741,7 @@
 .primaryButton:focus-visible {
   background: #b91c1c;
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .primaryButton:disabled,
@@ -705,6 +767,7 @@
 .secondaryButton:focus-visible {
   border-color: var(--focus-ring);
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .dangerButton {
@@ -717,6 +780,7 @@
 .dangerButton:focus-visible {
   border-color: #be123c;
   outline: 0;
+  transform: translateY(-1px);
 }
 
 .resourceItem {
@@ -931,6 +995,134 @@
   background: #dc2626;
 }
 
+.mobileBottomSheet {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  z-index: 980;
+  display: none;
+  max-height: min(58dvh, 460px);
+  border: 1px solid var(--premium-glass-border);
+  border-radius: 24px 24px 18px 18px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(24px) saturate(1.18);
+  box-shadow: var(--premium-glass-shadow);
+  color: var(--text-strong);
+  overflow: hidden;
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobileSheetHandle {
+  display: grid;
+  width: 100%;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.mobileSheetHandle:active {
+  cursor: grabbing;
+}
+
+.mobileSheetHandle span {
+  width: 46px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--control-border);
+}
+
+.mobileSheetHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 0 16px 12px;
+}
+
+.mobileSheetHeader div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.mobileSheetHeader span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.mobileSheetHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  line-height: 1.24;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileSheetHeader button {
+  min-height: 34px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--control-selected);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 0 12px;
+}
+
+.mobileSheetDetails {
+  display: grid;
+  max-height: 220px;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 0 16px 14px;
+}
+
+.mobileSheetDetails div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.mobileSheetDetails dt {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.mobileSheetDetails dd {
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 780;
+  overflow-wrap: anywhere;
+}
+
+.mobileSheetActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 16px;
+}
+
+.mobileSheetActions a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 0 12px;
+}
+
 @media (max-width: 980px) {
   .loadingPage {
     height: auto;
@@ -986,6 +1178,11 @@
     overscroll-behavior: auto;
     overflow: visible;
   }
+
+  .mobileBottomSheet {
+    display: block;
+    animation: sheet-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 @media (max-width: 560px) {
@@ -998,5 +1195,41 @@
   .mapLegend {
     right: 10px;
     left: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navButton,
+  .navActive,
+  .refreshButton,
+  .mapToggle,
+  .mapToggleActive,
+  .metric,
+  .dataSourceItem,
+  .listItem,
+  .listButton,
+  .listButtonActive,
+  .resourceItem,
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .mobileBottomSheet {
+    transition: none;
+  }
+
+  .mobileBottomSheet {
+    animation: none;
+  }
+}
+
+@keyframes sheet-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 }

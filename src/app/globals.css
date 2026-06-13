@@ -5,6 +5,7 @@
   --border: #d8e0d9;
   --brand-mark: #1f8f57;
   --brand-mark-halo: #dff3e8;
+  --brand-gradient: linear-gradient(135deg, #e11d48 0%, #7c3aed 100%);
   --control-border: #ccd8cf;
   --control-selected: #ffffff;
   --control-shadow: 0 2px 8px rgb(24 32 28 / 12%);
@@ -26,6 +27,14 @@
   --notice-shadow: 0 12px 32px rgb(24 32 28 / 16%);
   --notice-surface: rgb(255 255 255 / 94%);
   --page-glow: #eef7f1;
+  --premium-glass-border: rgb(255 255 255 / 62%);
+  --premium-glass-shadow: 0 22px 70px rgb(15 23 42 / 18%);
+  --premium-glass-surface: rgb(255 255 255 / 78%);
+  --premium-panel-glow: radial-gradient(
+    circle at top left,
+    rgb(225 29 72 / 18%),
+    transparent 36%
+  );
   --text-muted: #617067;
   --text-strong: #18201c;
 }
@@ -63,6 +72,14 @@
     --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
     --notice-surface: rgb(22 29 24 / 94%);
     --page-glow: #16251c;
+    --premium-glass-border: rgb(255 255 255 / 14%);
+    --premium-glass-shadow: 0 26px 80px rgb(0 0 0 / 42%);
+    --premium-glass-surface: rgb(22 29 24 / 78%);
+    --premium-panel-glow: radial-gradient(
+      circle at top left,
+      rgb(225 29 72 / 20%),
+      transparent 38%
+    );
     --text-muted: #a7b5ac;
     --text-strong: #f3f8f4;
   }
