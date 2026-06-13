@@ -76,6 +76,11 @@ private key remains environment-only. Webhook destinations are deployment
 configuration, capped at five, restricted to HTTPS, checked against private DNS
 results, and called without following redirects.
 
+The PWA service worker is a small hand-written runtime under `public/sw.js`.
+It precaches the dashboard shell and `/offline`, uses network-first navigation
+with an offline fallback, and runtime-caches static assets plus previously seen
+map imagery. API requests are intentionally excluded from service-worker caches.
+
 ## Map Rendering
 
 `MapShell` owns the MapLibre instance and synchronizes independent GeoJSON
