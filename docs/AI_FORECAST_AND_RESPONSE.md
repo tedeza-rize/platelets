@@ -148,6 +148,10 @@ Available resources:
 Available tools:
 
 - `dataset_status`: source counts, freshness, and geocoding coverage.
+- `geocode_place`: bounded Kakao Local place/address lookup for one Korean map
+  query. Use it after deterministic source parsing, not for crawling webpages.
+- `list_assembly_protests`: normalized daily assembly/protest schedules from
+  police notices. Raw board text is never returned.
 - `list_points`: bounded point listing for small context windows. Prefer bbox and low limits.
 - `nearest_points`: straight-line nearest resources for an incident coordinate.
 - `rank_response_points`: route-aware ranking for existing response points. Uses Kakao directions when configured.
@@ -155,6 +159,9 @@ Available tools:
 LLM usage rules:
 
 - Do not request all points unless the user explicitly needs a full export.
+- Do not use LLMs or MCP tools to crawl police board pages. Parse source pages
+  first, then use `geocode_place` only for ambiguous place-to-coordinate
+  resolution.
 - Prefer `nearest_points` or `list_points` with a bounding box.
 - Treat route duration as operationally stronger than straight-line distance.
 - Do not claim hospital suitability is implemented until hospital/ER capability data is imported.
