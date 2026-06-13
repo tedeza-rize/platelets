@@ -1,15 +1,46 @@
-import fs from "node:fs";
-import path from "node:path";
 import type { DatasetUpdateProgress } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
+  closeDatabase,
+  databaseFileExists,
+  getDatabase,
+  getDatabaseFilePath,
+  getDataDirectoryPath,
+  withDatabaseWriteTransaction,
+} from "@/lib/points-db-modules/connection";
+import {
+  findNearestEmergencyInstitutions,
+  findNearestPoints,
+  getPointSummary,
+  listEmergencyHospitalFallbackPoints,
+  listPointMarkers,
+  listPointSummaries,
+  listPoints,
+  searchPointSummaries,
+} from "@/lib/points-db-modules/point-repository";
+import {
   allSqlite as all,
-  closeSqliteDatabase,
   getSqlite as get,
-  openSqliteDatabase,
   runSqlite as run,
   type SqliteDatabase,
 } from "@/lib/sqlite";
+
+export {
+  closeDatabase,
+  databaseFileExists,
+  getDatabase,
+  getDatabaseFilePath,
+  getDataDirectoryPath,
+  withDatabaseWriteTransaction,
+  findNearestEmergencyInstitutions,
+  findNearestPoints,
+  getPointSummary,
+  listEmergencyHospitalFallbackPoints,
+  listPointMarkers,
+  listPoints,
+  listPointSummaries,
+  searchPointSummaries,
+};
 
 export type EmergencyPointInput = {
   address: string;
@@ -218,22 +249,6 @@ export type AssemblyProtestUpdateResult = {
   sourceCount: number;
 };
 
-type PointRow = {
-  address: string;
-  category: string;
-  fetched_at: string | null;
-  id: number;
-  latitude: number | null;
-  longitude: number | null;
-  name: string;
-  parent_name: string | null;
-  phone: string | null;
-  raw_json: string;
-  source: DatasetSourceId;
-  source_record_id: string;
-  source_updated_at: string | null;
-};
-
 type StatusRow = {
   error: string | null;
   failed_count: number;
@@ -338,32 +353,9 @@ type AssemblyProtestRow = {
   starts_at: string | null;
 };
 
-const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
-const dataDirectory = configuredDataDirectory
-  ? path.isAbsolute(configuredDataDirectory)
-    ? configuredDataDirectory
-    : path.join(
-        /*turbopackIgnore: true*/ process.cwd(),
-        configuredDataDirectory,
-      )
-  : path.join(process.cwd(), "data");
-const databasePath = path.join(dataDirectory, "points.sqlite");
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const KMA_EARTHQUAKE_DAILY_LIMIT = 5_000;
 const KAKAO_LOCAL_DAILY_LIMIT = 100_000;
-const POINT_ORDER_CLAUSES = {
-  marker: "p.source, p.id",
-  name: "p.source, p.name",
-  proximity:
-    "((p.latitude - ?) * (p.latitude - ?) + (p.longitude - ?) * (p.longitude - ?)), p.id",
-} as const;
-const POINT_WHERE_CLAUSES = {
-  boundsLatitude: "p.latitude BETWEEN ? AND ?",
-  boundsLongitude: "p.longitude BETWEEN ? AND ?",
-  mappedLatitude: "p.latitude IS NOT NULL",
-  mappedLongitude: "p.longitude IS NOT NULL",
-  source: "p.source = ?",
-} as const;
 const API_LOG_WHERE_CLAUSES = {
   category: "category = ?",
   source: "source = ?",
@@ -371,331 +363,6 @@ const API_LOG_WHERE_CLAUSES = {
 const ASSEMBLY_PROTEST_WHERE_CLAUSES = {
   date: "date = ?",
 } as const;
-
-type PointOrderClauseId = keyof typeof POINT_ORDER_CLAUSES;
-
-let databasePromise: Promise<SqliteDatabase> | null = null;
-let writeTransactionQueue: Promise<void> = Promise.resolve();
-
-export function getDatabaseFilePath() {
-  return databasePath;
-}
-
-export function getDataDirectoryPath() {
-  return dataDirectory;
-}
-
-export function databaseFileExists() {
-  return fs.existsSync(databasePath);
-}
-
-export async function withDatabaseWriteTransaction<T>(
-  operation: (db: SqliteDatabase) => Promise<T>,
-) {
-  const previousTransaction = writeTransactionQueue;
-  let releaseTransaction = () => {};
-  writeTransactionQueue = new Promise<void>((resolve) => {
-    releaseTransaction = resolve;
-  });
-
-  await previousTransaction;
-
-  const db = await getDatabase();
-  let transactionStarted = false;
-
-  try {
-    await run(db, "BEGIN IMMEDIATE");
-    transactionStarted = true;
-    const result = await operation(db);
-    await run(db, "COMMIT");
-    transactionStarted = false;
-    return result;
-  } catch (error) {
-    if (transactionStarted) {
-      await run(db, "ROLLBACK").catch(() => undefined);
-    }
-
-    throw error;
-  } finally {
-    releaseTransaction();
-  }
-}
-
-async function initializeDatabase(db: SqliteDatabase) {
-  await run(db, "PRAGMA journal_mode = WAL");
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS points (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source TEXT NOT NULL,
-      source_record_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      address TEXT NOT NULL,
-      phone TEXT,
-      parent_name TEXT,
-      latitude REAL,
-      longitude REAL,
-      source_updated_at TEXT,
-      raw_json TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(source, source_record_id)
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS dataset_updates (
-      source TEXT PRIMARY KEY,
-      label TEXT NOT NULL,
-      source_url TEXT NOT NULL,
-      fetched_at TEXT,
-      record_count INTEGER NOT NULL DEFAULT 0,
-      geocoded_count INTEGER NOT NULL DEFAULT 0,
-      skipped_count INTEGER NOT NULL DEFAULT 0,
-      failed_count INTEGER NOT NULL DEFAULT 0,
-      error TEXT,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS dataset_import_progress (
-      source TEXT PRIMARY KEY,
-      status TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      next_index INTEGER NOT NULL DEFAULT 0,
-      total_count INTEGER NOT NULL DEFAULT 0,
-      imported_count INTEGER NOT NULL DEFAULT 0,
-      geocoded_count INTEGER NOT NULL DEFAULT 0,
-      skipped_count INTEGER NOT NULL DEFAULT 0,
-      failed_count INTEGER NOT NULL DEFAULT 0,
-      reason TEXT,
-      points_json TEXT NOT NULL DEFAULT '[]',
-      fetched_at TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS api_usage_windows (
-      provider TEXT PRIMARY KEY,
-      registered_at TEXT,
-      window_started_at TEXT,
-      window_ends_at TEXT,
-      used_count INTEGER NOT NULL DEFAULT 0,
-      monthly_limit INTEGER NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS api_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      level TEXT NOT NULL,
-      category TEXT NOT NULL,
-      source TEXT,
-      action TEXT NOT NULL,
-      status TEXT NOT NULL,
-      message TEXT NOT NULL,
-      request_count INTEGER NOT NULL DEFAULT 0,
-      metadata_json TEXT NOT NULL DEFAULT '{}'
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value_json TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS admin_update_cooldowns (
-      action TEXT PRIMARY KEY,
-      last_used_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS hazard_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event_id TEXT NOT NULL UNIQUE,
-      event_type TEXT NOT NULL,
-      title TEXT NOT NULL,
-      issued_at TEXT,
-      occurred_at TEXT,
-      latitude REAL,
-      longitude REAL,
-      location TEXT NOT NULL,
-      magnitude TEXT,
-      intensity TEXT,
-      depth TEXT,
-      description TEXT,
-      image_url TEXT,
-      raw_json TEXT NOT NULL,
-      fetched_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS assembly_protests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source_id TEXT NOT NULL,
-      source_record_id TEXT NOT NULL,
-      source_url TEXT NOT NULL,
-      detail_url TEXT,
-      agency TEXT NOT NULL,
-      date TEXT NOT NULL,
-      source_title TEXT NOT NULL,
-      starts_at TEXT,
-      ends_at TEXT,
-      location TEXT NOT NULL,
-      location_scope TEXT,
-      latitude REAL,
-      longitude REAL,
-      crowd_size INTEGER,
-      raw_json TEXT NOT NULL,
-      fetched_at TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(source_id, source_record_id, date)
-    )`,
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS points_source_idx ON points(source)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS points_coordinates_idx ON points(latitude, longitude)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS api_logs_event_idx ON api_logs(event_at DESC)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS api_logs_category_idx ON api_logs(category, event_at DESC)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS hazard_events_event_idx ON hazard_events(event_type, issued_at DESC)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS hazard_events_coordinates_idx ON hazard_events(latitude, longitude)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS assembly_protests_date_idx ON assembly_protests(date, agency)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS assembly_protests_coordinates_idx ON assembly_protests(latitude, longitude)",
-  );
-}
-
-export async function getDatabase() {
-  if (!databasePromise) {
-    databasePromise = (async () => {
-      fs.mkdirSync(dataDirectory, { recursive: true });
-      const db = openSqliteDatabase(databasePath);
-
-      try {
-        await initializeDatabase(db);
-        return db;
-      } catch (error) {
-        await closeSqliteDatabase(db).catch(() => undefined);
-        throw error;
-      }
-    })();
-  }
-
-  return databasePromise;
-}
-
-export async function closeDatabase() {
-  if (!databasePromise) {
-    return;
-  }
-
-  const promise = databasePromise;
-  databasePromise = null;
-
-  let db: SqliteDatabase;
-
-  try {
-    db = await promise;
-  } catch {
-    return;
-  }
-
-  await closeSqliteDatabase(db);
-}
-
-function mapPointRow(row: PointRow): EmergencyPoint {
-  return {
-    address: row.address,
-    category: row.category,
-    fetchedAt: row.fetched_at,
-    id: row.id,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    name: row.name,
-    parentName: row.parent_name,
-    phone: row.phone,
-    raw: JSON.parse(row.raw_json) as Record<string, string>,
-    source: row.source,
-    sourceRecordId: row.source_record_id,
-    sourceUpdatedAt: row.source_updated_at,
-  };
-}
-
-function mapPointSummaryRow(row: PointRow): EmergencyPointSummary {
-  return {
-    address: row.address,
-    category: row.category,
-    fetchedAt: row.fetched_at,
-    id: row.id,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    name: row.name,
-    parentName: row.parent_name,
-    phone: row.phone,
-    source: row.source,
-    sourceRecordId: row.source_record_id,
-    sourceUpdatedAt: row.source_updated_at,
-  };
-}
-
-function mapPointMarkerRow(row: PointRow): EmergencyPointMarker {
-  return {
-    category: row.category,
-    id: row.id,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    source: row.source,
-  };
-}
-
-function clampPointLimit(
-  limit: number | undefined,
-  fallback = 5_000,
-  max = 20_000,
-) {
-  if (limit === undefined) {
-    return fallback;
-  }
-
-  return Math.min(Math.max(Math.trunc(limit), 1), max);
-}
 
 function emptyStatus(source: DatasetSourceId): DatasetStatus {
   const definition = DATASET_SOURCES[source];
@@ -935,334 +602,6 @@ async function getKmaEarthquakeUsageWindowRow(db: SqliteDatabase) {
     "SELECT * FROM api_usage_windows WHERE provider = ?",
     ["kma-earthquake"],
   );
-}
-
-function buildPointWhereClause(options: PointSearchOptions) {
-  const conditions: Array<keyof typeof POINT_WHERE_CLAUSES> = [];
-  const params: unknown[] = [];
-
-  if (options.source) {
-    conditions.push("source");
-    params.push(options.source);
-  }
-
-  if (!options.includeUnmapped) {
-    conditions.push("mappedLatitude");
-    conditions.push("mappedLongitude");
-  }
-
-  if (options.bounds) {
-    conditions.push("boundsLatitude");
-    conditions.push("boundsLongitude");
-    params.push(options.bounds.minLatitude, options.bounds.maxLatitude);
-    params.push(options.bounds.minLongitude, options.bounds.maxLongitude);
-  }
-
-  const where = buildWhitelistedWhereClause(conditions, POINT_WHERE_CLAUSES);
-
-  return { params, where };
-}
-
-function getPointOrderClause(id: PointOrderClauseId) {
-  return POINT_ORDER_CLAUSES[id] ?? POINT_ORDER_CLAUSES.name;
-}
-
-function buildPointOrderClause(
-  options: PointSearchOptions,
-  fallback: Exclude<PointOrderClauseId, "proximity">,
-) {
-  if (!options.center) {
-    return { orderBy: getPointOrderClause(fallback), orderParams: [] };
-  }
-
-  return {
-    orderBy: getPointOrderClause("proximity"),
-    orderParams: [
-      options.center.latitude,
-      options.center.latitude,
-      options.center.longitude,
-      options.center.longitude,
-    ],
-  };
-}
-
-export async function listPointSummaries(options: PointSearchOptions = {}) {
-  const db = await getDatabase();
-  const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(options, "name");
-  const limit = clampPointLimit(options.limit, 100_000, 100_000);
-  const rows = await all<PointRow>(
-    db,
-    `SELECT
-        p.id,
-        p.source,
-        p.source_record_id,
-        p.name,
-        p.category,
-        p.address,
-        p.phone,
-        p.parent_name,
-        p.latitude,
-        p.longitude,
-        p.source_updated_at,
-        '' AS raw_json,
-        u.fetched_at
-      FROM points p
-      LEFT JOIN dataset_updates u ON u.source = p.source
-      ${where}
-      ORDER BY ${orderBy}
-      LIMIT ?`,
-    [...params, ...orderParams, limit],
-  );
-
-  return rows.map(mapPointSummaryRow);
-}
-
-export async function searchPointSummaries(query: string, limit = 20) {
-  const db = await getDatabase();
-  const normalized = query.trim().slice(0, 120);
-
-  if (!normalized) {
-    return [];
-  }
-
-  const pattern = `%${normalized.replace(/[\\%_]/g, "\\$&")}%`;
-  const rows = await all<PointRow>(
-    db,
-    `SELECT
-        p.id,
-        p.source,
-        p.source_record_id,
-        p.name,
-        p.category,
-        p.address,
-        p.phone,
-        p.parent_name,
-        p.latitude,
-        p.longitude,
-        p.source_updated_at,
-        '' AS raw_json,
-        u.fetched_at
-      FROM points p
-      LEFT JOIN dataset_updates u ON u.source = p.source
-      WHERE p.name LIKE ? ESCAPE '\\'
-        OR p.category LIKE ? ESCAPE '\\'
-        OR p.address LIKE ? ESCAPE '\\'
-      ORDER BY p.name
-      LIMIT ?`,
-    [pattern, pattern, pattern, Math.min(Math.max(limit, 1), 50)],
-  );
-
-  return rows.map(mapPointSummaryRow);
-}
-
-export async function listPointMarkers(options: PointSearchOptions = {}) {
-  const db = await getDatabase();
-  const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(options, "marker");
-  const limit = clampPointLimit(options.limit, 100_000, 100_000);
-  const rows = await all<PointRow>(
-    db,
-    `SELECT
-        p.id,
-        p.source,
-        '' AS source_record_id,
-        '' AS name,
-        p.category,
-        '' AS address,
-        NULL AS phone,
-        NULL AS parent_name,
-        p.latitude,
-        p.longitude,
-        NULL AS source_updated_at,
-        '' AS raw_json,
-        NULL AS fetched_at
-      FROM points p
-      ${where}
-      ORDER BY ${orderBy}
-      LIMIT ?`,
-    [...params, ...orderParams, limit],
-  );
-
-  return rows.map(mapPointMarkerRow);
-}
-
-export async function listPoints(options: PointSearchOptions = {}) {
-  const db = await getDatabase();
-  const { params, where } = buildPointWhereClause(options);
-  const { orderBy, orderParams } = buildPointOrderClause(options, "name");
-  const limit = clampPointLimit(options.limit);
-  const rows = await all<PointRow>(
-    db,
-    `SELECT p.*, u.fetched_at
-      FROM points p
-      LEFT JOIN dataset_updates u ON u.source = p.source
-      ${where}
-      ORDER BY ${orderBy}
-      LIMIT ?`,
-    [...params, ...orderParams, limit],
-  );
-
-  return rows.map(mapPointRow);
-}
-
-export async function listEmergencyHospitalFallbackPoints() {
-  const db = await getDatabase();
-  const rows = await all<PointRow>(
-    db,
-    `SELECT p.*, u.fetched_at
-      FROM points p
-      LEFT JOIN dataset_updates u ON u.source = p.source
-      WHERE p.source = 'hospitals'
-        AND json_extract(p.raw_json, '$.dutyEryn') = '1'
-      ORDER BY p.name`,
-  );
-
-  return rows.map(mapPointRow);
-}
-
-export async function getPointSummary(id: number) {
-  const db = await getDatabase();
-  const row = await get<PointRow>(
-    db,
-    `SELECT
-        p.id,
-        p.source,
-        p.source_record_id,
-        p.name,
-        p.category,
-        p.address,
-        p.phone,
-        p.parent_name,
-        p.latitude,
-        p.longitude,
-        p.source_updated_at,
-        '' AS raw_json,
-        u.fetched_at
-      FROM points p
-      LEFT JOIN dataset_updates u ON u.source = p.source
-      WHERE p.id = ?`,
-    [id],
-  );
-
-  return row ? mapPointSummaryRow(row) : null;
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
-}
-
-function distanceMeters(
-  from: { latitude: number; longitude: number },
-  to: { latitude: number; longitude: number },
-) {
-  const earthRadiusMeters = 6_371_000;
-  const dLat = toRadians(to.latitude - from.latitude);
-  const dLon = toRadians(to.longitude - from.longitude);
-  const lat1 = toRadians(from.latitude);
-  const lat2 = toRadians(to.latitude);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-
-  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-export async function findNearestPoints(options: {
-  latitude: number;
-  limit?: number;
-  longitude: number;
-  radiusMeters?: number;
-  source?: DatasetSourceId | null;
-}) {
-  const radiusMeters = Math.min(
-    Math.max(options.radiusMeters ?? 20_000, 500),
-    100_000,
-  );
-  const latitudeDelta = radiusMeters / 111_320;
-  const longitudeDelta =
-    radiusMeters /
-    (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
-  const candidates = await listPointSummaries({
-    bounds: {
-      maxLatitude: options.latitude + latitudeDelta,
-      maxLongitude: options.longitude + longitudeDelta,
-      minLatitude: options.latitude - latitudeDelta,
-      minLongitude: options.longitude - longitudeDelta,
-    },
-    limit: 20_000,
-    source: options.source,
-  });
-
-  return candidates
-    .filter(
-      (
-        point,
-      ): point is EmergencyPointSummary & {
-        latitude: number;
-        longitude: number;
-      } => point.latitude !== null && point.longitude !== null,
-    )
-    .map((point) => ({
-      ...point,
-      distanceMeters: Math.round(
-        distanceMeters(options, {
-          latitude: point.latitude,
-          longitude: point.longitude,
-        }),
-      ),
-    }))
-    .filter((point) => point.distanceMeters <= radiusMeters)
-    .sort((a, b) => a.distanceMeters - b.distanceMeters)
-    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 10), 1), 100));
-}
-
-export async function findNearestEmergencyInstitutions(options: {
-  latitude: number;
-  limit?: number;
-  longitude: number;
-  radiusMeters?: number;
-}) {
-  const radiusMeters = Math.min(
-    Math.max(options.radiusMeters ?? 100_000, 1_000),
-    200_000,
-  );
-  const latitudeDelta = radiusMeters / 111_320;
-  const longitudeDelta =
-    radiusMeters /
-    (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
-  const candidates = await listPoints({
-    bounds: {
-      maxLatitude: options.latitude + latitudeDelta,
-      maxLongitude: options.longitude + longitudeDelta,
-      minLatitude: options.latitude - latitudeDelta,
-      minLongitude: options.longitude - longitudeDelta,
-    },
-    limit: 5_000,
-    source: "emergency-medical-institutions",
-  });
-
-  return candidates
-    .filter(
-      (
-        point,
-      ): point is EmergencyPoint & {
-        latitude: number;
-        longitude: number;
-      } => point.latitude !== null && point.longitude !== null,
-    )
-    .map((point) => ({
-      ...point,
-      distanceMeters: Math.round(
-        distanceMeters(options, {
-          latitude: point.latitude,
-          longitude: point.longitude,
-        }),
-      ),
-    }))
-    .filter((point) => point.distanceMeters <= radiusMeters)
-    .sort((left, right) => left.distanceMeters - right.distanceMeters)
-    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 30), 1), 100));
 }
 
 export async function listApiLogs(
