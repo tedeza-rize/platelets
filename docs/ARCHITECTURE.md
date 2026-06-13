@@ -25,7 +25,7 @@ before changing framework code. Do not assume older Next.js behavior.
 | `src/lib/emergency-recommendation.ts` | Scenario weights and hospital scoring |
 | `src/lib/emergency-routing.ts` | Directed OSM A*, Kakao route adapter, and traffic-adjusted route result assembly |
 | `src/lib/traffic/` | Optional live traffic adapters used to adjust route ETAs |
-| `src/lib/disaster-response/` | MVP disaster-response domain models, SQLite incident repository, mock facility data, rule-based risk, dispatch, hospital, and resource recommendation services |
+| `src/lib/disaster-response/` | MVP disaster-response domain models, SQLite incident repository, in-process incident change events, mock facility data, rule-based risk, dispatch, hospital, and resource recommendation services |
 | `src/lib/building-safety/` | Building safety profile models and the current presentation-sample adapter for floor, exit, and refuge data |
 | `src/lib/ai-*.ts` | AI settings, provider validation, and summarized grounding |
 | `scripts/points-mcp.ts` | Read-only local MCP server |
@@ -62,6 +62,13 @@ operational use.
 
 Every new external source must be added to both
 `docs/DATA_SOURCES_AND_LICENSES.md` and `src/lib/data-licenses.ts`.
+
+Incident mutations publish bounded metadata to an in-process event hub after
+the database transaction succeeds. `/api/disaster/events` exposes those changes
+as a no-cache Server-Sent Events stream with heartbeats, and the dashboard
+coalesces notifications before refreshing its public snapshot. Deployments with
+multiple application processes require a shared event broker to extend this
+single-process delivery model.
 
 ## Map Rendering
 
