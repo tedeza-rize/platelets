@@ -1,5 +1,10 @@
 import dgram from "node:dgram";
-import { getAppSetting, recordApiLog, setAppSetting } from "@/lib/points-db";
+import {
+  databaseFileExists,
+  getAppSetting,
+  recordApiLog,
+  setAppSetting,
+} from "@/lib/points-db";
 
 const NTP_PORT = 123;
 const NTP_TIMEOUT_MS = 1800;
@@ -80,6 +85,10 @@ function sanitizeServers(servers: string[]) {
 }
 
 export async function getConfiguredNtpServers() {
+  if (!databaseFileExists()) {
+    return Array.from(DEFAULT_NTP_SERVERS);
+  }
+
   const servers = await getAppSetting<string[]>(
     SETTINGS_KEY,
     Array.from(DEFAULT_NTP_SERVERS),
@@ -217,8 +226,9 @@ function queryNtpServer(host: string): Promise<NtpServerResult> {
   });
 }
 
-async function buildServerTimeStatus(): Promise<CachedServerTimeStatus> {
-  const ntpServers = await getConfiguredNtpServers();
+async function buildServerTimeStatus(
+  ntpServers: string[],
+): Promise<CachedServerTimeStatus> {
   const responses = await Promise.all(ntpServers.map(queryNtpServer));
   const validResponses = responses
     .filter(
@@ -250,13 +260,29 @@ export async function getServerTimeStatus(
   const now = Date.now();
 
   if (!cachedStatus || cachedStatus.expiresAt <= now) {
+    const ntpServers = await getConfiguredNtpServers();
     cachedStatus = {
       expiresAt: now + 30_000,
-      promise: buildServerTimeStatus(),
+      promise: buildServerTimeStatus(ntpServers),
     };
   }
 
   const status = await cachedStatus.promise;
+  const respondedAt = new Date();
+
+  return {
+    ...status,
+    serverReceivedAt: (options.serverReceivedAt ?? respondedAt).toISOString(),
+    serverRespondedAt: respondedAt.toISOString(),
+    serverTime: respondedAt.toISOString(),
+  };
+}
+
+export async function getServerTimeStatusForServers(
+  ntpServers: string[],
+  options: { serverReceivedAt?: Date } = {},
+) {
+  const status = await buildServerTimeStatus(sanitizeServers(ntpServers));
   const respondedAt = new Date();
 
   return {

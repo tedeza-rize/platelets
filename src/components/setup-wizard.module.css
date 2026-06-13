@@ -283,6 +283,24 @@
   border-color: var(--setup-accent);
 }
 
+.fieldInvalid input,
+.field input[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.fieldInvalid input:focus,
+.field input[aria-invalid="true"]:focus {
+  outline: 3px solid rgb(220 38 38 / 14%);
+  border-color: #dc2626;
+}
+
+.fieldError {
+  color: #b42318;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .passwordChecklist {
   display: grid;
   gap: 10px;
@@ -340,17 +358,23 @@
 }
 
 .checkList {
+  min-width: 0;
   display: grid;
   gap: 12px;
 }
 
 .checkItem {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: flex-start;
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--setup-border);
   border-radius: 14px;
+}
+
+.checkItemFailed {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--setup-border));
 }
 
 .checkItem strong,
@@ -359,18 +383,72 @@
   margin: 0;
 }
 
+.checkItem > div {
+  min-width: 0;
+}
+
 .checkItem p {
   margin-top: 4px;
   color: var(--setup-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.checkActionButton {
+  min-height: 34px;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, #dc2626 48%, var(--setup-border));
+  border-radius: 9px;
+  color: #b42318;
+  background: color-mix(in srgb, #dc2626 8%, var(--setup-card));
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.checkActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .okMark {
-  width: 28px;
-  height: 28px;
+  inline-size: 28px;
+  block-size: 28px;
+  min-inline-size: 28px;
+  min-block-size: 28px;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   color: #ffffff;
   background: var(--setup-accent);
+  border-radius: 50%;
+}
+
+.failMark {
+  inline-size: 28px;
+  block-size: 28px;
+  min-inline-size: 28px;
+  min-block-size: 28px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  background: #dc2626;
+  border-radius: 50%;
+}
+
+.pendingMark {
+  inline-size: 28px;
+  block-size: 28px;
+  min-inline-size: 28px;
+  min-block-size: 28px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  color: var(--setup-accent);
+  background: color-mix(in srgb, var(--setup-accent) 10%, var(--setup-card));
   border-radius: 50%;
 }
 
@@ -549,7 +627,7 @@
 
   .mainPanel {
     display: grid;
-    align-content: center;
+    align-content: start;
     padding: 28px 22px;
   }
 
