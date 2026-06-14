@@ -241,7 +241,7 @@ export async function fetchItsTrafficSummary(params: {
       durationMultiplier: Number(durationMultiplier.toFixed(2)),
       message: `ITS 교통소통정보 ${sampleCount}개 구간 평균 ${averageSpeedKph.toFixed(
         1,
-      )}km/h${frequentRoads.length ? ` (${frequentRoads.join(", ")})` : ""}`,
+      )}km/h${frequentRoads.length > 0 ? ` (${frequentRoads.join(", ")})` : ""}`,
       provider: "its",
       sampleCount,
       status: "live",

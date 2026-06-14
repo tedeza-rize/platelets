@@ -17,7 +17,12 @@ import {
   UserCog,
 } from "lucide-react";
 import Image from "next/image";
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import {
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+  useId,
+} from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
@@ -309,10 +314,11 @@ export function HazardModal({
   dictionary,
   onClose,
 }: HazardModalProps) {
+  const titleId = useId();
   return (
     <div className={styles.modalBackdrop} role="presentation">
       <section
-        aria-labelledby="hazard-modal-title"
+        aria-labelledby={titleId}
         aria-modal="true"
         className={styles.hazardModal}
         role="dialog"
@@ -322,7 +328,7 @@ export function HazardModal({
             <span>
               {mapCore.hazardTypeLabel(activeHazard.eventType, dictionary)}
             </span>
-            <h2 id="hazard-modal-title">{activeHazard.title}</h2>
+            <h2 id={titleId}>{activeHazard.title}</h2>
           </div>
           <button
             aria-label={uiText(dictionary, "이벤트 정보 닫기")}

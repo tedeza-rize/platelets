@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function parseDate(value: string | null) {
-  if (!value) return undefined;
+  if (!value) return;
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 

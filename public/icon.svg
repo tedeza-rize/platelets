@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Platelets</title>
   <rect width="512" height="512" rx="112" fill="#e11d48"/>
   <path d="M256 88l132 48v95c0 88-52 158-132 193-80-35-132-105-132-193v-95l132-48z" fill="#fff"/>
   <path d="M256 151v209M151 256h210" stroke="#e11d48" stroke-width="54" stroke-linecap="round"/>

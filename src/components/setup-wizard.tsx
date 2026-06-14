@@ -583,8 +583,8 @@ async function readJsonResponse<TPayload>(
 
   try {
     return (await response.json()) as TPayload;
-  } catch {
-    throw new Error(fallbackMessage);
+  } catch (error) {
+    throw new Error(fallbackMessage, { cause: error });
   }
 }
 
@@ -624,12 +624,56 @@ function Field({
     >
       <span>{label}</span>
       {control}
-      {error && (
+      {error ? (
         <span className={styles.fieldError} id={errorId}>
           {error}
         </span>
-      )}
+      ) : null}
     </label>
+  );
+}
+
+function environmentCheckMarkClass(ok: boolean, pending: boolean) {
+  if (ok) {
+    return styles.okMark;
+  }
+
+  return pending ? styles.pendingMark : styles.failMark;
+}
+
+function EnvironmentCheckIcon({
+  ok,
+  pending,
+}: {
+  ok: boolean;
+  pending: boolean;
+}) {
+  if (ok) {
+    return <Check aria-hidden="true" size={16} />;
+  }
+
+  if (pending) {
+    return <LoaderCircle aria-hidden="true" size={16} />;
+  }
+
+  return <X aria-hidden="true" size={16} />;
+}
+
+function ContinueIcon({
+  busy,
+  lastStep,
+}: {
+  busy: boolean;
+  lastStep: boolean;
+}) {
+  if (busy) {
+    return <LoaderCircle aria-hidden="true" size={17} />;
+  }
+
+  return lastStep ? (
+    <ShieldCheck aria-hidden="true" size={17} />
+  ) : (
+    <ArrowRight aria-hidden="true" size={17} />
   );
 }
 
@@ -828,7 +872,7 @@ export function SetupWizard({
         ok?: boolean;
       }>(response, copy["json.failed"]);
 
-      if (!response.ok || !payload.ok) {
+      if (!(response.ok && payload.ok)) {
         throw new Error(payload.error ?? copy["api.failed"]);
       }
 
@@ -862,7 +906,7 @@ export function SetupWizard({
       >(response, copy["json.failed"]);
       const receivedAt = Date.now();
 
-      if (!response.ok || !payload.ok) {
+      if (!(response.ok && payload.ok)) {
         const errorKey = payload.errorKey;
 
         throw new Error(
@@ -908,7 +952,7 @@ export function SetupWizard({
         ok?: boolean;
       }>(response, copy["json.failed"]);
 
-      if (!response.ok || !payload.ok) {
+      if (!(response.ok && payload.ok)) {
         throw new Error(payload.error ?? copy["install.failed"]);
       }
 
@@ -1092,21 +1136,15 @@ export function SetupWizard({
                         key={check.id}
                       >
                         <span
-                          className={
-                            check.ok
-                              ? styles.okMark
-                              : isPending
-                                ? styles.pendingMark
-                                : styles.failMark
-                          }
-                        >
-                          {check.ok ? (
-                            <Check aria-hidden="true" size={16} />
-                          ) : isPending ? (
-                            <LoaderCircle aria-hidden="true" size={16} />
-                          ) : (
-                            <X aria-hidden="true" size={16} />
+                          className={environmentCheckMarkClass(
+                            check.ok,
+                            isPending,
                           )}
+                        >
+                          <EnvironmentCheckIcon
+                            ok={check.ok}
+                            pending={isPending}
+                          />
                         </span>
                         <div>
                           <strong>{checkText(check.titleKey)}</strong>
@@ -1248,9 +1286,9 @@ export function SetupWizard({
                 >
                   {copy["api.test"]}
                 </button>
-                {apiTestMessage && (
+                {apiTestMessage ? (
                   <p className={styles.successText}>{apiTestMessage}</p>
-                )}
+                ) : null}
               </>
             )}
 
@@ -1262,7 +1300,7 @@ export function SetupWizard({
               </>
             )}
 
-            {error && <p className={styles.errorText}>{error}</p>}
+            {error ? <p className={styles.errorText}>{error}</p> : null}
           </div>
 
           <footer className={styles.footer}>
@@ -1282,13 +1320,7 @@ export function SetupWizard({
               onClick={goNext}
               type="button"
             >
-              {isBusy ? (
-                <LoaderCircle aria-hidden="true" size={17} />
-              ) : isLastStep ? (
-                <ShieldCheck aria-hidden="true" size={17} />
-              ) : (
-                <ArrowRight aria-hidden="true" size={17} />
-              )}
+              <ContinueIcon busy={isBusy} lastStep={isLastStep} />
               {isLastStep ? copy["nav.install"] : copy["nav.continue"]}
             </button>
           </footer>
@@ -1366,11 +1398,11 @@ function AccountStep({
           type="password"
           value={account.password}
         />
-        {passwordError && (
+        {passwordError ? (
           <span className={styles.fieldError} id={passwordErrorId}>
             {passwordError}
           </span>
-        )}
+        ) : null}
       </label>
       <PasswordRequirementList
         id={`${passwordRequirementsId}-requirements`}

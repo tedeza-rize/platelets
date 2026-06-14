@@ -54,6 +54,14 @@ function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
 
+function normalizeApiItems<T>(items: T | T[] | null | undefined): T[] {
+  if (Array.isArray(items)) {
+    return items;
+  }
+
+  return items ? [items] : [];
+}
+
 function nullableText(value: unknown) {
   const valueText = text(value);
   return valueText ? valueText : null;
@@ -234,7 +242,7 @@ function parsePublicDataXml(xml: string, operation: string): PublicDataPage {
   }
 
   const rawItems = payload.response?.body?.items?.item;
-  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+  const items = normalizeApiItems(rawItems);
 
   return {
     items,
@@ -391,7 +399,7 @@ async function fetchMoisPharmacyPage(pageNo: number) {
   }
 
   const rawItems = payload.response?.body?.items?.item;
-  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+  const items = normalizeApiItems(rawItems);
 
   return {
     items,
@@ -418,7 +426,7 @@ function mapChildcareRecord(record: SourceRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.시설코드);
   const name = text(record.시설명);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -441,7 +449,7 @@ function mapPharmacyRecord(record: SourceRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.hpid);
   const name = text(record.dutyName);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -467,7 +475,7 @@ function mapHiraPharmacyRecord(
   const address = text(record.addr);
   const sourceRecordId = text(record.ykiho) || `${name}|${address}`;
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -497,9 +505,7 @@ function mapMoisPharmacyRecord(
   )}`;
 
   if (
-    !sourceRecordId ||
-    !name ||
-    !address ||
+    !(sourceRecordId && name && address) ||
     /폐업|취소|말소|휴업/.test(status)
   ) {
     return null;
@@ -527,7 +533,7 @@ function mapHospitalRecord(record: SourceRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.hpid);
   const name = text(record.dutyName);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -551,7 +557,7 @@ function mapEmergencyRecord(record: SourceRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.hpid);
   const name = text(record.dutyName);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -584,7 +590,7 @@ function mergeByHpid(
     const hpid = text(addition.hpid);
     const current = byHpid.get(hpid);
 
-    if (!hpid || !current) {
+    if (!(hpid && current)) {
       continue;
     }
 
@@ -718,6 +724,7 @@ export async function importPharmacies(report: DatasetProgressReporter) {
           }; MOIS(pharmacies/info): ${
             moisError instanceof Error ? moisError.message : String(moisError)
           }. 세 서비스의 공공데이터포털 활용신청/승인 상태를 확인하세요.`,
+          { cause: moisError },
         );
       }
     }
@@ -778,7 +785,7 @@ export async function importEmergencyMedicalInstitutions(
       url: DATASET_SOURCES["emergency-medical-institutions"].url,
     });
   } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes("(403)")) {
+    if (!(error instanceof Error && error.message.includes("(403)"))) {
       throw error;
     }
 

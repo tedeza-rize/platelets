@@ -139,7 +139,9 @@ function queryNtpServer(host: string): Promise<NtpServerResult> {
       clearTimeout(timeout);
       try {
         socket.close();
-      } catch {}
+      } catch {
+        // The socket may already be closed after a timeout or network error.
+      }
       resolve(result);
     }
 

@@ -165,7 +165,7 @@ export function MapShell({
         fetch("/data/seoul-citydata-areas.geojson", { cache: "no-store" }),
       ]);
 
-    if (!datasetsResponse.ok || !hazardsResponse.ok || !seoulResponse.ok) {
+    if (!(datasetsResponse.ok && hazardsResponse.ok && seoulResponse.ok)) {
       throw new Error("Failed to load map data");
     }
 
@@ -321,7 +321,7 @@ export function MapShell({
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      refreshHazards().catch(() => {});
+      refreshHazards().catch(() => undefined);
     }, mapCore.HAZARD_POLL_INTERVAL_MS);
 
     return () => {
@@ -511,8 +511,7 @@ export function MapShell({
         ];
 
         if (
-          !Number.isFinite(coordinates[0]) ||
-          !Number.isFinite(coordinates[1])
+          !(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))
         ) {
           return;
         }
@@ -558,8 +557,7 @@ export function MapShell({
         ];
 
         if (
-          !Number.isFinite(coordinates[0]) ||
-          !Number.isFinite(coordinates[1])
+          !(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))
         ) {
           return;
         }
@@ -707,7 +705,7 @@ export function MapShell({
       });
     }
 
-    initializeMap();
+    void initializeMap();
 
     return () => {
       isDisposed = true;
@@ -722,7 +720,7 @@ export function MapShell({
   useEffect(() => {
     isThreeDimensionalRef.current = isThreeDimensional;
 
-    if (!mapRef.current || !isMapReady) {
+    if (!(mapRef.current && isMapReady)) {
       return;
     }
 
@@ -784,7 +782,7 @@ export function MapShell({
       });
     }
 
-    updateStyle();
+    void updateStyle();
 
     return () => {
       isDisposed = true;

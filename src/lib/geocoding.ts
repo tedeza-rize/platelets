@@ -155,9 +155,11 @@ export async function searchKakaoLocalCoordinates(params: {
     const coordinates = { latitude, longitude };
 
     if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      !isWithinKoreaCoordinates(coordinates)
+      !(
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        isWithinKoreaCoordinates(coordinates)
+      )
     ) {
       await recordApiLog({
         action,

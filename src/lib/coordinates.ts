@@ -51,8 +51,8 @@ export function parseOptionalKoreaCoordinates(params: {
   const hasLatitude = !isBlankCoordinate(params.latitude);
   const hasLongitude = !isBlankCoordinate(params.longitude);
 
-  if (!hasLatitude && !hasLongitude) return undefined;
-  if (!hasLatitude || !hasLongitude) return null;
+  if (!(hasLatitude || hasLongitude)) return;
+  if (!(hasLatitude && hasLongitude)) return null;
 
   return parseRequiredKoreaCoordinates(params);
 }

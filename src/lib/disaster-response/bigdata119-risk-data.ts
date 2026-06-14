@@ -158,7 +158,7 @@ const FALLBACK_REGIONAL_STATS: FireSafetyRegionalStat[] = [
   },
 ];
 
-const REGIONAL_STAT_ALIASES: Record<string, Array<[string, string]>> = {
+const REGIONAL_STAT_ALIASES: Record<string, [string, string][]> = {
   "risk-busan-central": [["부산광역시", "중구"]],
   "risk-busan-haeundae": [["부산광역시", "해운대구"]],
   "risk-gangnam": [["서울특별시", "강남구"]],
@@ -303,7 +303,7 @@ function parseLocalStats(filePath: string): FireSafetyRegionalStat[] {
         "SGG_NM",
       ]);
 
-      if (!city || !town) {
+      if (!(city && town)) {
         return null;
       }
 
