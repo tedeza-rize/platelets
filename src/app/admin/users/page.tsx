@@ -8,11 +8,17 @@ export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
   await requireSetupComplete();
-  await requirePageRole("admin");
+  const session = await requirePageRole("admin");
   const headerList = await headers();
   const dictionary = getDictionary(
     resolveLocale(headerList.get("accept-language")),
   );
 
-  return <UserAdminConsole dictionary={dictionary} />;
+  return (
+    <UserAdminConsole
+      currentUserId={session.userId ?? ""}
+      dictionary={dictionary}
+      viewerRole={session.role === "sudo" ? "sudo" : "admin"}
+    />
+  );
 }
