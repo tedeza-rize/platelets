@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 > **⚠️ STOP. Read this entire file before touching anything.**
 >
-> This file is the single source of truth for all AI agents (Claude, Codex, Gemini, etc.). `CLAUDE.md` and `GEMINI.md` only point here. Past agents have repeatedly (1) coded without understanding the project, (2) committed directly to `main`, and (3) skipped the docs. All three are treated as failed work and will be reverted. Do not skim this file — read all of it, then follow it exactly.
+> This file is the single source of truth for all AI agents (Claude, Codex, Gemini, etc.). [CLAUDE.md](CLAUDE.md) and [GEMINI.md](GEMINI.md) only point here. Past agents have repeatedly (1) coded without understanding the project, (2) committed directly to `main`, and (3) skipped the docs. All three are treated as failed work and will be reverted. Do not skim this file — read all of it, then follow it exactly.
 
 ## What Platelets Is
 
@@ -67,7 +67,7 @@ npm run lint        # biome check + encoding check
 npm run test        # typecheck + unit tests
 npm run format      # biome format --write
 npm run build
-npm run test:e2e    # Playwright; if no local browsers: $env:PLAYWRIGHT_BROWSER_CHANNEL = "msedge"
+npm run test:e2e    # Playwright; if needed, set PLAYWRIGHT_BROWSER_CHANNEL first (PowerShell: $env:PLAYWRIGHT_BROWSER_CHANNEL="msedge"; bash/zsh: export PLAYWRIGHT_BROWSER_CHANNEL=msedge)
 ```
 
 For UI work, also verify the affected flow in a browser at desktop and mobile breakpoints.
