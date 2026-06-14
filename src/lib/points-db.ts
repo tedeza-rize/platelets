@@ -249,6 +249,22 @@ export type AssemblyProtestUpdateResult = {
   sourceCount: number;
 };
 
+export type AssemblyGeocodeSearchMode = "address" | "both" | "keyword";
+
+export type AssemblyGeocodeCacheInput = {
+  latitude: number;
+  longitude: number;
+  matchedAddress: string | null;
+  query: string;
+  searchMode: AssemblyGeocodeSearchMode;
+  source: string;
+};
+
+export type AssemblyGeocodeCacheEntry = AssemblyGeocodeCacheInput & {
+  createdAt: string;
+  updatedAt: string;
+};
+
 type StatusRow = {
   error: string | null;
   failed_count: number;
@@ -351,6 +367,17 @@ type AssemblyProtestRow = {
   source_title: string;
   source_url: string;
   starts_at: string | null;
+};
+
+type AssemblyGeocodeCacheRow = {
+  created_at: string;
+  latitude: number;
+  longitude: number;
+  matched_address: string | null;
+  provider_source: string;
+  query: string;
+  search_mode: AssemblyGeocodeSearchMode;
+  updated_at: string;
 };
 
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
@@ -549,6 +576,33 @@ function mapAssemblyProtestRow(row: AssemblyProtestRow): AssemblyProtest {
     sourceTitle: row.source_title,
     sourceUrl: row.source_url,
     startsAt: row.starts_at,
+  };
+}
+
+function normalizeAssemblyGeocodeCacheQuery(query: string) {
+  return query.replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR");
+}
+
+function assemblyGeocodeCacheKey(params: {
+  query: string;
+  searchMode: AssemblyGeocodeSearchMode;
+}) {
+  const query = normalizeAssemblyGeocodeCacheQuery(params.query);
+  return query ? `${params.searchMode}:${query}` : null;
+}
+
+function mapAssemblyGeocodeCacheRow(
+  row: AssemblyGeocodeCacheRow,
+): AssemblyGeocodeCacheEntry {
+  return {
+    createdAt: row.created_at,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    matchedAddress: row.matched_address,
+    query: row.query,
+    searchMode: row.search_mode,
+    source: row.provider_source,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -756,6 +810,74 @@ export async function replaceAssemblyProtestsForDate(params: {
       );
     }
   });
+}
+
+export async function getAssemblyGeocodeCacheEntry(params: {
+  query: string;
+  searchMode: AssemblyGeocodeSearchMode;
+}) {
+  const cacheKey = assemblyGeocodeCacheKey(params);
+  if (!cacheKey) return null;
+
+  const db = await getDatabase();
+  const row = await get<AssemblyGeocodeCacheRow>(
+    db,
+    `SELECT
+        created_at,
+        latitude,
+        longitude,
+        matched_address,
+        provider_source,
+        query,
+        search_mode,
+        updated_at
+      FROM assembly_geocode_cache
+      WHERE cache_key = ?`,
+    [cacheKey],
+  );
+
+  return row ? mapAssemblyGeocodeCacheRow(row) : null;
+}
+
+export async function saveAssemblyGeocodeCacheEntry(
+  input: AssemblyGeocodeCacheInput,
+) {
+  const cacheKey = assemblyGeocodeCacheKey(input);
+  if (!cacheKey) return null;
+
+  const db = await getDatabase();
+  await run(
+    db,
+    `INSERT INTO assembly_geocode_cache (
+      cache_key,
+      query,
+      search_mode,
+      latitude,
+      longitude,
+      matched_address,
+      provider_source,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(cache_key) DO UPDATE SET
+      query = excluded.query,
+      search_mode = excluded.search_mode,
+      latitude = excluded.latitude,
+      longitude = excluded.longitude,
+      matched_address = excluded.matched_address,
+      provider_source = excluded.provider_source,
+      updated_at = CURRENT_TIMESTAMP`,
+    [
+      cacheKey,
+      input.query.replace(/\s+/g, " ").trim(),
+      input.searchMode,
+      input.latitude,
+      input.longitude,
+      input.matchedAddress,
+      input.source,
+    ],
+  );
+
+  return getAssemblyGeocodeCacheEntry(input);
 }
 
 export async function recordApiLog(input: ApiLogInput) {

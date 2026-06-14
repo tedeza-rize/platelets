@@ -163,6 +163,9 @@ Board HTML and supported PDF/HWP/HWPX attachments are parsed before any model
 call. After deterministic parsing and direct map lookup, LLM usage is limited
 to a forced `geocode_place` map tool call; latitude/longitude persistence still
 requires a bounded map/geocoding result inside Korea coordinate bounds. The
+default assembly geocoder runs independent candidate queries with bounded
+parallelism and stores successful query results in `assembly_geocode_cache` to
+avoid repeated provider calls for recurring public-safety landmarks. The
 local MCP server also exposes a
 `geocode_place` map tool and `list_assembly_protests` read tool for LLM-assisted
 place-to-coordinate resolution and raw-free daily schedule context without

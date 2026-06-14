@@ -15,9 +15,11 @@ import { searchKakaoLocalCoordinates } from "@/lib/geocoding";
 import {
   type AssemblyProtestInput,
   type AssemblyProtestUpdateResult,
+  getAssemblyGeocodeCacheEntry,
   listAssemblyProtests,
   recordApiLog,
   replaceAssemblyProtestsForDate,
+  saveAssemblyGeocodeCacheEntry,
 } from "@/lib/points-db";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
@@ -261,6 +263,10 @@ const USER_AGENT =
   "Platelets public-safety data crawler (contact: local operator)";
 const PDFJS_LEGACY_MODULE = ["pdfjs-dist", "legacy/build/pdf.mjs"].join("/");
 let rhwpCorePromise: Promise<typeof import("@rhwp/core")> | null = null;
+const assemblyGeocodeQueryPromises = new Map<
+  string,
+  Promise<AssemblyCoordinateMatch | null>
+>();
 const AGENCY_GEOCODING_PREFIX: Record<AssemblyPoliceAgency, string> = {
   busan: "\uBD80\uC0B0",
   chungbuk: "\uCDA9\uBD81",
@@ -1054,8 +1060,58 @@ async function tryKakaoAssemblyQuery(
         })));
 }
 
+function assemblyGeocodeInFlightKey(
+  query: string,
+  searchMode: GeocodePlaceToolArguments["searchMode"],
+) {
+  return `${searchMode}:${query.replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR")}`;
+}
+
+async function tryCachedKakaoAssemblyQuery(
+  query: string,
+  searchMode: GeocodePlaceToolArguments["searchMode"] = "both",
+): Promise<AssemblyCoordinateMatch | null> {
+  const inFlightKey = assemblyGeocodeInFlightKey(query, searchMode);
+  const existing = assemblyGeocodeQueryPromises.get(inFlightKey);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const cached = await getAssemblyGeocodeCacheEntry({ query, searchMode });
+    if (cached) {
+      return {
+        latitude: cached.latitude,
+        longitude: cached.longitude,
+        matchedAddress: cached.matchedAddress,
+        query: cached.query,
+        source: `assembly-geocode-cache:${cached.source}`,
+      };
+    }
+
+    const result = await tryKakaoAssemblyQuery(query, searchMode);
+    if (result) {
+      await saveAssemblyGeocodeCacheEntry({
+        latitude: result.latitude,
+        longitude: result.longitude,
+        matchedAddress: result.matchedAddress,
+        query: result.query,
+        searchMode,
+        source: result.source,
+      }).catch(() => undefined);
+    }
+
+    return result;
+  })();
+
+  assemblyGeocodeQueryPromises.set(inFlightKey, promise);
+  try {
+    return await promise;
+  } finally {
+    assemblyGeocodeQueryPromises.delete(inFlightKey);
+  }
+}
+
 async function runGeocodePlaceTool(args: GeocodePlaceToolArguments) {
-  const result = await tryKakaoAssemblyQuery(args.query, args.searchMode);
+  const result = await tryCachedKakaoAssemblyQuery(args.query, args.searchMode);
 
   return result
     ? {
@@ -1143,10 +1199,15 @@ async function defaultAssemblyCoordinateResolver(params: {
     locationScope: params.locationScope,
   });
 
-  for (const query of candidateQueries) {
-    const result = await tryKakaoAssemblyQuery(query);
-    if (result) return result;
-  }
+  const candidateResults = await mapWithConcurrency(
+    candidateQueries,
+    3,
+    async (query) => tryCachedKakaoAssemblyQuery(query).catch(() => null),
+  );
+  const firstCoordinate = candidateResults.find(
+    (result): result is AssemblyCoordinateMatch => result !== null,
+  );
+  if (firstCoordinate) return firstCoordinate;
 
   return resolveAssemblyCoordinateWithLlmMapTool({
     ...params,

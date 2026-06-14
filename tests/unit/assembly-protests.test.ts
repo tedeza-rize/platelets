@@ -501,6 +501,55 @@ test("crawlAssemblyProtests resolves independent parsed locations in parallel", 
   }
 });
 
+test("crawlAssemblyProtests reuses cached default geocoding results", async () => {
+  await pointsDb.saveAssemblyGeocodeCacheEntry({
+    latitude: 35.227,
+    longitude: 128.681,
+    matchedAddress: "\uCC3D\uC6D0\uAD11\uC7A5",
+    query: "\uACBD\uB0A8 \uCC3D\uC6D0\uAD11\uC7A5",
+    searchMode: "both",
+    source: "kakao-local-keyword",
+  });
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      list: [
+        {
+          CPDS_CONTENT:
+            "\uC77C\uC2DC : 10:00~11:00 \uC7A5\uC18C : \uCC3D\uC6D0\uAD11\uC7A5 \uC778\uC6D0 : 20\uBA85",
+          CPDS_SUBJECT: "06.24 \uC624\uB298\uC758 \uC9D1\uD68C",
+          IPDS_IDX: "cached-geocode",
+        },
+      ],
+    });
+
+  try {
+    const result = await assemblyProtests.crawlAssemblyProtests({
+      agency: "gyeongnam",
+      date: "2026-06-24",
+      enrichLocations: true,
+    });
+    const stored = await pointsDb.listAssemblyProtests({
+      date: "2026-06-24",
+    });
+
+    assert.equal(result.importedCount, 1);
+    assert.equal(result.geocodedCount, 1);
+    assert.equal(stored[0].latitude, 35.227);
+    assert.equal(stored[0].longitude, 128.681);
+    assert.deepEqual(stored[0].raw.geocoding, {
+      latitude: 35.227,
+      longitude: 128.681,
+      matchedAddress: "\uCC3D\uC6D0\uAD11\uC7A5",
+      query: "\uACBD\uB0A8 \uCC3D\uC6D0\uAD11\uC7A5",
+      source: "assembly-geocode-cache:kakao-local-keyword",
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("parseGeocodePlaceToolArguments ignores model-supplied coordinates", () => {
   assert.deepEqual(
     assemblyProtests.parseGeocodePlaceToolArguments(

@@ -148,6 +148,17 @@ const DATABASE_SCHEMA = `
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(source_id, source_record_id, date)
   );
+  CREATE TABLE IF NOT EXISTS assembly_geocode_cache (
+    cache_key TEXT PRIMARY KEY,
+    query TEXT NOT NULL,
+    search_mode TEXT NOT NULL,
+    latitude REAL NOT NULL,
+    longitude REAL NOT NULL,
+    matched_address TEXT,
+    provider_source TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
   CREATE INDEX IF NOT EXISTS points_source_idx ON points(source);
   CREATE INDEX IF NOT EXISTS points_coordinates_idx ON points(latitude, longitude);
   CREATE INDEX IF NOT EXISTS api_logs_event_idx ON api_logs(event_at DESC);
@@ -156,6 +167,7 @@ const DATABASE_SCHEMA = `
   CREATE INDEX IF NOT EXISTS hazard_events_coordinates_idx ON hazard_events(latitude, longitude);
   CREATE INDEX IF NOT EXISTS assembly_protests_date_idx ON assembly_protests(date, agency);
   CREATE INDEX IF NOT EXISTS assembly_protests_coordinates_idx ON assembly_protests(latitude, longitude);
+  CREATE INDEX IF NOT EXISTS assembly_geocode_cache_updated_idx ON assembly_geocode_cache(updated_at DESC);
 `;
 
 export function getDatabaseFilePath() {

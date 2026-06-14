@@ -106,3 +106,25 @@ test("listPoints binds source filters instead of treating them as SQL", async ()
 
   assert.deepEqual(results, []);
 });
+
+test("assembly geocode cache normalizes query whitespace and case", async () => {
+  await pointsDb.saveAssemblyGeocodeCacheEntry({
+    latitude: 37.5665,
+    longitude: 126.978,
+    matchedAddress: "Seoul Plaza",
+    query: " Seoul   Plaza ",
+    searchMode: "both",
+    source: "kakao-local-keyword",
+  });
+
+  const cached = await pointsDb.getAssemblyGeocodeCacheEntry({
+    query: "seoul plaza",
+    searchMode: "both",
+  });
+
+  assert.equal(cached?.latitude, 37.5665);
+  assert.equal(cached?.longitude, 126.978);
+  assert.equal(cached?.matchedAddress, "Seoul Plaza");
+  assert.equal(cached?.query, "Seoul Plaza");
+  assert.equal(cached?.source, "kakao-local-keyword");
+});
