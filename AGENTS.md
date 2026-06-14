@@ -29,6 +29,8 @@ These are not suggestions. There are no exceptions, including "small" or "obviou
 5. **Never commit real API keys, tokens, or downloaded raw datasets.** Use environment variables; update `env.example` with placeholder names only.
 6. **Follow the verification order** before every commit: code → `npm run lint` → `npm run test` → `npm run format` → `npm run test` again → commit → push.
 7. **Cross-engine browser testing is mandatory when behavior may diverge.** If a change could plausibly behave differently between Chromium-based browsers and Firefox — CSS layout/scrolling, pointer/touch/wheel events, map rendering (MapLibre/WebGL), input and IME handling, date/number formatting, clipboard, media, or any browser API with known engine differences — you MUST run the affected tests/flows on **both** Chromium and Firefox before opening a PR. Do not skip Firefox because it is inconvenient or binaries are missing; install them (`npx playwright install chromium firefox`) or, if local install is truly impossible, state this explicitly in the PR and confirm the GitHub Actions Chromium + Firefox run passes before merge.
+8. **Maximize Server Components.** Use `"use client"` ONLY when absolutely necessary for client-side interactivity (e.g., state, effects, event listeners like dropdowns). Everything else must remain Server Components to maximize performance.
+9. **Keep files under 500 lines.** For maintainability, no file should exceed 500 lines of code. If a file becomes too long, refactor and split it into smaller, focused modules.
 
 ## Required Reading
 
