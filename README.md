@@ -308,6 +308,8 @@ ETA and are marked as traffic-aware external routes.
 
 ## Documentation
 
+- [Coding Style](CODING_STYLE.md)
+- [Design Standard](DESIGN.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Development Guide](docs/DEVELOPMENT_GUIDE.md)
 - [CI/CD And GitHub Flow](docs/CI_CD_AND_GITHUB_FLOW.md)
