@@ -193,7 +193,7 @@ test("routes staff login and updates an account lifecycle", async ({
 }) => {
   await ensureSetupComplete(request);
   await page.setViewportSize({ height: 800, width: 360 });
-  const fieldUsername = `field.${browserName}.${randomUUID().replaceAll("-", "")}`;
+  const fieldUsername = `field.${browserName}.${randomUUID().slice(0, 8)}`;
 
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Username", { exact: true }).fill("admin");
