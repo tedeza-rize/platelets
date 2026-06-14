@@ -52,6 +52,9 @@ export function UserAdminConsole({
   const [editingId, setEditingId] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
 
   function updateForm<TKey extends keyof typeof form>(
     key: TKey,
@@ -61,16 +64,21 @@ export function UserAdminConsole({
   }
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/admin/users", { cache: "no-store" });
-    const payload = (await response.json().catch(() => null)) as {
-      users?: UserAccount[];
-    } | null;
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/admin/users", { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as {
+        users?: UserAccount[];
+      } | null;
 
-    if (!response.ok || !payload?.users) {
-      throw new Error(t("Could not load users."));
+      if (!response.ok || !payload?.users) {
+        throw new Error(t("Could not load users."));
+      }
+
+      setUsers(payload.users);
+    } finally {
+      setIsLoading(false);
     }
-
-    setUsers(payload.users);
   }, [t]);
 
   useEffect(() => {
@@ -115,39 +123,44 @@ export function UserAdminConsole({
     event.preventDefault();
     setError("");
     setNotice("");
+    setIsSaving(true);
 
-    const response = await fetch(
-      editingId ? `/api/admin/users/${editingId}` : "/api/admin/users",
-      {
-        body: JSON.stringify(form),
-        headers: { "Content-Type": "application/json" },
-        method: editingId ? "PATCH" : "POST",
-      },
-    );
-    const payload = (await response.json().catch(() => null)) as {
-      errorCode?: UserErrorCode;
-      sessionRevoked?: boolean;
-    } | null;
-
-    if (!response.ok) {
-      setError(
-        apiErrorMessage(
-          payload?.errorCode,
-          editingId ? "Could not update user." : "Could not save user.",
-        ),
+    try {
+      const response = await fetch(
+        editingId ? `/api/admin/users/${editingId}` : "/api/admin/users",
+        {
+          body: JSON.stringify(form),
+          headers: { "Content-Type": "application/json" },
+          method: editingId ? "PATCH" : "POST",
+        },
       );
-      return;
-    }
+      const payload = (await response.json().catch(() => null)) as {
+        errorCode?: UserErrorCode;
+        sessionRevoked?: boolean;
+      } | null;
 
-    if (editingId === currentUserId && payload?.sessionRevoked) {
-      window.location.assign("/login");
-      return;
-    }
+      if (!response.ok) {
+        setError(
+          apiErrorMessage(
+            payload?.errorCode,
+            editingId ? "Could not update user." : "Could not save user.",
+          ),
+        );
+        return;
+      }
 
-    setForm(emptyForm);
-    setEditingId("");
-    setNotice(t(editingId ? "User updated." : "User saved."));
-    await refresh();
+      if (editingId === currentUserId && payload?.sessionRevoked) {
+        window.location.assign("/login");
+        return;
+      }
+
+      setForm(emptyForm);
+      setEditingId("");
+      setNotice(t(editingId ? "User updated." : "User saved."));
+      await refresh();
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function remove(id: string) {
@@ -157,20 +170,25 @@ export function UserAdminConsole({
 
     setError("");
     setNotice("");
-    const response = await fetch(`/api/admin/users/${id}`, {
-      method: "DELETE",
-    });
-    const payload = (await response.json().catch(() => null)) as {
-      errorCode?: UserErrorCode;
-    } | null;
+    setDeletingId(id);
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        errorCode?: UserErrorCode;
+      } | null;
 
-    if (!response.ok) {
-      setError(apiErrorMessage(payload?.errorCode, "Could not delete user."));
-      return;
+      if (!response.ok) {
+        setError(apiErrorMessage(payload?.errorCode, "Could not delete user."));
+        return;
+      }
+
+      setNotice(t("User deleted."));
+      await refresh();
+    } finally {
+      setDeletingId("");
     }
-
-    setNotice(t("User deleted."));
-    await refresh();
   }
 
   const editingUser = users.find((user) => user.id === editingId);
@@ -196,13 +214,22 @@ export function UserAdminConsole({
             <h1>{t("Staff accounts")}</h1>
             <p>{t("Create dispatcher and field worker accounts.")}</p>
           </div>
-          <button className={styles.secondary} onClick={refresh} type="button">
-            <RefreshCw aria-hidden="true" size={16} />
+          <button
+            className={styles.secondary}
+            disabled={isLoading}
+            onClick={refresh}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={isLoading ? styles.spin : undefined}
+              size={16}
+            />
             {t("Refresh")}
           </button>
         </header>
 
-        <form className={styles.card} onSubmit={save}>
+        <form aria-busy={isSaving} className={styles.card} onSubmit={save}>
           {editingUser ? (
             <h2 className={styles.formTitle}>
               {t("Edit account")}: {editingUser.name}
@@ -278,17 +305,28 @@ export function UserAdminConsole({
             </label>
           </div>
           <div className={styles.actions}>
-            <button className={styles.primary} type="submit">
+            <button
+              className={styles.primary}
+              disabled={isSaving}
+              type="submit"
+            >
               {editingId ? (
                 <Save aria-hidden="true" size={16} />
               ) : (
                 <Plus aria-hidden="true" size={16} />
               )}
-              {t(editingId ? "Save changes" : "Create account")}
+              {t(
+                isSaving
+                  ? "Saving..."
+                  : editingId
+                    ? "Save changes"
+                    : "Create account",
+              )}
             </button>
             {editingId ? (
               <button
                 className={styles.secondary}
+                disabled={isSaving}
                 onClick={cancelEdit}
                 type="button"
               >
@@ -305,7 +343,11 @@ export function UserAdminConsole({
           ) : null}
         </form>
 
-        <section className={styles.tableCard}>
+        <section
+          aria-busy={isLoading}
+          className={styles.tableCard}
+          aria-label={t("Staff account list")}
+        >
           <table className={styles.table}>
             <thead>
               <tr>
@@ -318,43 +360,67 @@ export function UserAdminConsole({
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.username}</td>
-                  <td>{user.name}</td>
-                  <td>{t(user.role)}</td>
-                  <td>{user.department || "-"}</td>
-                  <td>{user.phone || "-"}</td>
-                  <td>
-                    <div className={styles.tableActions}>
-                      {canEdit(user) ? (
-                        <button
-                          className={styles.secondary}
-                          onClick={() => beginEdit(user)}
-                          type="button"
-                        >
-                          <Pencil aria-hidden="true" size={16} />
-                          {t("Edit")}
-                        </button>
-                      ) : null}
-                      {canDelete(user) ? (
-                        <button
-                          className={styles.danger}
-                          onClick={() => remove(user.id)}
-                          type="button"
-                        >
-                          <Trash2 aria-hidden="true" size={16} />
-                          {t("Delete")}
-                        </button>
-                      ) : (
-                        <span className={styles.protected}>
-                          {t("Protected")}
-                        </span>
-                      )}
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td className={styles.stateCell} colSpan={6}>
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={styles.spin}
+                      size={20}
+                    />
+                    {t("Loading users...")}
                   </td>
                 </tr>
-              ))}
+              ) : null}
+              {!isLoading && users.length === 0 ? (
+                <tr>
+                  <td className={styles.stateCell} colSpan={6}>
+                    {t("No staff accounts are available.")}
+                  </td>
+                </tr>
+              ) : null}
+              {!isLoading &&
+                users.map((user) => (
+                  <tr key={user.id}>
+                    <td data-label={t("Username")}>{user.username}</td>
+                    <td data-label={t("Name")}>{user.name}</td>
+                    <td data-label={t("Role")}>{t(user.role)}</td>
+                    <td data-label={t("Department")}>
+                      {user.department || "-"}
+                    </td>
+                    <td data-label={t("Phone")}>{user.phone || "-"}</td>
+                    <td data-label={t("Actions")}>
+                      <div className={styles.tableActions}>
+                        {canEdit(user) ? (
+                          <button
+                            className={styles.secondary}
+                            disabled={Boolean(deletingId)}
+                            onClick={() => beginEdit(user)}
+                            type="button"
+                          >
+                            <Pencil aria-hidden="true" size={16} />
+                            {t("Edit")}
+                          </button>
+                        ) : null}
+                        {canDelete(user) ? (
+                          <button
+                            className={styles.danger}
+                            disabled={Boolean(deletingId)}
+                            onClick={() => remove(user.id)}
+                            type="button"
+                          >
+                            <Trash2 aria-hidden="true" size={16} />
+                            {t("Delete")}
+                          </button>
+                        ) : (
+                          <span className={styles.protected}>
+                            {t("Protected")}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </section>
