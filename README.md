@@ -54,6 +54,11 @@ WEB_PUSH_CONTACT=mailto:operations@example.com
 admin access. `PLATELETS_SUDO_TOKEN` protects dataset refreshes, logs, quota
 details, schedules, NTP settings, and AI configuration.
 
+API keys are optional during setup. Empty keys are recorded as skipped so the
+operator can finish installation and add integrations later. When VWorld is
+not configured, the root map falls back to the OpenStreetMap/OpenFreeMap
+renderer instead of blocking the dashboard.
+
 When `data/points.sqlite` or a completed setup state is missing, Platelets
 redirects `/` to `/setup`. The setup assistant stores hashed sudo/admin
 credentials and encrypted API key configuration in SQLite, then sends the
@@ -177,7 +182,8 @@ gh pr merge --merge --delete-branch
 ## AI And MCP
 
 - AI analysis: `/ai`
-- AI model, proxy, reasoning, verbosity, and system prompt settings: `/sudo/ai`
+- AI provider preset, model, proxy, reasoning, verbosity, and system prompt
+  settings: `/sudo/ai`
 - Local MCP server: `npm run mcp:points`
 
 The AI and MCP payloads intentionally contain bounded summaries rather than

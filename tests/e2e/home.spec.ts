@@ -19,10 +19,7 @@ async function ensureSetupComplete(
         fullName: "Setup Admin",
         password: "StrongAdminPass1!",
       },
-      apiKeys: {
-        openaiApiKey: "sk-test",
-        openaiBaseUrl: "https://api.openai.com/v1",
-      },
+      apiKeys: {},
       licenseAccepted: true,
       sudo: {
         email: "sudo@example.com",
@@ -139,7 +136,6 @@ test("redirects first-run deployments to the setup wizard", async ({
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.getByRole("heading", { name: "API keys" })).toBeVisible();
-  await page.getByLabel("OpenAI API key").fill("sk-test");
   await page.getByRole("button", { name: "Test API keys" }).click();
   await expect(
     page.getByText("API key configuration is ready to save."),
