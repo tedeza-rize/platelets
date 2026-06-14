@@ -1,4 +1,4 @@
-import { getRequestAccessSession } from "@/lib/access-control";
+import { requireAccessSession } from "@/lib/access-control";
 import { incidentService } from "@/lib/disaster-response/incident-service";
 import type {
   IncidentActor,
@@ -62,14 +62,6 @@ function updateInput(payload: Record<string, unknown>): UpdateIncidentInput {
   };
 }
 
-async function requestActor(request: Request): Promise<IncidentActor | null> {
-  const session = await getRequestAccessSession(request);
-
-  return session
-    ? { id: session.userId, name: session.name, role: session.role }
-    : null;
-}
-
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -94,6 +86,12 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const [session, forbidden] = await requireAccessSession(
+    request,
+    "field_worker",
+  );
+  if (forbidden) return forbidden;
+
   const limited = enforceRateLimit(request, {
     bucket: "disaster-incident-status",
     limit: 40,
@@ -132,7 +130,11 @@ export async function PATCH(
   }
 
   try {
-    const actor = await requestActor(request);
+    const actor = {
+      id: session.userId,
+      name: session.name,
+      role: session.role,
+    } satisfies IncidentActor;
     let incident = shouldUpdateIncident
       ? await incidentService.updateIncident(id, updateInput(payload), actor)
       : await incidentService.getIncident(id);
@@ -164,6 +166,12 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const [session, forbidden] = await requireAccessSession(
+    request,
+    "field_worker",
+  );
+  if (forbidden) return forbidden;
+
   const limited = enforceRateLimit(request, {
     bucket: "disaster-incident-delete",
     limit: 20,
@@ -172,10 +180,11 @@ export async function DELETE(
   if (limited) return limited;
 
   const { id } = await context.params;
-  const deleted = await incidentService.deleteIncident(
-    id,
-    await requestActor(request),
-  );
+  const deleted = await incidentService.deleteIncident(id, {
+    id: session.userId,
+    name: session.name,
+    role: session.role,
+  } satisfies IncidentActor);
 
   if (!deleted) {
     return noStoreJson(

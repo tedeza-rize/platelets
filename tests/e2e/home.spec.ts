@@ -32,6 +32,20 @@ async function ensureSetupComplete(
   expect(completed.ok()).toBeTruthy();
 }
 
+async function signInAsStaff(
+  request: import("@playwright/test").APIRequestContext,
+  username: "admin" | "sudo",
+) {
+  const response = await request.post("/api/auth/login", {
+    data: {
+      password: username === "sudo" ? "StrongSudoPass1!" : "StrongAdminPass1!",
+      username,
+    },
+  });
+
+  expect(response.ok()).toBeTruthy();
+}
+
 async function showEnglishSetup(page: import("@playwright/test").Page) {
   if (
     (await page
@@ -369,6 +383,18 @@ test("incident API records create, edit, and status history", async ({
   request,
 }) => {
   await ensureSetupComplete(request);
+  const denied = await request.post("/api/disaster/incidents", {
+    data: {
+      latitude: 37.5665,
+      longitude: 126.978,
+      riskLevel: "medium",
+      title: "Anonymous E2E incident",
+      type: "fire",
+    },
+  });
+  expect(denied.status()).toBe(401);
+
+  await signInAsStaff(request, "admin");
   const created = await request.post("/api/disaster/incidents", {
     data: {
       address: "서울특별시 중구 세종대로 110",
@@ -454,6 +480,7 @@ test("incident updates reach an open dashboard without a reload", async ({
   request,
 }) => {
   await ensureSetupComplete(request);
+  await signInAsStaff(request, "sudo");
   const observer = await page.context().newPage();
   const eventStream = observer.waitForResponse(
     (response) =>
