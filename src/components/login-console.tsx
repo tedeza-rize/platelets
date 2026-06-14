@@ -13,6 +13,7 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isReady, setIsReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setIsReady(true);
@@ -21,6 +22,7 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
+    setIsSubmitting(true);
     const formData = new FormData(event.currentTarget as HTMLFormElement);
     const nextUsername = String(formData.get("username") ?? "");
     const nextPassword = String(formData.get("password") ?? "");
@@ -36,7 +38,12 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
     } | null;
 
     if (!response.ok) {
-      setError(payload?.error ?? t("Login failed."));
+      setError(
+        response.status === 429
+          ? t("Too many sign-in attempts. Try again shortly.")
+          : t("Login failed."),
+      );
+      setIsSubmitting(false);
       return;
     }
 
@@ -52,7 +59,11 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
             <p>{t("Sign in with an assigned account.")}</p>
           </div>
         </header>
-        <form className={styles.card} onSubmit={submit}>
+        <form
+          aria-busy={isSubmitting}
+          className={styles.card}
+          onSubmit={submit}
+        >
           <label className={styles.field}>
             {t("Username")}
             <input
@@ -67,6 +78,8 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
             {t("Password")}
             <input
               autoComplete="current-password"
+              aria-describedby={error ? "login-error" : undefined}
+              aria-invalid={Boolean(error)}
               name="password"
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -77,14 +90,18 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
           <div className={styles.actions}>
             <button
               className={styles.primary}
-              disabled={!isReady}
+              disabled={!isReady || isSubmitting}
               type="submit"
             >
               <LogIn aria-hidden="true" size={18} />
-              {t("Sign in")}
+              {t(isSubmitting ? "Signing in..." : "Sign in")}
             </button>
           </div>
-          {error ? <p className={styles.error}>{error}</p> : null}
+          {error ? (
+            <p className={styles.error} id="login-error" role="alert">
+              {error}
+            </p>
+          ) : null}
         </form>
       </section>
     </main>
