@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { inflateRawSync, inflateSync } from "node:zlib";
 import OpenAI from "openai";
 import type {
   ChatCompletionMessageFunctionToolCall,
@@ -260,6 +259,7 @@ export const ASSEMBLY_GEOCODE_PLACE_TOOL = {
 const GYEONGNAM_BBS_ID = "GNPMNG_D101";
 const USER_AGENT =
   "Platelets public-safety data crawler (contact: local operator)";
+const PDFJS_LEGACY_MODULE = ["pdfjs-dist", "legacy/build/pdf.mjs"].join("/");
 let rhwpCorePromise: Promise<typeof import("@rhwp/core")> | null = null;
 const AGENCY_GEOCODING_PREFIX: Record<AssemblyPoliceAgency, string> = {
   busan: "\uBD80\uC0B0",
@@ -290,6 +290,26 @@ const HTML_ENTITY_REPLACEMENTS: Record<string, string> = {
   nbsp: " ",
   quot: '"',
   rarr: "->",
+};
+
+type PdfTextItem = {
+  str?: string;
+};
+
+type PdfJsModule = {
+  getDocument: (params: {
+    data: Uint8Array;
+    disableFontFace?: boolean;
+    useSystemFonts?: boolean;
+  }) => {
+    destroy: () => Promise<void>;
+    promise: Promise<{
+      getPage: (pageNumber: number) => Promise<{
+        getTextContent: () => Promise<{ items: PdfTextItem[] }>;
+      }>;
+      numPages: number;
+    }>;
+  };
 };
 
 function decodeHtmlEntities(value: string) {
@@ -607,94 +627,34 @@ function cleanExtractedDocumentText(value: string) {
     .slice(0, ATTACHMENT_TEXT_LIMIT);
 }
 
-function decodePdfString(value: string) {
-  const bytes: number[] = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const char = value[index];
-    if (char !== "\\") {
-      bytes.push(char.charCodeAt(0) & 0xff);
-      continue;
-    }
+async function extractPdfText(buffer: Buffer) {
+  const pdfjs = (await import(PDFJS_LEGACY_MODULE)) as PdfJsModule;
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    disableFontFace: true,
+    useSystemFonts: true,
+  });
+  const document = await loadingTask.promise;
 
-    const next = value[index + 1];
-    if (next === "n" || next === "r" || next === "t") {
-      bytes.push(32);
-      index += 1;
-    } else if (next === "b" || next === "f") {
-      index += 1;
-    } else if (next && /[0-7]/.test(next)) {
-      const octal = value.slice(index + 1).match(/^[0-7]{1,3}/)?.[0] ?? "";
-      bytes.push(Number.parseInt(octal, 8));
-      index += octal.length;
-    } else if (next) {
-      bytes.push(next.charCodeAt(0) & 0xff);
-      index += 1;
-    }
-  }
-
-  const buffer = Buffer.from(bytes);
-  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
-    let text = "";
-    for (let index = 2; index + 1 < buffer.length; index += 2) {
-      text += String.fromCharCode(buffer.readUInt16BE(index));
-    }
-    return text;
-  }
-
-  return new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-}
-
-function decodePdfHexString(value: string) {
-  const normalized = value.replace(/\s+/g, "");
-  if (!normalized) return "";
-  const padded = normalized.length % 2 === 0 ? normalized : `${normalized}0`;
-  const buffer = Buffer.from(padded, "hex");
-
-  if (buffer.length >= 2 && buffer[0] === 0xfe && buffer[1] === 0xff) {
-    let text = "";
-    for (let index = 2; index + 1 < buffer.length; index += 2) {
-      text += String.fromCharCode(buffer.readUInt16BE(index));
-    }
-    return text;
-  }
-
-  return new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-}
-
-function inflatePdfStream(stream: Buffer) {
   try {
-    return inflateSync(stream);
-  } catch {
-    try {
-      return inflateRawSync(stream);
-    } catch {
-      return stream;
+    const pageCount = Math.min(document.numPages, 10);
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      pages.push(
+        content.items
+          .map((item) => item.str ?? "")
+          .filter(Boolean)
+          .join(" "),
+      );
     }
+
+    return cleanExtractedDocumentText(pages.join(" "));
+  } finally {
+    await loadingTask.destroy().catch(() => undefined);
   }
-}
-
-function extractPdfText(buffer: Buffer) {
-  const latin1 = buffer.toString("latin1");
-  const chunks: string[] = [];
-
-  for (const match of latin1.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
-    const stream = Buffer.from(match[1], "latin1");
-    chunks.push(inflatePdfStream(stream).toString("latin1"));
-  }
-  chunks.push(latin1);
-
-  const strings: string[] = [];
-  for (const chunk of chunks) {
-    for (const match of chunk.matchAll(/\((?:\\.|[^\\)])*\)/g)) {
-      strings.push(decodePdfString(match[0].slice(1, -1)));
-    }
-    for (const match of chunk.matchAll(/<([0-9A-Fa-f\s]{4,})>/g)) {
-      strings.push(decodePdfHexString(match[1]));
-    }
-  }
-
-  const text = cleanExtractedDocumentText(strings.join(" "));
-  return /[\uAC00-\uD7A3]/.test(text) ? text : "";
 }
 
 function extractSvgText(svg: string) {
@@ -753,7 +713,7 @@ export async function extractTextFromAssemblyAttachment(params: {
     return extractHwpTextWithRhwp(params.buffer).catch(() => "");
   }
   if (extension === "pdf" || contentType.includes("pdf")) {
-    return extractPdfText(params.buffer);
+    return extractPdfText(params.buffer).catch(() => "");
   }
   if (extension === "hwp" || contentType.includes("hwp")) {
     return extractHwpTextWithRhwp(params.buffer).catch(() => "");
