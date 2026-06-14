@@ -98,13 +98,7 @@ function routeBounds(origin: Coordinate, destination: Coordinate) {
   };
 }
 
-function congestionLevel(
-  averageSpeedKph: number | null,
-): TrafficCongestionLevel {
-  if (averageSpeedKph === null) {
-    return "unknown";
-  }
-
+function congestionLevel(averageSpeedKph: number): TrafficCongestionLevel {
   if (averageSpeedKph < 22) {
     return "congested";
   }

@@ -313,7 +313,8 @@ export async function updateHazardEvents(
   hazardUpdateGlobal.__plateletsHazardUpdatePromise = promise;
 
   try {
-    return await promise;
+    const result = await promise;
+    return result;
   } finally {
     if (hazardUpdateGlobal.__plateletsHazardUpdatePromise === promise) {
       hazardUpdateGlobal.__plateletsHazardUpdatePromise = undefined;
