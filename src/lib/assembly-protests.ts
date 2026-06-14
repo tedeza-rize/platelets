@@ -627,6 +627,28 @@ function cleanExtractedDocumentText(value: string) {
     .slice(0, ATTACHMENT_TEXT_LIMIT);
 }
 
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T, index: number) => Promise<R>,
+) {
+  const output = new Array<R>(values.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < values.length) {
+      const index = cursor;
+      cursor += 1;
+      output[index] = await mapper(values[index], index);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return output;
+}
+
 async function extractPdfText(buffer: Buffer) {
   const pdfjs = (await import(PDFJS_LEGACY_MODULE)) as PdfJsModule;
   const loadingTask = pdfjs.getDocument({
@@ -751,11 +773,9 @@ async function fetchAttachmentText(url: string) {
 }
 
 async function fetchAttachmentTexts(urls: string[]) {
-  const texts: string[] = [];
-  for (const url of urls.slice(0, 3)) {
-    const text = await fetchAttachmentText(url).catch(() => "");
-    if (text) texts.push(text);
-  }
+  const texts = await mapWithConcurrency(urls.slice(0, 3), 3, async (url) =>
+    fetchAttachmentText(url).catch(() => ""),
+  );
   return texts.join(" ").slice(0, ATTACHMENT_TEXT_LIMIT);
 }
 
@@ -1169,54 +1189,54 @@ async function buildProtestsFromPost(params: {
   const events =
     parsedEvents.length > 0 ? parsedEvents : [fallbackEvent(params.post.title)];
 
-  const protests: AssemblyProtestInput[] = [];
+  return mapWithConcurrency(
+    events,
+    3,
+    async (event, index): Promise<AssemblyProtestInput> => {
+      const location = event.location?.trim() || params.post.title;
+      const locationScope = event.locationScope?.trim() || null;
+      const coordinateMatch =
+        params.enrichLocations && params.coordinateResolver
+          ? await params.coordinateResolver({
+              agency: params.source.id,
+              agencyName: params.source.agency,
+              date: params.date,
+              detailText: params.detailText,
+              location,
+              locationScope,
+              title: params.post.title,
+            })
+          : null;
+      const coordinates = validCoordinate(
+        coordinateMatch?.latitude,
+        coordinateMatch?.longitude,
+      );
 
-  for (const [index, event] of events.entries()) {
-    const location = event.location?.trim() || params.post.title;
-    const locationScope = event.locationScope?.trim() || null;
-    const coordinateMatch =
-      params.enrichLocations && params.coordinateResolver
-        ? await params.coordinateResolver({
-            agency: params.source.id,
-            agencyName: params.source.agency,
-            date: params.date,
-            detailText: params.detailText,
-            location,
-            locationScope,
-            title: params.post.title,
-          })
-        : null;
-    const coordinates = validCoordinate(
-      coordinateMatch?.latitude,
-      coordinateMatch?.longitude,
-    );
-
-    protests.push({
-      agency: params.source.agency,
-      crowdSize: parseCrowdSize(event.crowdSize),
-      date: params.date,
-      detailUrl: params.detailUrl,
-      endsAt: event.endsAt ?? null,
-      latitude: coordinates.latitude,
-      location,
-      locationScope,
-      longitude: coordinates.longitude,
-      raw: {
-        attachmentUrls: params.post.attachmentUrls,
-        detailText: params.detailText,
-        geocoding: coordinateMatch,
-        postTitle: params.post.title,
-        sourceType: params.source.sourceType,
-      },
-      sourceId: params.source.id,
-      sourceRecordId: `${params.post.recordId}:${index}`,
-      sourceTitle: params.post.title,
-      sourceUrl: params.source.listUrl,
-      startsAt: event.startsAt ?? null,
-    });
-  }
-
-  return protests;
+      return {
+        agency: params.source.agency,
+        crowdSize: parseCrowdSize(event.crowdSize),
+        date: params.date,
+        detailUrl: params.detailUrl,
+        endsAt: event.endsAt ?? null,
+        latitude: coordinates.latitude,
+        location,
+        locationScope,
+        longitude: coordinates.longitude,
+        raw: {
+          attachmentUrls: params.post.attachmentUrls,
+          detailText: params.detailText,
+          geocoding: coordinateMatch,
+          postTitle: params.post.title,
+          sourceType: params.source.sourceType,
+        },
+        sourceId: params.source.id,
+        sourceRecordId: `${params.post.recordId}:${index}`,
+        sourceTitle: params.post.title,
+        sourceUrl: params.source.listUrl,
+        startsAt: event.startsAt ?? null,
+      };
+    },
+  );
 }
 
 async function fetchGyeongnamPosts(date: string) {
@@ -1272,10 +1292,11 @@ async function crawlSource(
   coordinateResolver: AssemblyCoordinateResolver | null,
 ) {
   if (source.sourceType === "gn-json") {
-    const protests: AssemblyProtestInput[] = [];
-    for (const post of await fetchGyeongnamPosts(date)) {
-      protests.push(
-        ...(await buildProtestsFromPost({
+    const postResults = await mapWithConcurrency(
+      await fetchGyeongnamPosts(date),
+      3,
+      async (post) =>
+        buildProtestsFromPost({
           coordinateResolver,
           date,
           detailText: post.text ?? post.title,
@@ -1283,17 +1304,14 @@ async function crawlSource(
           enrichLocations,
           post,
           source,
-        })),
-      );
-    }
-    return protests;
+        }),
+    );
+    return postResults.flat();
   }
 
   const listPage = await fetchPage(source.listUrl);
   const htmlPosts = extractBoardPosts(listPage.html, listPage.url, date);
-  const protests: AssemblyProtestInput[] = [];
-
-  for (const post of htmlPosts) {
+  const postResults = await mapWithConcurrency(htmlPosts, 3, async (post) => {
     const detailPage = post.detailUrl ? await fetchPage(post.detailUrl) : null;
     const detailText = detailPage
       ? extractMainText(detailPage.html)
@@ -1310,23 +1328,21 @@ async function crawlSource(
       .join(" ")
       .slice(0, DETAIL_TEXT_LIMIT + ATTACHMENT_TEXT_LIMIT);
 
-    protests.push(
-      ...(await buildProtestsFromPost({
-        coordinateResolver,
-        date,
-        detailText: combinedDetailText,
-        detailUrl: detailPage?.url ?? post.detailUrl,
-        enrichLocations,
-        post: {
-          ...post,
-          attachmentUrls,
-        },
-        source,
-      })),
-    );
-  }
+    return buildProtestsFromPost({
+      coordinateResolver,
+      date,
+      detailText: combinedDetailText,
+      detailUrl: detailPage?.url ?? post.detailUrl,
+      enrichLocations,
+      post: {
+        ...post,
+        attachmentUrls,
+      },
+      source,
+    });
+  });
 
-  return protests;
+  return postResults.flat();
 }
 
 function hasAssemblyCoordinates(protest: AssemblyProtestInput) {
@@ -1351,46 +1367,60 @@ export async function crawlAssemblyProtests(
   const coordinateResolver = enrichLocations
     ? (options.coordinateResolver ?? defaultAssemblyCoordinateResolver)
     : null;
-  const completedSourceIds: string[] = [];
-  const sourceResults: AssemblyProtestUpdateResult["sourceResults"] = [];
+  const sourceOutcomes = await mapWithConcurrency(
+    sources,
+    4,
+    async (source) => {
+      try {
+        const sourceProtests = await crawlSource(
+          source,
+          options.date,
+          enrichLocations,
+          coordinateResolver,
+        );
 
-  for (const source of sources) {
-    try {
-      const sourceProtests = await crawlSource(
-        source,
-        options.date,
-        enrichLocations,
-        coordinateResolver,
-      );
-      protests.push(...sourceProtests);
-      completedSourceIds.push(source.id);
-      sourceResults.push({
-        agency: source.agency,
-        geocodedCount: sourceProtests.filter(hasAssemblyCoordinates).length,
-        importedCount: sourceProtests.length,
-        sourceId: source.id,
-        status: "success",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      sourceResults.push({
-        agency: source.agency,
-        error: message,
-        geocodedCount: 0,
-        importedCount: 0,
-        sourceId: source.id,
-        status: "failure",
-      });
-      await recordApiLog({
-        action: `assembly-protests:${source.id}`,
-        category: "dataset",
-        level: "warn",
-        message,
-        metadata: { agency: source.agency, date: options.date },
-        status: "failure",
-      });
-    }
-  }
+        return {
+          completedSourceId: source.id,
+          protests: sourceProtests,
+          result: {
+            agency: source.agency,
+            geocodedCount: sourceProtests.filter(hasAssemblyCoordinates).length,
+            importedCount: sourceProtests.length,
+            sourceId: source.id,
+            status: "success" as const,
+          },
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await recordApiLog({
+          action: `assembly-protests:${source.id}`,
+          category: "dataset",
+          level: "warn",
+          message,
+          metadata: { agency: source.agency, date: options.date },
+          status: "failure",
+        });
+
+        return {
+          completedSourceId: null,
+          protests: [],
+          result: {
+            agency: source.agency,
+            error: message,
+            geocodedCount: 0,
+            importedCount: 0,
+            sourceId: source.id,
+            status: "failure" as const,
+          },
+        };
+      }
+    },
+  );
+  const completedSourceIds = sourceOutcomes
+    .map((outcome) => outcome.completedSourceId)
+    .filter((sourceId): sourceId is AssemblyPoliceAgency => sourceId !== null);
+  const sourceResults = sourceOutcomes.map((outcome) => outcome.result);
+  protests.push(...sourceOutcomes.flatMap((outcome) => outcome.protests));
 
   await replaceAssemblyProtestsForDate({
     date: options.date,

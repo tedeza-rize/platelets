@@ -323,6 +323,43 @@ test("crawlAssemblyProtests reports per-source failures", async () => {
   }
 });
 
+test("crawlAssemblyProtests fetches independent agency sources in parallel", async () => {
+  const originalFetch = globalThis.fetch;
+  let activeFetches = 0;
+  let peakFetches = 0;
+
+  globalThis.fetch = async (input) => {
+    activeFetches += 1;
+    peakFetches = Math.max(peakFetches, activeFetches);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    activeFetches -= 1;
+
+    const url = String(input);
+    if (url.includes("getBbsList.do")) {
+      return Response.json({ list: [] });
+    }
+
+    return new Response("<table></table>", {
+      headers: { "content-type": "text/html; charset=utf-8" },
+      status: 200,
+    });
+  };
+
+  try {
+    const result = await assemblyProtests.crawlAssemblyProtests({
+      date: "2026-06-22",
+      enrichLocations: false,
+    });
+
+    assert.equal(result.sourceCount, 18);
+    assert.equal(result.failedSourceCount, 0);
+    assert.equal(result.importedCount, 0);
+    assert.ok(peakFetches > 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("crawlAssemblyProtests stores bounded coordinate resolver results", async () => {
   const originalFetch = globalThis.fetch;
   const html =
@@ -403,6 +440,62 @@ test("crawlAssemblyProtests rejects coordinate resolver results outside Korea", 
     assert.equal(stored.length, 1);
     assert.equal(stored[0].latitude, null);
     assert.equal(stored[0].longitude, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("crawlAssemblyProtests resolves independent parsed locations in parallel", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    Response.json({
+      list: [
+        {
+          CPDS_CONTENT: [
+            "일시 : 10:00~11:00 장소 : 창원광장 인원 : 20명",
+            "일시 : 12:00~13:00 장소 : 경남도청 인원 : 30명",
+          ].join(" "),
+          CPDS_SUBJECT: "06.21 오늘의 집회",
+          IPDS_IDX: "parallel",
+        },
+      ],
+    });
+
+  let activeResolvers = 0;
+  let peakResolvers = 0;
+
+  try {
+    const result = await assemblyProtests.crawlAssemblyProtests({
+      agency: "gyeongnam",
+      coordinateResolver: async (params) => {
+        activeResolvers += 1;
+        peakResolvers = Math.max(peakResolvers, activeResolvers);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        activeResolvers -= 1;
+
+        return {
+          latitude: params.location.includes("도청") ? 35.237 : 35.227,
+          longitude: params.location.includes("도청") ? 128.691 : 128.681,
+          matchedAddress: params.location,
+          query: `경남 ${params.location}`,
+          source: "unit-map-tool",
+        };
+      },
+      date: "2026-06-21",
+      enrichLocations: true,
+    });
+
+    const stored = await pointsDb.listAssemblyProtests({
+      date: "2026-06-21",
+    });
+
+    assert.equal(result.importedCount, 2);
+    assert.equal(result.geocodedCount, 2);
+    assert.equal(peakResolvers, 2);
+    assert.deepEqual(
+      stored.map((row) => row.location),
+      ["창원광장", "경남도청"],
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
