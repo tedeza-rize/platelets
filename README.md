@@ -66,6 +66,10 @@ database file. Serverless or multi-instance signals disable writes unless
 single-process deployment. Use an external database architecture before running
 multiple writable app instances.
 
+For Nginx, Apache, and load balancer requirements, including forwarded headers
+and Server-Sent Events buffering, see
+[`docs/REVERSE_PROXY.md`](docs/REVERSE_PROXY.md).
+
 High-risk incident creation can notify browser subscribers and up to five
 HTTPS webhook destinations. Generate one VAPID key pair for the deployment and
 store it in `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_VAPID_PRIVATE_KEY`; set
