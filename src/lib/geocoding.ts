@@ -4,6 +4,16 @@ import {
 } from "@/lib/coordinates";
 import { consumeKakaoLocalQuota, recordApiLog } from "@/lib/points-db";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
+import {
+  searchVworldAddressCoordinates,
+  searchVworldLocations,
+} from "@/lib/vworld-geocoding";
+
+export {
+  reverseVworldCoordinates,
+  searchVworldAddressCoordinates,
+  searchVworldLocations,
+} from "@/lib/vworld-geocoding";
 
 type KakaoLocalSearchResponse = {
   documents?: Array<{
@@ -29,10 +39,30 @@ type KakaoLocalSearchResponse = {
 
 export type KakaoLocalSearchKind = "address" | "keyword";
 
-export type KakaoLocalCoordinateResult = CoordinatePair & {
+export type MapGeocodingProvider = "auto" | "kakao" | "vworld";
+export type MapSearchMode = "address" | "both" | "keyword";
+export type MapGeocodingSource =
+  | "kakao-local-address"
+  | "kakao-local-keyword"
+  | "vworld-address-parcel"
+  | "vworld-address-road"
+  | "vworld-search-address-parcel"
+  | "vworld-search-address-road"
+  | "vworld-search-district"
+  | "vworld-search-place";
+
+export type MapCoordinateResult = CoordinatePair & {
   matchedAddress: string | null;
   query: string;
+  source: MapGeocodingSource;
+};
+
+export type KakaoLocalCoordinateResult = MapCoordinateResult & {
   source: "kakao-local-address" | "kakao-local-keyword";
+};
+
+export type MapSearchResult = MapCoordinateResult & {
+  title: string | null;
 };
 
 async function getKakaoRestApiKey() {
@@ -48,6 +78,13 @@ function kakaoLocalEndpoint(kind: KakaoLocalSearchKind) {
 
 function resultSource(kind: KakaoLocalSearchKind) {
   return kind === "address" ? "kakao-local-address" : "kakao-local-keyword";
+}
+
+function isQuotaExceededError(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes("quota exceeded")
+  );
 }
 
 export async function searchKakaoLocalCoordinates(params: {
@@ -184,6 +221,104 @@ export async function searchKakaoLocalCoordinates(params: {
   }
 }
 
+export async function searchMapCoordinates(params: {
+  action?: string;
+  kind?: KakaoLocalSearchKind;
+  provider?: MapGeocodingProvider;
+  query: string;
+}): Promise<MapCoordinateResult | null> {
+  const provider = params.provider ?? "auto";
+  const kind = params.kind ?? "address";
+
+  if (provider === "kakao") {
+    return searchKakaoLocalCoordinates({ ...params, kind });
+  }
+
+  if (provider === "vworld") {
+    return searchVworldAddressCoordinates({
+      action: params.action,
+      query: params.query,
+      type: kind === "address" ? "road" : "parcel",
+    });
+  }
+
+  try {
+    const kakao = await searchKakaoLocalCoordinates({ ...params, kind });
+    if (kakao) return kakao;
+  } catch (error) {
+    if (!isQuotaExceededError(error)) throw error;
+
+    await recordApiLog({
+      action: params.action ?? "geocode",
+      category: "geocoding",
+      level: "warn",
+      message:
+        "Kakao Local daily quota exceeded; falling back to VWorld geocoding.",
+      metadata: { query: params.query.trim(), searchKind: kind },
+      status: "skipped",
+    });
+  }
+
+  return searchVworldAddressCoordinates({
+    action: params.action,
+    query: params.query,
+    type: kind === "address" ? "road" : "parcel",
+  });
+}
+
+export async function searchMapLocations(params: {
+  action?: string;
+  limit?: number;
+  provider?: MapGeocodingProvider;
+  query: string;
+  searchMode?: MapSearchMode;
+}): Promise<MapSearchResult[]> {
+  const provider = params.provider ?? "auto";
+  const searchMode = params.searchMode ?? "both";
+  const limit = Math.min(Math.max(params.limit ?? 5, 1), 20);
+  const results: MapSearchResult[] = [];
+
+  if (provider !== "vworld") {
+    const kinds: KakaoLocalSearchKind[] =
+      searchMode === "both" ? ["keyword", "address"] : [searchMode];
+
+    for (const kind of kinds) {
+      try {
+        const result = await searchKakaoLocalCoordinates({
+          action: params.action ?? "map-search",
+          kind,
+          query: params.query,
+        });
+        if (result) {
+          results.push({ ...result, title: result.matchedAddress });
+        }
+      } catch (error) {
+        if (!isQuotaExceededError(error) || provider === "kakao") {
+          throw error;
+        }
+        break;
+      }
+
+      if (provider === "kakao" || results.length >= limit) {
+        return results.slice(0, limit);
+      }
+    }
+  }
+
+  if (provider === "kakao") {
+    return results.slice(0, limit);
+  }
+
+  const vworldResults = await searchVworldLocations({
+    action: params.action,
+    limit: limit - results.length,
+    query: params.query,
+    searchMode,
+  });
+
+  return [...results, ...vworldResults].slice(0, limit);
+}
+
 export async function geocodeAddress(address: string) {
-  return searchKakaoLocalCoordinates({ kind: "address", query: address });
+  return searchMapCoordinates({ kind: "address", query: address });
 }

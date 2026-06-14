@@ -33,6 +33,27 @@ export const DATA_LICENSE_ENTRIES = [
       "관리자 설정으로 선택하는 브이월드 레스터/벡터 기본 지도와 도로 벡터 레이어",
   },
   {
+    id: "vworld-geocoder-search",
+    license: "VWorld terms of use and Open API policy apply.",
+    notes:
+      "VWorld API keys are loaded from encrypted setup settings or VWORLD_API_KEY/NEXT_PUBLIC_VWORLD_API_KEY environment variables. Public API and MCP responses expose bounded normalized coordinates and addresses only, not raw provider payloads.",
+    provider: "Spatial Information Industry Promotion Institute / VWorld",
+    sourceName: "VWorld Geocoder API 2.0 and Search API 2.0",
+    sourceUrl: "https://www.vworld.kr/",
+    sourceUrls: [
+      {
+        label: "VWorld Geocoder API 2.0",
+        url: "https://www.vworld.kr/dev/v4dv_geocoderguide2_s001.do",
+      },
+      {
+        label: "VWorld Search API 2.0",
+        url: "https://www.vworld.kr/dev/v4dv_search2_s001.do",
+      },
+    ],
+    usage:
+      "Fallback address geocoding, reverse geocoding, and place/address/district search for Korean map workflows.",
+  },
+  {
     id: "openfreemap-openstreetmap",
     license:
       "OpenStreetMap ODbL, OpenMapTiles 라이선스, OpenFreeMap 이용 조건 준수",

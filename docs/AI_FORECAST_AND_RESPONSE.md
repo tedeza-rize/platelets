@@ -174,6 +174,12 @@ Available tools:
 - `dataset_status`: source counts, freshness, and geocoding coverage.
 - `geocode_place`: bounded Kakao Local place/address lookup for one Korean map
   query. Use it after deterministic source parsing, not for crawling webpages.
+- `vworld_geocode_address`: VWorld Geocoder API 2.0 address-to-coordinate
+  lookup for Korean road or parcel addresses.
+- `vworld_search_locations`: VWorld Search API 2.0 place, road address,
+  parcel address, and district search with bounded normalized results.
+- `vworld_reverse_geocode`: VWorld Geocoder API 2.0 coordinate-to-address
+  lookup for Korean road and parcel addresses.
 - `list_assembly_protests`: normalized daily assembly/protest schedules from
   police notices. Raw board text is never returned.
 - `list_points`: bounded point listing for small context windows. Prefer bbox and low limits.

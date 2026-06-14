@@ -7,6 +7,10 @@ test("points MCP exposes bounded place geocoding for map-assisted LLM flows", as
 
   assert.match(source, /server\.registerTool\(\s*"geocode_place"/);
   assert.match(source, /Kakao Local/);
+  assert.match(source, /server\.registerTool\(\s*"vworld_geocode_address"/);
+  assert.match(source, /server\.registerTool\(\s*"vworld_search_locations"/);
+  assert.match(source, /server\.registerTool\(\s*"vworld_reverse_geocode"/);
+  assert.match(source, /VWorld Search API 2\.0/);
   assert.match(source, /isWithinKoreaCoordinates/);
   assert.match(source, /Returns no raw provider payload/);
 });
