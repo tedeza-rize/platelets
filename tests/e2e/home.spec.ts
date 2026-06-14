@@ -167,6 +167,33 @@ test("loads the integrated disaster response map", async ({
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
 });
 
+test("shows a mobile bottom sheet for map selections", async ({
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
+  await page.setViewportSize({ height: 780, width: 390 });
+  await page.context().grantPermissions(["geolocation"]);
+  await page.context().setGeolocation({
+    accuracy: 25,
+    latitude: 37.5665,
+    longitude: 126.978,
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const canvas = page.locator("canvas.maplibregl-canvas");
+  await expect(canvas).toBeVisible();
+  const locateButton = page.getByTestId("locate-user-button");
+  await expect(locateButton).toBeVisible();
+  await locateButton.click();
+
+  const sheet = page.getByTestId("mobile-bottom-sheet");
+  await expect(sheet).toBeVisible({ timeout: 15_000 });
+  await expect(sheet.getByText(/Coordinates|좌표/)).toBeVisible();
+  await sheet.getByTestId("mobile-bottom-sheet-close").click();
+  await expect(sheet).toBeHidden();
+});
+
 test("registers the push service worker when notifications are configured", async ({
   page,
   request,

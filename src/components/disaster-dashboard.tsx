@@ -49,6 +49,7 @@ import type {
   RiskArea,
   RiskLevel,
 } from "@/lib/disaster-response/types";
+import { type AppDictionary, uiText } from "@/lib/i18n";
 import {
   DEFAULT_MAP_RENDERING_SETTINGS,
   type MapRenderingSettings,
@@ -78,6 +79,7 @@ type DashboardSnapshot = {
 };
 
 export type DisasterDashboardProps = {
+  dictionary: AppDictionary;
   initialView?: DashboardView;
   mapSettings?: MapRenderingSettings;
   vworldApiKey?: string;
@@ -150,6 +152,21 @@ type ReportLocation = {
   address: string;
   latitude: number;
   longitude: number;
+};
+type MobileSheetRow = {
+  label: string;
+  value: string;
+};
+type MobileSheetLink = {
+  href: string;
+  label: string;
+};
+type MobileSheet = {
+  id: string;
+  links?: MobileSheetLink[];
+  rows: MobileSheetRow[];
+  subtitle: string;
+  title: string;
 };
 
 const MAP_CENTER: [number, number] = [127.85, 36.45];
@@ -1492,6 +1509,147 @@ function localDateTimeToIso(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+type DashboardText = (key: string) => string;
+
+function coordinateText(latitude: number, longitude: number) {
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+}
+
+function compactRows(
+  rows: Array<[string, string | null | undefined]>,
+): MobileSheetRow[] {
+  return rows
+    .filter((row): row is [string, string] => Boolean(row[1]))
+    .map(([label, value]) => ({ label, value }));
+}
+
+function userLocationSheet(
+  location: UserLocation,
+  text: DashboardText,
+): MobileSheet {
+  return {
+    id: `user-${location.locatedAt}`,
+    rows: compactRows([
+      [
+        text("dashboard.sheet.coordinates"),
+        coordinateText(location.latitude, location.longitude),
+      ],
+      [text("dashboard.sheet.accuracy"), distanceText(location.accuracy)],
+      [text("dashboard.sheet.checkedAt"), formatDateTime(location.locatedAt)],
+    ]),
+    subtitle: text("dashboard.sheet.userLocationSubtitle"),
+    title: text("dashboard.sheet.userLocationTitle"),
+  };
+}
+
+function reportLocationSheet(
+  location: ReportLocation,
+  text: DashboardText,
+): MobileSheet {
+  return {
+    id: `report-${location.latitude}-${location.longitude}`,
+    rows: compactRows([
+      [text("dashboard.sheet.address"), location.address],
+      [
+        text("dashboard.sheet.coordinates"),
+        coordinateText(location.latitude, location.longitude),
+      ],
+      [text("dashboard.sheet.status"), text("dashboard.sheet.reportStatus")],
+    ]),
+    subtitle: text("dashboard.sheet.reportLocationSubtitle"),
+    title: text("dashboard.sheet.reportLocationTitle"),
+  };
+}
+
+function bigData119Sheet(
+  point: BigData119MapPoint,
+  text: DashboardText,
+): MobileSheet {
+  const searchQuery = point.address || point.name || point.sourceLabel;
+
+  return {
+    id: `bigdata-${point.id}`,
+    links: [
+      {
+        href: point.sourceUrl,
+        label: text("dashboard.sheet.source"),
+      },
+      {
+        href: buildExternalMapSearchUrl("naver", searchQuery),
+        label: text("dashboard.sheet.naverMap"),
+      },
+    ],
+    rows: compactRows([
+      [text("dashboard.sheet.type"), BIGDATA119_KIND_LABEL[point.kind]],
+      [text("dashboard.sheet.category"), point.category],
+      [text("dashboard.sheet.address"), point.address],
+      [
+        text("dashboard.sheet.region"),
+        [point.city, point.district].filter(Boolean).join(" "),
+      ],
+      [
+        text("dashboard.sheet.governingOffice"),
+        [point.stationName, point.centerName].filter(Boolean).join(" / "),
+      ],
+      [text("dashboard.sheet.status"), point.status],
+      [
+        text("dashboard.sheet.coordinates"),
+        coordinateText(point.latitude, point.longitude),
+      ],
+      [
+        text("dashboard.sheet.dataStatus"),
+        point.isSample
+          ? text("dashboard.sheet.sampleData")
+          : text("dashboard.sheet.approvedCsv"),
+      ],
+    ]),
+    subtitle: point.sourceLabel,
+    title: point.name,
+  };
+}
+
+function buildingSheet(
+  report: ReportLocation,
+  name: string | null,
+  safetyProfile: BuildingSafetyProfile | null,
+  text: DashboardText,
+): MobileSheet {
+  return {
+    id: `building-${report.latitude}-${report.longitude}`,
+    links: [
+      {
+        href: buildExternalMapSearchUrl("naver", name ?? report.address),
+        label: text("dashboard.sheet.naverMap"),
+      },
+      {
+        href: buildExternalMapSearchUrl("kakao", name ?? report.address),
+        label: text("dashboard.sheet.kakaoMap"),
+      },
+    ],
+    rows: compactRows([
+      [text("dashboard.sheet.address"), report.address],
+      [
+        text("dashboard.sheet.coordinates"),
+        coordinateText(report.latitude, report.longitude),
+      ],
+      [
+        text("dashboard.sheet.dataStatus"),
+        safetyProfile
+          ? safetyProfile.dataStatus === "sample"
+            ? text("dashboard.sheet.sampleData")
+            : text("dashboard.sheet.verifiedData")
+          : text("dashboard.sheet.noSafetyProfile"),
+      ],
+      [
+        text("dashboard.sheet.assemblyPoint"),
+        safetyProfile?.nearestAssemblyPoint,
+      ],
+    ]),
+    subtitle: text("dashboard.sheet.buildingSubtitle"),
+    title: name ?? text("dashboard.sheet.buildingTitle"),
+  };
+}
+
 function incidentFormValue(incident: Incident): IncidentForm {
   return {
     address: incident.address,
@@ -1875,6 +2033,7 @@ function fitMapToSnapshot(map: MapLibreMap, snapshot: DashboardSnapshot) {
 }
 
 export function DisasterDashboard({
+  dictionary,
   initialView = "dashboard",
   mapSettings = DEFAULT_MAP_RENDERING_SETTINGS,
   vworldApiKey = "",
@@ -1922,6 +2081,8 @@ export function DisasterDashboard({
   const [hospitalRecommendations, setHospitalRecommendations] = useState<
     HospitalRecommendation[]
   >([]);
+  const [mobileSheet, setMobileSheet] = useState<MobileSheet | null>(null);
+  const [mobileSheetDragOffset, setMobileSheetDragOffset] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
@@ -1953,6 +2114,11 @@ export function DisasterDashboard({
   const userLocationRef = useRef<UserLocation | null>(null);
   const reportLocationRef = useRef<ReportLocation | null>(null);
   const didFitInitialSnapshotRef = useRef(false);
+  const mobileSheetDragStartRef = useRef<number | null>(null);
+  const dashboardText = useCallback(
+    (key: string) => uiText(dictionary, key),
+    [dictionary],
+  );
 
   const loadSnapshot = useCallback(async () => {
     setIsLoading(true);
@@ -1994,6 +2160,8 @@ export function DisasterDashboard({
 
   const loadRecommendations = useCallback(async (incident: Incident) => {
     popupRef.current?.remove();
+    setMobileSheet(null);
+    setMobileSheetDragOffset(0);
     reportLocationRef.current = null;
     setReportLocation(null);
     setActiveIncident(incident);
@@ -2140,6 +2308,8 @@ export function DisasterDashboard({
           longitude: location.longitude.toFixed(6),
         }));
         setNotice("현재 위치를 지도와 사고 등록 폼에 반영했습니다.");
+        setMobileSheet(reportLocationSheet(report, dashboardText));
+        setMobileSheetDragOffset(0);
 
         const map = mapRef.current;
 
@@ -2184,7 +2354,7 @@ export function DisasterDashboard({
         timeout: 12_000,
       },
     );
-  }, []);
+  }, [dashboardText]);
 
   useEffect(() => {
     loadSnapshot();
@@ -2373,6 +2543,19 @@ export function DisasterDashboard({
           report,
           "건물 위치가 신고 예정 위치로 표시되었습니다. 건물 정보를 확인한 뒤 등록하세요.",
         );
+        setMobileSheet(
+          buildingSheet(
+            report,
+            buildingDisplayName(
+              buildingProperties,
+              poiProperties,
+              safetyProfile,
+            ),
+            safetyProfile,
+            dashboardText,
+          ),
+        );
+        setMobileSheetDragOffset(0);
 
         popupRef.current?.remove();
         popupRef.current = new maplibre.Popup({
@@ -2408,6 +2591,8 @@ export function DisasterDashboard({
 
       function showUserLocationPopup(location: UserLocation) {
         popupRef.current?.remove();
+        setMobileSheet(userLocationSheet(location, dashboardText));
+        setMobileSheetDragOffset(0);
         popupRef.current = new maplibre.Popup({
           closeButton: true,
           maxWidth: "300px",
@@ -2421,6 +2606,8 @@ export function DisasterDashboard({
 
       function showReportLocationPopup(location: ReportLocation) {
         popupRef.current?.remove();
+        setMobileSheet(reportLocationSheet(location, dashboardText));
+        setMobileSheetDragOffset(0);
         popupRef.current = new maplibre.Popup({
           closeButton: true,
           maxWidth: "320px",
@@ -2434,6 +2621,8 @@ export function DisasterDashboard({
 
       function showBigData119Popup(point: BigData119MapPoint) {
         popupRef.current?.remove();
+        setMobileSheet(bigData119Sheet(point, dashboardText));
+        setMobileSheetDragOffset(0);
         popupRef.current = new maplibre.Popup({
           closeButton: true,
           maxWidth: "340px",
@@ -2479,6 +2668,8 @@ export function DisasterDashboard({
 
         if (area) {
           popupRef.current?.remove();
+          setMobileSheet(null);
+          setMobileSheetDragOffset(0);
           reportLocationRef.current = null;
           setReportLocation(null);
           setActiveRiskArea(area);
@@ -2611,6 +2802,8 @@ export function DisasterDashboard({
 
           if (area) {
             popupRef.current?.remove();
+            setMobileSheet(null);
+            setMobileSheetDragOffset(0);
             reportLocationRef.current = null;
             setReportLocation(null);
             setActiveRiskArea(area);
@@ -2663,6 +2856,7 @@ export function DisasterDashboard({
       mapRef.current = null;
     };
   }, [
+    dashboardText,
     effectiveMapSettings,
     loadRecommendations,
     visibleBigDataKinds,
@@ -2911,6 +3105,44 @@ export function DisasterDashboard({
     }
   }
 
+  function closeMobileSheet() {
+    setMobileSheet(null);
+    setMobileSheetDragOffset(0);
+    mobileSheetDragStartRef.current = null;
+  }
+
+  function beginMobileSheetDrag(event: React.PointerEvent<HTMLElement>) {
+    mobileSheetDragStartRef.current = event.clientY;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function updateMobileSheetDrag(event: React.PointerEvent<HTMLElement>) {
+    if (mobileSheetDragStartRef.current === null) {
+      return;
+    }
+
+    setMobileSheetDragOffset(
+      Math.max(0, event.clientY - mobileSheetDragStartRef.current),
+    );
+  }
+
+  function endMobileSheetDrag(event: React.PointerEvent<HTMLElement>) {
+    if (mobileSheetDragStartRef.current === null) {
+      return;
+    }
+
+    const offset = Math.max(0, event.clientY - mobileSheetDragStartRef.current);
+    mobileSheetDragStartRef.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+
+    if (offset > 96) {
+      closeMobileSheet();
+      return;
+    }
+
+    setMobileSheetDragOffset(0);
+  }
+
   const riskAreas = snapshot?.riskAreas ?? [];
   const incidents = snapshot?.incidents ?? [];
   const recommendations = snapshot?.resourceRecommendations ?? [];
@@ -3000,6 +3232,7 @@ export function DisasterDashboard({
             </button>
             <button
               className={styles.mapToggle}
+              data-testid="locate-user-button"
               disabled={isLocating}
               onClick={locateUser}
               title="내 위치로 이동"
@@ -3079,6 +3312,63 @@ export function DisasterDashboard({
               },
             ]}
           />
+          {mobileSheet ? (
+            <aside
+              aria-label={dashboardText("dashboard.sheet.aria")}
+              className={styles.mobileBottomSheet}
+              data-testid="mobile-bottom-sheet"
+              onPointerCancel={endMobileSheetDrag}
+              onPointerMove={updateMobileSheetDrag}
+              onPointerUp={endMobileSheetDrag}
+              style={{
+                transform: `translate3d(0, ${mobileSheetDragOffset}px, 0)`,
+              }}
+            >
+              <button
+                aria-label={dashboardText("dashboard.sheet.dragHandle")}
+                className={styles.mobileSheetHandle}
+                onPointerDown={beginMobileSheetDrag}
+                type="button"
+              >
+                <span aria-hidden="true" />
+              </button>
+              <div className={styles.mobileSheetHeader}>
+                <div>
+                  <span>{mobileSheet.subtitle}</span>
+                  <strong>{mobileSheet.title}</strong>
+                </div>
+                <button
+                  data-testid="mobile-bottom-sheet-close"
+                  onClick={closeMobileSheet}
+                  type="button"
+                >
+                  {dashboardText("dashboard.sheet.close")}
+                </button>
+              </div>
+              <dl className={styles.mobileSheetDetails}>
+                {mobileSheet.rows.map((row) => (
+                  <div key={`${row.label}-${row.value}`}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {mobileSheet.links?.length ? (
+                <div className={styles.mobileSheetActions}>
+                  {mobileSheet.links.map((link) => (
+                    <a
+                      href={link.href}
+                      key={link.href}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </aside>
+          ) : null}
         </section>
 
         <aside className={styles.panel}>
