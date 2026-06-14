@@ -50,7 +50,11 @@
   flex-direction: column;
   gap: 32px;
   padding: 34px;
-  background: color-mix(in srgb, var(--setup-card) 72%, var(--setup-background));
+  background: color-mix(
+    in srgb,
+    var(--setup-card) 72%,
+    var(--setup-background)
+  );
   border-right: 1px solid var(--setup-border);
 }
 

@@ -104,7 +104,7 @@ function lastAttemptAt(
 }
 
 export async function runDueDatasetUpdates() {
-  if (!databaseFileExists() || !(await isSetupCompleteFromDatabaseFile())) {
+  if (!(databaseFileExists() && (await isSetupCompleteFromDatabaseFile()))) {
     return;
   }
 

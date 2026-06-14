@@ -8,15 +8,18 @@ import {
 } from "@/lib/sqlite";
 
 const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
-const dataDirectory = configuredDataDirectory
-  ? path.isAbsolute(configuredDataDirectory)
-    ? configuredDataDirectory
-    : path.join(
-        /*turbopackIgnore: true*/ process.cwd(),
-        configuredDataDirectory,
-      )
-  : path.join(process.cwd(), "data");
+const dataDirectory = resolveDataDirectory(configuredDataDirectory);
 const databasePath = path.join(dataDirectory, "points.sqlite");
+
+function resolveDataDirectory(configuredDirectory: string | undefined) {
+  if (!configuredDirectory) {
+    return path.join(process.cwd(), "data");
+  }
+
+  return path.isAbsolute(configuredDirectory)
+    ? configuredDirectory
+    : path.join(/*turbopackIgnore: true*/ process.cwd(), configuredDirectory);
+}
 
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeTransactionQueue: Promise<void> = Promise.resolve();
@@ -318,7 +321,7 @@ export async function closeDatabase() {
   try {
     await closeSqliteDatabase(await promise);
   } catch {
-    return;
+    // Closing an already-failed connection is a best-effort cleanup.
   }
 }
 
@@ -340,7 +343,9 @@ export async function withDatabaseWriteTransaction<T>(
   }
 
   const previousTransaction = writeTransactionQueue;
-  let releaseTransaction = () => {};
+  let releaseTransaction = () => {
+    // Assigned by the queue promise constructor below.
+  };
   writeTransactionQueue = new Promise<void>((resolve) => {
     releaseTransaction = resolve;
   });
@@ -354,7 +359,6 @@ export async function withDatabaseWriteTransaction<T>(
     transactionStarted = true;
     const result = await operation(db);
     await runSqlite(db, "COMMIT");
-    transactionStarted = false;
     return result;
   } catch (error) {
     if (transactionStarted) {

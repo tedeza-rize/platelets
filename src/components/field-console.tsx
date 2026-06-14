@@ -44,7 +44,7 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
         incidents?: Incident[];
       } | null;
 
-      if (!response.ok || !payload?.incidents) {
+      if (!(response.ok && payload?.incidents)) {
         throw new Error(t("Could not load incidents."));
       }
 

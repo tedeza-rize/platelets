@@ -29,19 +29,19 @@ import {
 export {
   closeDatabase,
   databaseFileExists,
+  findNearestEmergencyInstitutions,
+  findNearestPoints,
   getDatabase,
   getDatabaseFilePath,
   getDataDirectoryPath,
-  getSqliteWriteSafetyStatus,
-  withDatabaseWriteTransaction,
-  findNearestEmergencyInstitutions,
-  findNearestPoints,
   getPointSummary,
+  getSqliteWriteSafetyStatus,
   listEmergencyHospitalFallbackPoints,
   listPointMarkers,
-  listPoints,
   listPointSummaries,
+  listPoints,
   searchPointSummaries,
+  withDatabaseWriteTransaction,
 };
 
 export type EmergencyPointInput = {

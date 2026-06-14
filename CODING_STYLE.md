@@ -91,7 +91,7 @@ export function ok<T, E = never>(value: T): GoResult<T, E> {
 
 // 실패 결과를 만든다.
 // 함수 반환부에서 [null, error]를 직접 쓰지 않고 fail(error)를 사용해 의도를 명확히 한다.
-export function fail<T = never, E = unknown>(error: E): GoResult<T, E> {
+export function fail<T = never, E = never>(error: E): GoResult<T, E> {
   return [null, error];
 }
 
@@ -335,18 +335,25 @@ export async function createUserAction(
 import { redirect } from 'next/navigation';
 import { createUser } from '@/features/users/user-service';
 
-// 사용자를 생성한 뒤 사용자 목록 페이지로 이동한다.
-// redirect는 프레임워크 제어 흐름이므로 try/catch 안에서 호출하지 않는다.
-export async function createUserAndRedirectAction(formData: FormData): Promise<void> {
+type CreateUserActionState = {
+  ok: boolean;
+  message: string | null;
+  fieldErrors?: { name?: string; email?: string };
+};
+
+// 예상 가능한 검증 실패는 throw하지 않고 상태로 반환한다.
+export async function createUserAndRedirectAction(
+  formData: FormData
+): Promise<CreateUserActionState> {
   const name = formData.get('name');
   const email = formData.get('email');
 
   if (typeof name !== 'string') {
-    throw new Error('name field must be string');
+    return { ok: false, message: 'validation failed', fieldErrors: { name: 'name field must be string' } };
   }
 
   if (typeof email !== 'string') {
-    throw new Error('email field must be string');
+    return { ok: false, message: 'validation failed', fieldErrors: { email: 'email field must be string' } };
   }
 
   const [_user, createUserError] = createUser({
@@ -355,7 +362,7 @@ export async function createUserAndRedirectAction(formData: FormData): Promise<v
   });
 
   if (createUserError !== null) {
-    throw new Error(createUserError.message);
+    return { ok: false, message: createUserError.message };
   }
 
   redirect('/users');
@@ -447,7 +454,7 @@ export default async function UserPage(
       notFound();
     }
 
-    throw new Error(`find user: ${findUserError.message}`);
+    throw new Error(`Failed to load user details: ${findUserError.message}`);
   }
 
   return (

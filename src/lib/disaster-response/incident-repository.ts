@@ -50,24 +50,27 @@ type MaxIncidentIdRow = {
 };
 
 export type IncidentRepository = {
-  createIncident(
+  createIncident: (
     incident: Omit<Incident, "id">,
     actor?: IncidentActor | null,
-  ): Promise<Incident>;
-  deleteIncident(id: string, actor?: IncidentActor | null): Promise<boolean>;
-  getIncident(id: string): Promise<Incident | null>;
-  listIncidentEvents(id: string): Promise<IncidentEvent[]>;
-  listIncidents(): Promise<Incident[]>;
-  updateIncident(
+  ) => Promise<Incident>;
+  deleteIncident: (
+    id: string,
+    actor?: IncidentActor | null,
+  ) => Promise<boolean>;
+  getIncident: (id: string) => Promise<Incident | null>;
+  listIncidentEvents: (id: string) => Promise<IncidentEvent[]>;
+  listIncidents: () => Promise<Incident[]>;
+  updateIncident: (
     id: string,
     incident: Omit<Incident, "createdAt" | "id" | "status">,
     actor?: IncidentActor | null,
-  ): Promise<Incident | null>;
-  updateIncidentStatus(
+  ) => Promise<Incident | null>;
+  updateIncidentStatus: (
     id: string,
     status: IncidentStatus,
     actor?: IncidentActor | null,
-  ): Promise<Incident | null>;
+  ) => Promise<Incident | null>;
 };
 
 let databasePromise: Promise<SqliteDatabase> | null = null;

@@ -360,6 +360,14 @@ function text(value: unknown) {
   return value === null || value === undefined ? "" : String(value).trim();
 }
 
+function normalizeApiItems<T>(items: T | T[] | null | undefined): T[] {
+  if (Array.isArray(items)) {
+    return items;
+  }
+
+  return items ? [items] : [];
+}
+
 function nullableText(value: unknown) {
   const trimmed = text(value);
   return trimmed.length > 0 ? trimmed : null;
@@ -379,8 +387,8 @@ function wait(milliseconds: number) {
 export class DatasetImportPausedError extends Error {
   source: DatasetSourceId;
 
-  constructor(source: DatasetSourceId, message: string) {
-    super(message);
+  constructor(source: DatasetSourceId, message: string, cause?: unknown) {
+    super(message, { cause });
     this.name = "DatasetImportPausedError";
     this.source = source;
   }
@@ -700,7 +708,7 @@ async function fetchAedPage(pageNo: number) {
 
   const body = payload.response?.body;
   const rawItems = body?.items?.item;
-  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+  const items = normalizeApiItems(rawItems);
 
   return {
     items,
@@ -758,7 +766,7 @@ function mapFireRecord(record: CsvRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.번호);
   const name = text(record["소방서 및 안전센터명"]);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -786,7 +794,7 @@ function mapPoliceRecord(
   const station = text(record.관서명);
   const category = text(record.구분) || "경찰";
 
-  if (!sourceRecordId || !station || !coordinates) {
+  if (!(sourceRecordId && station && coordinates)) {
     return null;
   }
 
@@ -820,7 +828,7 @@ function mapAedRecord(record: AedRecord): EmergencyPointInput | null {
   const buildPlace = text(record.buildPlace);
   const name = org || buildPlace || "AED";
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -843,7 +851,7 @@ function mapSchoolRecord(record: SchoolRecord): EmergencyPointInput | null {
   const sourceRecordId = text(record.SCHOOL_ID);
   const name = text(record.SCHOOL_NM);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -870,7 +878,7 @@ function mapUniversityRecord(
   const sourceRecordId = text(record.학교코드변환) || text(record.학교코드);
   const name = text(record.학교명);
 
-  if (!sourceRecordId || !name) {
+  if (!(sourceRecordId && name)) {
     return null;
   }
 
@@ -1213,7 +1221,8 @@ async function importPoliceStations(
         status: "paused",
         totalCount: rows.length,
       });
-      throw new DatasetImportPausedError("police-stations", reason);
+      // biome-ignore lint/style/useErrorCause: DatasetImportPausedError forwards the cause through its constructor.
+      throw new DatasetImportPausedError("police-stations", reason, error);
     }
 
     if ((index + 1) % 25 === 0 || index + 1 === rows.length) {
@@ -1472,17 +1481,20 @@ export async function updateDataset(
 ) {
   const mode = options.mode ?? "restart";
   const report: DatasetProgressReporter = async (stage, percent, message) => {
+    let status: "completed" | "failed" | "running" = "running";
+
+    if (stage === "failed") {
+      status = "failed";
+    } else if (stage === "completed") {
+      status = "completed";
+    }
+
     await setDatasetUpdateProgress({
       message,
       percent,
       source,
       stage,
-      status:
-        stage === "failed"
-          ? "failed"
-          : stage === "completed"
-            ? "completed"
-            : "running",
+      status,
     });
   };
 

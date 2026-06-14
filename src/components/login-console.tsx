@@ -2,12 +2,13 @@
 
 import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./role-console.module.css";
 
 export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
   const router = useRouter();
+  const errorId = useId();
   const t = (key: string) => uiText(dictionary, key);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -78,7 +79,7 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
             {t("Password")}
             <input
               autoComplete="current-password"
-              aria-describedby={error ? "login-error" : undefined}
+              aria-describedby={error ? errorId : undefined}
               aria-invalid={Boolean(error)}
               name="password"
               onChange={(event) => setPassword(event.target.value)}
@@ -98,7 +99,7 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
             </button>
           </div>
           {error ? (
-            <p className={styles.error} id="login-error" role="alert">
+            <p className={styles.error} id={errorId} role="alert">
               {error}
             </p>
           ) : null}

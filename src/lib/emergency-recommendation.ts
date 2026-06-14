@@ -28,6 +28,34 @@ type ScoreCategory =
 
 type ScoreWeights = Record<ScoreCategory, number>;
 
+function emergencyBedRatios(
+  emergencyBeds: number | null,
+  fallbackBedRatio: number,
+) {
+  if (emergencyBeds === null) {
+    return { availabilityRatio: 0.45, bedRatio: fallbackBedRatio };
+  }
+
+  if (emergencyBeds > 0) {
+    return {
+      availabilityRatio: Math.min(1, 0.65 + emergencyBeds / 20),
+      bedRatio: 1,
+    };
+  }
+
+  return { availabilityRatio: 0.05, bedRatio: 0.1 };
+}
+
+function emergencyBedReason(emergencyBeds: number | null) {
+  if (emergencyBeds === null) {
+    return "응급실 병상 정보 미확인";
+  }
+
+  return emergencyBeds > 0
+    ? `응급실 가용병상 ${emergencyBeds}개`
+    : "응급실 가용병상 없음";
+}
+
 const WEIGHTS: Record<EmergencyScenario, ScoreWeights> = {
   general: {
     availability: 20,
@@ -347,18 +375,10 @@ export async function recommendEmergencyHospitals(params: {
         "realtimeBed.hvec",
         "hvec",
       ]);
-      const bedRatio =
-        emergencyBeds === null
-          ? termRatio(text, CAPABILITY_TERMS.bedType[params.scenario])
-          : emergencyBeds > 0
-            ? 1
-            : 0.1;
-      const availabilityRatio =
-        emergencyBeds === null
-          ? 0.45
-          : emergencyBeds > 0
-            ? Math.min(1, 0.65 + emergencyBeds / 20)
-            : 0.05;
+      const { availabilityRatio, bedRatio } = emergencyBedRatios(
+        emergencyBeds,
+        termRatio(text, CAPABILITY_TERMS.bedType[params.scenario]),
+      );
       const travelMinutes = durationSeconds / 60;
       const ratios: Record<ScoreCategory, number> = {
         availability: availabilityRatio,
@@ -396,11 +416,7 @@ export async function recommendEmergencyHospitals(params: {
         ) / 10;
       const reasons = [
         `${Math.max(1, Math.round(travelMinutes))}분 예상`,
-        emergencyBeds === null
-          ? "응급실 병상 정보 미확인"
-          : emergencyBeds > 0
-            ? `응급실 가용병상 ${emergencyBeds}개`
-            : "응급실 가용병상 없음",
+        emergencyBedReason(emergencyBeds),
         minimum.reason,
       ];
 

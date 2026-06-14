@@ -23,6 +23,26 @@ function numberParam(searchParams: URLSearchParams, name: string) {
   return Number.isFinite(value) ? value : Number.NaN;
 }
 
+async function loadPoints(
+  detail: string,
+  includeRaw: boolean,
+  options: Parameters<typeof listPoints>[0],
+) {
+  if (includeRaw) {
+    return listPoints(options);
+  }
+
+  if (detail === "summary") {
+    return listPointSummaries(options);
+  }
+
+  if (detail === "map") {
+    return listPointMarkers(options);
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const source = request.nextUrl.searchParams.get("source");
   const searchParams = request.nextUrl.searchParams;
@@ -110,13 +130,7 @@ export async function GET(request: NextRequest) {
     limit: limitParam ?? undefined,
     source: selectedSource,
   };
-  const points = includeRaw
-    ? await listPoints(options)
-    : detail === "summary"
-      ? await listPointSummaries(options)
-      : detail === "map"
-        ? await listPointMarkers(options)
-        : null;
+  const points = await loadPoints(detail, includeRaw, options);
 
   if (points === null) {
     return noStoreJson({ error: "Unknown detail level" }, { status: 400 });

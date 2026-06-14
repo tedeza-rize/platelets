@@ -828,7 +828,7 @@ function syncThreeDimensionalView(
 }
 
 function featureCollection(
-  features: Array<GeoJSON.Feature<GeoJSON.Geometry, FeatureProperties>>,
+  features: GeoJSON.Feature<GeoJSON.Geometry, FeatureProperties>[],
 ): GeoJsonData {
   return {
     features,
@@ -994,14 +994,14 @@ function routeData(
   recommendation: DispatchRecommendation | null,
   dispatchRoute: DispatchRoute | null,
 ) {
-  if (!incident || !recommendation) {
+  if (!(incident && recommendation)) {
     return EMPTY_FEATURE_COLLECTION;
   }
 
   return featureCollection([
     lineFeature(
       `route-${recommendation.station.id}-${incident.id}`,
-      dispatchRoute?.coordinates.length
+      dispatchRoute && dispatchRoute.coordinates.length > 0
         ? dispatchRoute.coordinates
         : [
             [recommendation.station.longitude, recommendation.station.latitude],
@@ -1245,16 +1245,17 @@ function buildBuildingPopupHtml(
       ? "샘플 안전 프로필"
       : (poiType ?? buildingType ?? "공개 지도 건물 데이터");
   const searchQuery = name ?? address ?? coordinateLabel;
-  const sectionText = safetyProfile?.section.length
-    ? safetyProfile.section
-        .map(
-          (level) =>
-            `${level.floor} ${level.use}${
-              level.riskNote ? `(${level.riskNote})` : ""
-            }`,
-        )
-        .join(" · ")
-    : null;
+  const sectionText =
+    safetyProfile && safetyProfile.section.length > 0
+      ? safetyProfile.section
+          .map(
+            (level) =>
+              `${level.floor} ${level.use}${
+                level.riskNote ? `(${level.riskNote})` : ""
+              }`,
+          )
+          .join(" · ")
+      : null;
   const evacuationRouteText = safetyProfile
     ? safetyProfile.floors
         .flatMap((floor) =>
@@ -1270,9 +1271,10 @@ function buildBuildingPopupHtml(
         .slice(0, 4)
         .join(" · ")
     : null;
-  const sourceNotesText = safetyProfile?.sourceNotes.length
-    ? safetyProfile.sourceNotes.join(" ")
-    : null;
+  const sourceNotesText =
+    safetyProfile && safetyProfile.sourceNotes.length > 0
+      ? safetyProfile.sourceNotes.join(" ")
+      : null;
   const sourceLabel = safetyProfile?.sourceUrl
     ? `<a href="${escapeHtml(
         safetyProfile.sourceUrl,
@@ -1316,7 +1318,7 @@ function buildBuildingPopupHtml(
               .map(
                 (floor) =>
                   `${floor.floor}: ${floor.keySpaces.join("/")}${
-                    floor.hazards.length
+                    floor.hazards.length > 0
                       ? `, 위험요소 ${floor.hazards.join("/")}`
                       : ""
                   }`,
@@ -1501,7 +1503,7 @@ function localDateTimeInputValue(date: Date) {
 
 function localDateTimeToIso(value: string) {
   if (!value) {
-    return undefined;
+    return;
   }
 
   const date = new Date(value);
@@ -1511,12 +1513,37 @@ function localDateTimeToIso(value: string) {
 
 type DashboardText = (key: string) => string;
 
+function buildingDataStatus(
+  safetyProfile: BuildingSafetyProfile | null,
+  text: DashboardText,
+) {
+  if (!safetyProfile) {
+    return text("dashboard.sheet.noSafetyProfile");
+  }
+
+  return safetyProfile.dataStatus === "sample"
+    ? text("dashboard.sheet.sampleData")
+    : text("dashboard.sheet.verifiedData");
+}
+
+function OperationalSourceIcon({ kind }: { kind: string }) {
+  if (kind === "ems-dispatch") {
+    return <Ambulance aria-hidden="true" size={16} />;
+  }
+
+  return kind === "rescue-dispatch" ? (
+    <Truck aria-hidden="true" size={16} />
+  ) : (
+    <AlertTriangle aria-hidden="true" size={16} />
+  );
+}
+
 function coordinateText(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
 
 function compactRows(
-  rows: Array<[string, string | null | undefined]>,
+  rows: [string, string | null | undefined][],
 ): MobileSheetRow[] {
   return rows
     .filter((row): row is [string, string] => Boolean(row[1]))
@@ -1634,11 +1661,7 @@ function buildingSheet(
       ],
       [
         text("dashboard.sheet.dataStatus"),
-        safetyProfile
-          ? safetyProfile.dataStatus === "sample"
-            ? text("dashboard.sheet.sampleData")
-            : text("dashboard.sheet.verifiedData")
-          : text("dashboard.sheet.noSafetyProfile"),
+        buildingDataStatus(safetyProfile, text),
       ],
       [
         text("dashboard.sheet.assemblyPoint"),
@@ -2065,6 +2088,8 @@ export function DisasterDashboard({
   const [view, setView] = useState<DashboardView>(initialView);
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
   const [activeIncident, setActiveIncident] = useState<Incident | null>(null);
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] =
+    useState(false);
   const [activeIncidentEvents, setActiveIncidentEvents] = useState<
     IncidentEvent[]
   >([]);
@@ -2204,7 +2229,7 @@ export function DisasterDashboard({
   }, []);
 
   useEffect(() => {
-    if (!activeIncident || !dispatchRecommendation) {
+    if (!(activeIncident && dispatchRecommendation)) {
       setDispatchRoute(null);
       setDispatchRouteStatus(null);
       setIsDispatchRouteLoading(false);
@@ -2237,7 +2262,7 @@ export function DisasterDashboard({
       .then(async (response) => {
         const payload = (await response.json()) as DispatchRouteResponse;
 
-        if (!response.ok || !payload.route) {
+        if (!(response.ok && payload.route)) {
           throw new Error(payload.error ?? "도로 경로 계산 실패");
         }
 
@@ -2357,10 +2382,12 @@ export function DisasterDashboard({
   }, [dashboardText]);
 
   useEffect(() => {
-    loadSnapshot();
+    void loadSnapshot();
   }, [loadSnapshot]);
 
-  useIncidentEvents(loadSnapshot);
+  useIncidentEvents(() => {
+    void loadSnapshot();
+  });
 
   useEffect(() => {
     setView(initialView);
@@ -2391,7 +2418,7 @@ export function DisasterDashboard({
       }
     }
 
-    loadIncidentEvents();
+    void loadIncidentEvents();
 
     return () => {
       disposed = true;
@@ -2403,7 +2430,7 @@ export function DisasterDashboard({
 
     const map = mapRef.current;
 
-    if (!map || !isMapReady) {
+    if (!(map && isMapReady)) {
       return;
     }
 
@@ -2415,7 +2442,7 @@ export function DisasterDashboard({
 
     const map = mapRef.current;
 
-    if (!map || !isMapReady) {
+    if (!(map && isMapReady)) {
       return;
     }
 
@@ -2427,7 +2454,7 @@ export function DisasterDashboard({
 
     const map = mapRef.current;
 
-    if (!map || !isMapReady) {
+    if (!(map && isMapReady)) {
       return;
     }
 
@@ -2446,7 +2473,7 @@ export function DisasterDashboard({
     const latitude = Number(form.latitude);
     const longitude = Number(form.longitude);
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (!(Number.isFinite(latitude) && Number.isFinite(longitude))) {
       return;
     }
 
@@ -2659,7 +2686,7 @@ export function DisasterDashboard({
         const incident = incidentsRef.current.find((item) => item.id === id);
 
         if (incident) {
-          loadRecommendations(incident);
+          void loadRecommendations(incident);
         }
       });
       map.on("click", RISK_AREA_LAYER_ID, (event: MapLayerMouseEvent) => {
@@ -2724,11 +2751,12 @@ export function DisasterDashboard({
           }
 
           if (
-            [INCIDENT_LAYER_ID, RISK_AREA_LAYER_ID].includes(feature.layer.id)
+            [INCIDENT_LAYER_ID, RISK_AREA_LAYER_ID].includes(
+              feature.layer.id,
+            ) &&
+            feature.layer.id === INCIDENT_LAYER_ID
           ) {
-            if (feature.layer.id === INCIDENT_LAYER_ID) {
-              return;
-            }
+            return;
           }
 
           if (
@@ -2846,7 +2874,7 @@ export function DisasterDashboard({
       }
     }
 
-    createMap();
+    void createMap();
 
     return () => {
       disposed = true;
@@ -2866,7 +2894,7 @@ export function DisasterDashboard({
   useEffect(() => {
     const map = mapRef.current;
 
-    if (!map || !isMapReady || !snapshot) {
+    if (!(map && isMapReady && snapshot)) {
       return;
     }
 
@@ -2933,6 +2961,10 @@ export function DisasterDashboard({
     };
   }, [snapshot]);
 
+  const bigData119Summaries = snapshot?.bigData119Summaries ?? [];
+  const bigData119OperationalSummaries =
+    snapshot?.bigData119OperationalSummaries ?? [];
+
   async function createIncident(event: React.FormEvent) {
     event.preventDefault();
     setNotice("사고 정보를 등록하고 추천을 계산하는 중입니다.");
@@ -2953,7 +2985,7 @@ export function DisasterDashboard({
         incident?: Incident;
       };
 
-      if (!response.ok || !payload.incident) {
+      if (!(response.ok && payload.incident)) {
         throw new Error(payload.error ?? "사고 등록에 실패했습니다.");
       }
 
@@ -2990,7 +3022,7 @@ export function DisasterDashboard({
         incident?: Incident;
       };
 
-      if (!response.ok || !payload.incident) {
+      if (!(response.ok && payload.incident)) {
         throw new Error(payload.error ?? "사고 상태 변경에 실패했습니다.");
       }
 
@@ -3019,7 +3051,7 @@ export function DisasterDashboard({
   async function saveIncidentEdit(event: React.FormEvent) {
     event.preventDefault();
 
-    if (!editIncidentId || !editIncidentForm) {
+    if (!(editIncidentId && editIncidentForm)) {
       return;
     }
 
@@ -3042,7 +3074,7 @@ export function DisasterDashboard({
       );
       const payload = (await response.json()) as IncidentDetailResponse;
 
-      if (!response.ok || !payload.incident) {
+      if (!(response.ok && payload.incident)) {
         throw new Error(payload.error ?? "사고 정보 수정에 실패했습니다.");
       }
 
@@ -3065,14 +3097,7 @@ export function DisasterDashboard({
       return;
     }
 
-    const confirmed = window.confirm(
-      `"${activeIncident.title}" 사고를 삭제할까요? 삭제한 사고는 목록과 지도에서 제거됩니다.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+    setIsDeleteConfirmationOpen(false);
     setIsIncidentDeleting(true);
     setNotice("사고를 삭제하는 중입니다.");
 
@@ -3086,7 +3111,7 @@ export function DisasterDashboard({
         error?: string;
       } | null;
 
-      if (!response.ok || !payload?.deleted) {
+      if (!(response.ok && payload?.deleted)) {
         throw new Error(payload?.error ?? "사고 삭제에 실패했습니다.");
       }
 
@@ -3353,7 +3378,7 @@ export function DisasterDashboard({
                   </div>
                 ))}
               </dl>
-              {mobileSheet.links?.length ? (
+              {mobileSheet.links && mobileSheet.links.length > 0 ? (
                 <div className={styles.mobileSheetActions}>
                   {mobileSheet.links.map((link) => (
                     <a
@@ -3416,16 +3441,16 @@ export function DisasterDashboard({
 
           {notice ? <output className={styles.notice}>{notice}</output> : null}
 
-          {snapshot?.bigData119Summaries.length ? (
+          {bigData119Summaries.length > 0 ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.kicker}>소방안전 빅데이터 활용</span>
                 <strong>
-                  플랫폼 CSV {snapshot.bigData119Summaries.length}종 지도 반영
+                  플랫폼 CSV {bigData119Summaries.length}종 지도 반영
                 </strong>
               </div>
               <div className={styles.dataSourceGrid}>
-                {snapshot.bigData119Summaries.map((source) => (
+                {bigData119Summaries.map((source) => (
                   <a
                     className={styles.dataSourceItem}
                     href={source.sourceUrl}
@@ -3454,17 +3479,16 @@ export function DisasterDashboard({
             </section>
           ) : null}
 
-          {snapshot?.bigData119OperationalSummaries.length ? (
+          {bigData119OperationalSummaries.length > 0 ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.kicker}>119 신고·출동 데이터</span>
                 <strong>
-                  운영 CSV {snapshot.bigData119OperationalSummaries.length}종
-                  위험도 반영
+                  운영 CSV {bigData119OperationalSummaries.length}종 위험도 반영
                 </strong>
               </div>
               <div className={styles.dataSourceGrid}>
-                {snapshot.bigData119OperationalSummaries.map((source) => (
+                {bigData119OperationalSummaries.map((source) => (
                   <a
                     className={styles.dataSourceItem}
                     href={source.sourceUrl}
@@ -3472,13 +3496,7 @@ export function DisasterDashboard({
                     rel="noreferrer"
                     target="_blank"
                   >
-                    {source.kind === "ems-dispatch" ? (
-                      <Ambulance aria-hidden="true" size={16} />
-                    ) : source.kind === "rescue-dispatch" ? (
-                      <Truck aria-hidden="true" size={16} />
-                    ) : (
-                      <AlertTriangle aria-hidden="true" size={16} />
-                    )}
+                    <OperationalSourceIcon kind={source.kind} />
                     <div>
                       <strong>{source.sourceLabel}</strong>
                       <span>
@@ -3499,7 +3517,7 @@ export function DisasterDashboard({
                             )}`
                           : ""}
                       </span>
-                      {source.areaLoads.length ? (
+                      {source.areaLoads.length > 0 ? (
                         <span>
                           위험권역 매칭:{" "}
                           {source.areaLoads
@@ -3551,7 +3569,7 @@ export function DisasterDashboard({
               </dl>
               <p className={styles.description}>{activeIncident.description}</p>
               <div className={styles.statusActions}>
-                {activeIncident.status !== "dispatched" ? (
+                {activeIncident.status === "dispatched" ? null : (
                   <button
                     className={styles.primaryButton}
                     disabled={isStatusUpdating || isIncidentDeleting}
@@ -3560,8 +3578,8 @@ export function DisasterDashboard({
                   >
                     출동 처리
                   </button>
-                ) : null}
-                {activeIncident.status !== "closed" ? (
+                )}
+                {activeIncident.status === "closed" ? null : (
                   <button
                     className={styles.dangerButton}
                     disabled={isStatusUpdating || isIncidentDeleting}
@@ -3570,8 +3588,8 @@ export function DisasterDashboard({
                   >
                     종료
                   </button>
-                ) : null}
-                {activeIncident.status !== "reported" ? (
+                )}
+                {activeIncident.status === "reported" ? null : (
                   <button
                     className={styles.secondaryButton}
                     disabled={isStatusUpdating || isIncidentDeleting}
@@ -3580,7 +3598,7 @@ export function DisasterDashboard({
                   >
                     접수로 되돌리기
                   </button>
-                ) : null}
+                )}
                 <button
                   className={styles.secondaryButton}
                   disabled={isIncidentSaving || isIncidentDeleting}
@@ -3589,14 +3607,35 @@ export function DisasterDashboard({
                 >
                   수정
                 </button>
-                <button
-                  className={styles.dangerButton}
-                  disabled={isIncidentDeleting}
-                  onClick={deleteActiveIncident}
-                  type="button"
-                >
-                  삭제
-                </button>
+                {isDeleteConfirmationOpen ? (
+                  <>
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={isIncidentDeleting}
+                      onClick={() => setIsDeleteConfirmationOpen(false)}
+                      type="button"
+                    >
+                      {dashboardText("Cancel")}
+                    </button>
+                    <button
+                      className={styles.dangerButton}
+                      disabled={isIncidentDeleting}
+                      onClick={deleteActiveIncident}
+                      type="button"
+                    >
+                      {dashboardText("Delete")}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className={styles.dangerButton}
+                    disabled={isIncidentDeleting}
+                    onClick={() => setIsDeleteConfirmationOpen(true)}
+                    type="button"
+                  >
+                    {dashboardText("Delete")}
+                  </button>
+                )}
               </div>
               {editIncidentId === activeIncident.id && editIncidentForm ? (
                 <form className={styles.form} onSubmit={saveIncidentEdit}>

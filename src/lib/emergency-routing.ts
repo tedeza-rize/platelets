@@ -45,7 +45,7 @@ const MAX_ASTAR_DISTANCE_METERS = 70_000;
 const graphCache = new Map<string, { expiresAt: number; graph: RoadGraph }>();
 
 class MinPriorityQueue {
-  private items: QueueItem[] = [];
+  private readonly items: QueueItem[] = [];
 
   get size() {
     return this.items.length;
@@ -92,8 +92,9 @@ class MinPriorityQueue {
 
   private bubbleDown(index: number) {
     let current = index;
+    let settled = false;
 
-    while (true) {
+    while (!settled) {
       const left = current * 2 + 1;
       const right = left + 1;
       let smallest = current;
@@ -113,7 +114,8 @@ class MinPriorityQueue {
       }
 
       if (smallest === current) {
-        break;
+        settled = true;
+        continue;
       }
 
       [this.items[current], this.items[smallest]] = [
@@ -150,8 +152,7 @@ export function haversineMeters(from: Coordinate, to: Coordinate) {
 
 function assertCoordinate(value: Coordinate) {
   if (
-    !Number.isFinite(value.latitude) ||
-    !Number.isFinite(value.longitude) ||
+    !(Number.isFinite(value.latitude) && Number.isFinite(value.longitude)) ||
     value.latitude < -90 ||
     value.latitude > 90 ||
     value.longitude < -180 ||
@@ -287,7 +288,7 @@ async function fetchRoadGraph(
       const previous = nodes.get(previousId);
       const current = nodes.get(currentId);
 
-      if (!previous || !current) {
+      if (!(previous && current)) {
         continue;
       }
 
@@ -330,11 +331,12 @@ function nearestNode(nodes: Map<number, Coordinate>, target: Coordinate) {
 }
 
 function reconstructPath(cameFrom: Map<number, number>, current: number) {
-  const path = [current];
+  let cursor = current;
+  const path = [cursor];
 
-  while (cameFrom.has(current)) {
-    current = cameFrom.get(current) as number;
-    path.push(current);
+  while (cameFrom.has(cursor)) {
+    cursor = cameFrom.get(cursor) as number;
+    path.push(cursor);
   }
 
   return path.reverse();

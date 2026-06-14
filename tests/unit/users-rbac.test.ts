@@ -19,6 +19,10 @@ const adminUsersRoute = await import("@/app/api/admin/users/route");
 const adminUserRoute = await import("@/app/api/admin/users/[id]/route");
 const incidentRoute = await import("@/app/api/disaster/incidents/[id]/route");
 
+test.after(async () => {
+  await pointsDb.closeDatabase();
+});
+
 const sudoPassword = "StrongSudoPass1!";
 const adminPassword = "StrongAdminPass1!";
 
@@ -288,6 +292,4 @@ test("incident events record the acting staff member", async () => {
 
   assert.equal(created?.actorName, "Field Worker");
   assert.equal(created?.actorRole, "field_worker");
-
-  await pointsDb.closeDatabase();
 });

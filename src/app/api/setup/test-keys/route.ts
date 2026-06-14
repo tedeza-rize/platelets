@@ -169,11 +169,11 @@ async function checkVworld(payload: Record<string, unknown>) {
       );
     }
 
-    const payload = (await response.json().catch(() => null)) as {
+    const responsePayload = (await response.json().catch(() => null)) as {
       response?: { status?: string };
     } | null;
 
-    return payload?.response?.status === "OK"
+    return responsePayload?.response?.status === "OK"
       ? passed("vworld", title)
       : failed("vworld", title, "Provider did not return an OK status.");
   } catch (error) {

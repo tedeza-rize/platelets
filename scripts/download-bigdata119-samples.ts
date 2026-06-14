@@ -94,7 +94,7 @@ const PRODUCTS: ProductConfig[] = [
   },
 ];
 
-const APPROXIMATE_COORDINATES: Array<[string, number, number]> = [
+const APPROXIMATE_COORDINATES: [string, number, number][] = [
   ["서울특별시 광진구 자양동", 37.5346, 127.0824],
   ["서울특별시 종로구 세종로", 37.5759, 126.9769],
   ["서울특별시 종로구 훈정동", 37.5732, 126.9942],
@@ -299,12 +299,12 @@ function approximateCoordinates(record: CsvRecord, index: number) {
 function enrichRecords(
   records: CsvRecord[],
   product: ProductConfig,
-  downloadedAt: string,
+  fetchedAt: string,
 ) {
   return records.map((record, index) => {
     const enriched: CsvRecord = {
       ...record,
-      _platelets_sample_downloaded_at: downloadedAt,
+      _platelets_sample_downloaded_at: fetchedAt,
       _platelets_source: "소방안전 빅데이터 플랫폼 샘플 데이터",
       _platelets_source_url: product.sourceUrl,
     };
@@ -380,7 +380,7 @@ async function downloadSampleXlsx(goodsId: string, goodsName: string) {
 
 async function downloadProduct(
   product: ProductConfig,
-  downloadedAt: string,
+  fetchedAt: string,
 ): Promise<ProductManifest["products"][number]> {
   const info = await postCallService<{
     filedataList?: Array<{
@@ -399,7 +399,7 @@ async function downloadProduct(
   const goodsId = text(info.goodsInfo?.goods_id);
   const goodsName = text(info.goodsInfo?.goods_nm);
 
-  if (!goodsId || !goodsName) {
+  if (!(goodsId && goodsName)) {
     throw new Error(`Missing goods info for ${product.goodsManagementSerial}`);
   }
 
@@ -407,7 +407,7 @@ async function downloadProduct(
   const records = enrichRecords(
     recordsFromWorksheet(sample.buffer),
     product,
-    downloadedAt,
+    fetchedAt,
   );
   const outputPath = path.join(DATA_DIR, product.outputFileName);
 
@@ -434,7 +434,7 @@ async function downloadProduct(
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const downloadedAt = new Date().toISOString();
-const products = [];
+const products: ProductManifest["products"] = [];
 
 for (const product of PRODUCTS) {
   const result = await downloadProduct(product, downloadedAt);

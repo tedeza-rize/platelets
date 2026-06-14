@@ -1862,7 +1862,7 @@ export function syncSeoulAreaLayer(
   areas: SeoulAreasData | null,
   dictionary: AppDictionary,
 ) {
-  if (!areas || !map.isStyleLoaded()) {
+  if (!(areas && map.isStyleLoaded())) {
     return;
   }
 

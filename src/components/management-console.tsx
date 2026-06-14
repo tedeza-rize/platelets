@@ -17,7 +17,7 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import type { OperationalSettings } from "@/lib/operational-settings";
@@ -240,6 +240,7 @@ export function ManagementConsole({
   dictionary,
   mode,
 }: ManagementConsoleProps) {
+  const progressTitleId = useId();
   const t = useCallback(
     (key: string, values?: Record<string, string | number>) =>
       uiText(dictionary, key, values),
@@ -408,10 +409,12 @@ export function ManagementConsole({
     ]);
 
     if (
-      !datasetsResponse.ok ||
-      !timeResponse.ok ||
-      !schedulesResponse.ok ||
-      !operationalSettingsResponse.ok
+      !(
+        datasetsResponse.ok &&
+        timeResponse.ok &&
+        schedulesResponse.ok &&
+        operationalSettingsResponse.ok
+      )
     ) {
       throw new Error(t("관리 데이터를 불러오지 못했습니다."));
     }
@@ -448,10 +451,12 @@ export function ManagementConsole({
       ]);
 
     if (
-      !quotaResponse.ok ||
-      !kmaQuotaResponse.ok ||
-      !logsResponse.ok ||
-      !cooldownsResponse.ok
+      !(
+        quotaResponse.ok &&
+        kmaQuotaResponse.ok &&
+        logsResponse.ok &&
+        cooldownsResponse.ok
+      )
     ) {
       throw new Error(t("개발자 권한 데이터를 불러오지 못했습니다."));
     }
@@ -464,10 +469,10 @@ export function ManagementConsole({
 
   async function requestDatasetUpdate(
     source: DatasetSourceId,
-    mode: "restart" | "resume",
+    importMode: "restart" | "resume",
   ) {
     const response = await fetch(`/api/datasets/${source}/update`, {
-      body: JSON.stringify({ mode }),
+      body: JSON.stringify({ mode: importMode }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
@@ -592,7 +597,7 @@ export function ManagementConsole({
         settings?: OperationalSettings;
       } | null;
 
-      if (!response.ok || !payload?.settings) {
+      if (!(response.ok && payload?.settings)) {
         throw new Error(payload?.error ?? t("운영 설정 저장 실패"));
       }
 
@@ -703,7 +708,7 @@ export function ManagementConsole({
   }, [refresh]);
 
   useEffect(() => {
-    if (!activeUpdate && !progress) {
+    if (!(activeUpdate || progress)) {
       return;
     }
 
@@ -1409,13 +1414,13 @@ export function ManagementConsole({
       {visibleProgress ? (
         <div className={styles.progressBackdrop} role="presentation">
           <section
-            aria-labelledby="progress-title"
+            aria-labelledby={progressTitleId}
             aria-modal="true"
             className={styles.progressModal}
             role="dialog"
           >
             <div className={styles.progressHeader}>
-              <h2 id="progress-title">{visibleProgress.title}</h2>
+              <h2 id={progressTitleId}>{visibleProgress.title}</h2>
               <span>{visibleProgress.percent}%</span>
             </div>
             <div

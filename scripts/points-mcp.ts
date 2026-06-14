@@ -134,11 +134,7 @@ const POINT_COLUMNS = `
 `;
 const projectRoot = process.cwd();
 const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
-const dataDirectory = configuredDataDirectory
-  ? path.isAbsolute(configuredDataDirectory)
-    ? configuredDataDirectory
-    : path.join(projectRoot, configuredDataDirectory)
-  : path.join(projectRoot, "data");
+const dataDirectory = resolveDataDirectory(configuredDataDirectory);
 const databasePath = path.join(dataDirectory, "points.sqlite");
 const forecastDocPath = path.join(
   projectRoot,
@@ -147,6 +143,24 @@ const forecastDocPath = path.join(
 );
 
 type SqliteDatabase = Database.Database;
+
+function resolveDataDirectory(configuredDirectory: string | undefined) {
+  if (!configuredDirectory) {
+    return path.join(projectRoot, "data");
+  }
+
+  return path.isAbsolute(configuredDirectory)
+    ? configuredDirectory
+    : path.join(projectRoot, configuredDirectory);
+}
+
+function emergencyBedAvailability(emergencyBeds: number | null) {
+  if (emergencyBeds === null) {
+    return 0.45;
+  }
+
+  return emergencyBeds > 0 ? 1 : 0.05;
+}
 
 type PointRow = {
   address: string;
@@ -294,6 +308,34 @@ type KakaoDirectionError = {
 };
 
 type KakaoDirectionResult = KakaoDirectionError | KakaoDirectionSummary | null;
+
+type EmergencyHospitalRecommendation = {
+  address: string;
+  category: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  emergencyBeds: number | null;
+  id: number;
+  name: string;
+  phone: string | null;
+  route: KakaoDirectionResult;
+  score: number;
+  scoreBasis: string;
+  scenarioMinimum: string;
+  sourceUpdatedAt: string | null;
+};
+
+type VworldSearchResult = Coordinate & {
+  matchedAddress: string | null;
+  query: string;
+  source: string;
+  title: string | null;
+};
+
+type RankedResponsePoint = NearestPoint & {
+  route: KakaoDirectionResult;
+  scoreBasis: "kakao-route-duration" | "straight-line-distance";
+};
 
 type ToolResult = {
   content: Array<{
@@ -887,20 +929,20 @@ async function recommendEmergencyHospitalsForMcp(options: {
     limit: Math.max((options.limit ?? 8) * 3, 12),
     radiusMeters: options.radiusMeters,
   });
-  const results = [];
+  const results: EmergencyHospitalRecommendation[] = [];
 
   for (const candidate of candidates.slice(0, 12)) {
     const route =
-      options.useDirections !== false
-        ? await kakaoDirectionSummary(
+      options.useDirections === false
+        ? null
+        : await kakaoDirectionSummary(
             origin,
             {
               latitude: candidate.latitude,
               longitude: candidate.longitude,
             },
             "TIME",
-          )
-        : null;
+          );
     const durationSeconds = isKakaoDirectionSummary(route)
       ? route.durationSeconds
       : Math.round((candidate.distanceMeters * 1.25) / 11.1);
@@ -909,8 +951,7 @@ async function recommendEmergencyHospitalsForMcp(options: {
       rawSearchText(candidate.raw),
       EMERGENCY_SCENARIO_TERMS[options.scenario],
     );
-    const availability =
-      emergencyBeds === null ? 0.45 : emergencyBeds > 0 ? 1 : 0.05;
+    const availability = emergencyBedAvailability(emergencyBeds);
     const minimum = passesEmergencyScenarioMinimum({
       availability,
       candidate,
@@ -1181,7 +1222,7 @@ async function vworldSearchLocations(params: {
             type: "district",
           },
         ];
-  const results = [];
+  const results: VworldSearchResult[] = [];
   const seen = new Set<string>();
 
   for (const request of requests) {
@@ -1345,7 +1386,7 @@ async function kakaoDirectionSummary(
   const payload = (await response.json()) as KakaoDirectionsResponse;
   const route = payload.routes?.[0];
 
-  if (!route || route.result_code !== 0) {
+  if (route?.result_code !== 0) {
     return {
       error: route?.result_msg ?? "Kakao directions returned no route",
       resultCode: route?.result_code ?? null,
@@ -1752,7 +1793,7 @@ server.registerTool(
       radiusMeters: args.radiusMeters,
       source: args.source,
     });
-    const ranked = [];
+    const ranked: RankedResponsePoint[] = [];
 
     for (const point of nearest.slice(0, 10)) {
       const route =

@@ -98,13 +98,7 @@ function routeBounds(origin: Coordinate, destination: Coordinate) {
   };
 }
 
-function congestionLevel(
-  averageSpeedKph: number | null,
-): TrafficCongestionLevel {
-  if (averageSpeedKph === null) {
-    return "unknown";
-  }
-
+function congestionLevel(averageSpeedKph: number): TrafficCongestionLevel {
   if (averageSpeedKph < 22) {
     return "congested";
   }
@@ -247,7 +241,7 @@ export async function fetchItsTrafficSummary(params: {
       durationMultiplier: Number(durationMultiplier.toFixed(2)),
       message: `ITS 교통소통정보 ${sampleCount}개 구간 평균 ${averageSpeedKph.toFixed(
         1,
-      )}km/h${frequentRoads.length ? ` (${frequentRoads.join(", ")})` : ""}`,
+      )}km/h${frequentRoads.length > 0 ? ` (${frequentRoads.join(", ")})` : ""}`,
       provider: "its",
       sampleCount,
       status: "live",
