@@ -1,5 +1,7 @@
+import { getRequestAccessSession } from "@/lib/access-control";
 import { incidentService } from "@/lib/disaster-response/incident-service";
 import type {
+  IncidentActor,
   IncidentStatus,
   IncidentType,
   RiskLevel,
@@ -58,6 +60,14 @@ function updateInput(payload: Record<string, unknown>): UpdateIncidentInput {
     title: typeof payload.title === "string" ? payload.title : undefined,
     type: incidentType(payload.type),
   };
+}
+
+async function requestActor(request: Request): Promise<IncidentActor | null> {
+  const session = await getRequestAccessSession(request);
+
+  return session
+    ? { id: session.userId, name: session.name, role: session.role }
+    : null;
 }
 
 export async function GET(
@@ -122,12 +132,13 @@ export async function PATCH(
   }
 
   try {
+    const actor = await requestActor(request);
     let incident = shouldUpdateIncident
-      ? await incidentService.updateIncident(id, updateInput(payload))
+      ? await incidentService.updateIncident(id, updateInput(payload), actor)
       : await incidentService.getIncident(id);
 
     if (incident && status && incident.status !== status) {
-      incident = await incidentService.updateIncidentStatus(id, status);
+      incident = await incidentService.updateIncidentStatus(id, status, actor);
     }
 
     if (!incident) {
@@ -161,7 +172,10 @@ export async function DELETE(
   if (limited) return limited;
 
   const { id } = await context.params;
-  const deleted = await incidentService.deleteIncident(id);
+  const deleted = await incidentService.deleteIncident(
+    id,
+    await requestActor(request),
+  );
 
   if (!deleted) {
     return noStoreJson(

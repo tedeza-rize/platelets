@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { INITIAL_INCIDENTS } from "@/lib/disaster-response/mock-data";
 import type {
   Incident,
+  IncidentActor,
   IncidentEvent,
   IncidentEventType,
   IncidentStatus,
@@ -32,6 +33,9 @@ type IncidentRow = {
 };
 
 type IncidentEventRow = {
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_role: string | null;
   created_at: string;
   from_status: string | null;
   id: string;
@@ -46,18 +50,23 @@ type MaxIncidentIdRow = {
 };
 
 export type IncidentRepository = {
-  createIncident(incident: Omit<Incident, "id">): Promise<Incident>;
-  deleteIncident(id: string): Promise<boolean>;
+  createIncident(
+    incident: Omit<Incident, "id">,
+    actor?: IncidentActor | null,
+  ): Promise<Incident>;
+  deleteIncident(id: string, actor?: IncidentActor | null): Promise<boolean>;
   getIncident(id: string): Promise<Incident | null>;
   listIncidentEvents(id: string): Promise<IncidentEvent[]>;
   listIncidents(): Promise<Incident[]>;
   updateIncident(
     id: string,
     incident: Omit<Incident, "createdAt" | "id" | "status">,
+    actor?: IncidentActor | null,
   ): Promise<Incident | null>;
   updateIncidentStatus(
     id: string,
     status: IncidentStatus,
+    actor?: IncidentActor | null,
   ): Promise<Incident | null>;
 };
 
@@ -111,6 +120,9 @@ function mapIncidentRow(row: IncidentRow): Incident {
 
 function mapIncidentEventRow(row: IncidentEventRow): IncidentEvent {
   return {
+    actorId: row.actor_id,
+    actorName: row.actor_name,
+    actorRole: row.actor_role,
     createdAt: row.created_at,
     fromStatus: row.from_status ? asIncidentStatus(row.from_status) : null,
     id: row.id,
@@ -157,7 +169,9 @@ async function insertIncident(db: SqliteDatabase, incident: Incident) {
 
 async function insertIncidentEvent(
   db: SqliteDatabase,
-  event: Omit<IncidentEvent, "id">,
+  event: Omit<IncidentEvent, "actorId" | "actorName" | "actorRole" | "id"> & {
+    actor?: IncidentActor | null;
+  },
 ) {
   await run(
     db,
@@ -168,8 +182,11 @@ async function insertIncidentEvent(
       message,
       from_status,
       to_status,
+      actor_id,
+      actor_name,
+      actor_role,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       `evt-${randomUUID()}`,
       event.incidentId,
@@ -177,9 +194,30 @@ async function insertIncidentEvent(
       event.message,
       event.fromStatus,
       event.toStatus,
+      event.actor?.id ?? null,
+      event.actor?.name ?? null,
+      event.actor?.role ?? null,
       event.createdAt,
     ],
   );
+}
+
+async function addIncidentEventColumnIfMissing(
+  db: SqliteDatabase,
+  name: string,
+  definition: string,
+) {
+  const columns = await all<{ name: string }>(
+    db,
+    "PRAGMA table_info(disaster_incident_events)",
+  );
+
+  if (!columns.some((column) => column.name === name)) {
+    await run(
+      db,
+      `ALTER TABLE disaster_incident_events ADD COLUMN ${definition}`,
+    );
+  }
 }
 
 async function seedInitialIncidents(db: SqliteDatabase) {
@@ -252,9 +290,15 @@ async function initializeDatabase(db: SqliteDatabase) {
       message TEXT NOT NULL,
       from_status TEXT,
       to_status TEXT,
+      actor_id TEXT,
+      actor_name TEXT,
+      actor_role TEXT,
       created_at TEXT NOT NULL
     )`,
   );
+  await addIncidentEventColumnIfMissing(db, "actor_id", "actor_id TEXT");
+  await addIncidentEventColumnIfMissing(db, "actor_name", "actor_name TEXT");
+  await addIncidentEventColumnIfMissing(db, "actor_role", "actor_role TEXT");
   await run(
     db,
     "CREATE INDEX IF NOT EXISTS disaster_incidents_occurred_idx ON disaster_incidents(occurred_at DESC)",
@@ -331,7 +375,10 @@ export class SqliteIncidentRepository implements IncidentRepository {
     return rows.map(mapIncidentEventRow);
   }
 
-  async createIncident(input: Omit<Incident, "id">) {
+  async createIncident(
+    input: Omit<Incident, "id">,
+    actor?: IncidentActor | null,
+  ) {
     return withIncidentWriteTransaction(async (db) => {
       const row = await get<MaxIncidentIdRow>(
         db,
@@ -351,6 +398,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
 
       await insertIncident(db, incident);
       await insertIncidentEvent(db, {
+        actor,
         createdAt: incident.createdAt,
         fromStatus: null,
         incidentId: incident.id,
@@ -366,6 +414,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
   async updateIncident(
     id: string,
     input: Omit<Incident, "createdAt" | "id" | "status">,
+    actor?: IncidentActor | null,
   ) {
     const now = new Date().toISOString();
 
@@ -407,6 +456,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
         ],
       );
       await insertIncidentEvent(db, {
+        actor,
         createdAt: now,
         fromStatus: null,
         incidentId: id,
@@ -425,7 +475,11 @@ export class SqliteIncidentRepository implements IncidentRepository {
     });
   }
 
-  async updateIncidentStatus(id: string, status: IncidentStatus) {
+  async updateIncidentStatus(
+    id: string,
+    status: IncidentStatus,
+    actor?: IncidentActor | null,
+  ) {
     const now = new Date().toISOString();
 
     return withIncidentWriteTransaction(async (db) => {
@@ -447,6 +501,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
         [status, now, id],
       );
       await insertIncidentEvent(db, {
+        actor,
         createdAt: now,
         fromStatus: asIncidentStatus(current.status),
         incidentId: id,
@@ -465,7 +520,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
     });
   }
 
-  async deleteIncident(id: string) {
+  async deleteIncident(id: string, actor?: IncidentActor | null) {
     const now = new Date().toISOString();
 
     return withIncidentWriteTransaction(async (db) => {
@@ -481,6 +536,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
 
       await run(db, "DELETE FROM disaster_incidents WHERE id = ?", [id]);
       await insertIncidentEvent(db, {
+        actor,
         createdAt: now,
         fromStatus: asIncidentStatus(current.status),
         incidentId: id,

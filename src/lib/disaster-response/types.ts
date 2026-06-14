@@ -24,6 +24,9 @@ export type Incident = Coordinate & {
 };
 
 export type IncidentEvent = {
+  actorId: string | null;
+  actorName: string | null;
+  actorRole: string | null;
   createdAt: string;
   fromStatus: IncidentStatus | null;
   id: string;
@@ -31,6 +34,12 @@ export type IncidentEvent = {
   message: string;
   toStatus: IncidentStatus | null;
   type: IncidentEventType;
+};
+
+export type IncidentActor = {
+  id: string | null;
+  name: string;
+  role: string;
 };
 
 export type FireStation = Coordinate & {

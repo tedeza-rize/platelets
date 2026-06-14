@@ -1,29 +1,22 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { LazyDisasterDashboard } from "@/components/lazy-disaster-dashboard";
-import { getDisasterDashboardConfig } from "@/lib/disaster-dashboard-config";
+import { LoginConsole } from "@/components/login-console";
 import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { homePathForRole } from "@/lib/role-routing";
 import { getCurrentAccessSession } from "@/lib/server-session";
 import { requireSetupComplete } from "@/lib/setup-redirect";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function LoginPage() {
   await requireSetupComplete();
   const session = await getCurrentAccessSession();
-  if (session?.role === "field_worker") redirect("/field");
+  if (session) redirect(homePathForRole(session.role));
 
   const headerList = await headers();
-  const dashboardConfig = await getDisasterDashboardConfig();
   const dictionary = getDictionary(
     resolveLocale(headerList.get("accept-language")),
   );
 
-  return (
-    <LazyDisasterDashboard
-      dictionary={dictionary}
-      initialView="dashboard"
-      {...dashboardConfig}
-    />
-  );
+  return <LoginConsole dictionary={dictionary} />;
 }

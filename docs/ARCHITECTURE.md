@@ -197,6 +197,22 @@ default is the Responses API with configurable model, reasoning effort,
 verbosity, system prompt, and HTTPS OpenAI-compatible base URL. Chat Completions
 mode supports providers that have not implemented Responses.
 
+## Staff Accounts And Role Routing
+
+Setup still creates the bootstrap `sudo` administrator and `admin` operator
+accounts, and now mirrors them into the SQLite `users` table. Additional staff
+accounts are managed from `/admin/users` with one-way PBKDF2 password hashes,
+unique usernames, contact metadata, department, and a role of `admin`,
+`dispatcher`, or `field_worker`.
+
+`/login` creates the same HTTP-only session cookie used by the admin consoles,
+but the session now includes the user's id, display name, and role. Login sends
+field workers to `/field`, dispatchers to `/dashboard`, and administrators to
+`/admin/users`. Route handlers remain the authorization boundary for mutations;
+new staff-management APIs require `admin` or `sudo`, and incident mutations add
+the active session's display name and role to `disaster_incident_events` for
+audit history.
+
 Grounding contains dataset counts, recent hazard summaries, bounded text
 matches, and optional nearby facilities. It excludes raw records and API keys.
 Requests set `store: false`.

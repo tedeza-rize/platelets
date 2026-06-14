@@ -1,8 +1,10 @@
 import { after } from "next/server";
+import { getRequestAccessSession } from "@/lib/access-control";
 import { dispatchIncidentAlerts } from "@/lib/disaster-response/incident-alerts";
 import { incidentService } from "@/lib/disaster-response/incident-service";
 import type {
   CreateIncidentInput,
+  IncidentActor,
   IncidentType,
   RiskLevel,
 } from "@/lib/disaster-response/types";
@@ -25,6 +27,14 @@ function riskLevel(value: unknown): RiskLevel {
   return value === "low" || value === "medium" || value === "high"
     ? value
     : "medium";
+}
+
+async function requestActor(request: Request): Promise<IncidentActor | null> {
+  const session = await getRequestAccessSession(request);
+
+  return session
+    ? { id: session.userId, name: session.name, role: session.role }
+    : null;
 }
 
 export async function GET() {
@@ -64,7 +74,10 @@ export async function POST(request: Request) {
       title: typeof payload.title === "string" ? payload.title : undefined,
       type: incidentType(payload.type),
     };
-    const incident = await incidentService.createIncident(input);
+    const incident = await incidentService.createIncident(
+      input,
+      await requestActor(request),
+    );
     after(() => dispatchIncidentAlerts(incident));
 
     return noStoreJson({ incident }, { status: 201 });
