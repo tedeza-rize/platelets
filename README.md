@@ -42,6 +42,7 @@ PLATELETS_SUDO_TOKEN=
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
 PLATELETS_DATA_DIR=data
+PLATELETS_SQLITE_WRITE_MODE=single-process
 PLATELETS_SECRET_KEY=
 PLATELETS_INCIDENT_WEBHOOK_URLS=
 WEB_PUSH_VAPID_PUBLIC_KEY=
@@ -59,6 +60,11 @@ credentials and encrypted API key configuration in SQLite, then sends the
 operator to the integrated disaster dashboard. `PLATELETS_DATA_DIR` can point
 deployments or tests at a different data directory. `PLATELETS_SECRET_KEY`
 overrides the local encryption key file used to protect stored setup secrets.
+SQLite writes are supported only when one persistent Node.js process owns the
+database file. Serverless or multi-instance signals disable writes unless
+`PLATELETS_SQLITE_WRITE_MODE=single-process` is set explicitly for a verified
+single-process deployment. Use an external database architecture before running
+multiple writable app instances.
 
 High-risk incident creation can notify browser subscribers and up to five
 HTTPS webhook destinations. Generate one VAPID key pair for the deployment and

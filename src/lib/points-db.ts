@@ -6,6 +6,7 @@ import {
   getDatabase,
   getDatabaseFilePath,
   getDataDirectoryPath,
+  getSqliteWriteSafetyStatus,
   withDatabaseWriteTransaction,
 } from "@/lib/points-db-modules/connection";
 import {
@@ -31,6 +32,7 @@ export {
   getDatabase,
   getDatabaseFilePath,
   getDataDirectoryPath,
+  getSqliteWriteSafetyStatus,
   withDatabaseWriteTransaction,
   findNearestEmergencyInstitutions,
   findNearestPoints,

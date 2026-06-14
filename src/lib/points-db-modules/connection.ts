@@ -21,6 +21,97 @@ const databasePath = path.join(dataDirectory, "points.sqlite");
 let databasePromise: Promise<SqliteDatabase> | null = null;
 let writeTransactionQueue: Promise<void> = Promise.resolve();
 
+export type SqliteWriteSafetyStatus = {
+  deploymentSignals: string[];
+  mode: "blocked" | "single-process";
+  reason: string | null;
+  writesAllowed: boolean;
+};
+
+const SERVERLESS_DEPLOYMENT_SIGNALS = [
+  "AWS_EXECUTION_ENV",
+  "AWS_LAMBDA_FUNCTION_NAME",
+  "FUNCTIONS_WORKER_RUNTIME",
+  "K_SERVICE",
+  "LAMBDA_TASK_ROOT",
+  "VERCEL",
+  "WEBSITE_INSTANCE_ID",
+] as const;
+
+function clean(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+function detectedDeploymentSignals() {
+  return SERVERLESS_DEPLOYMENT_SIGNALS.filter((name) =>
+    Boolean(process.env[name]?.trim()),
+  );
+}
+
+function explicitWriteMode() {
+  const mode = clean(process.env.PLATELETS_SQLITE_WRITE_MODE);
+
+  if (
+    mode === "single-process" ||
+    mode === "single-writer" ||
+    mode === "local"
+  ) {
+    return "single-process";
+  }
+
+  if (
+    mode === "blocked" ||
+    mode === "multi-instance" ||
+    mode === "read-only" ||
+    mode === "readonly" ||
+    mode === "serverless"
+  ) {
+    return "blocked";
+  }
+
+  return null;
+}
+
+export function getSqliteWriteSafetyStatus(): SqliteWriteSafetyStatus {
+  const mode = explicitWriteMode();
+  const deploymentSignals = detectedDeploymentSignals();
+
+  if (mode === "single-process") {
+    return {
+      deploymentSignals,
+      mode,
+      reason: null,
+      writesAllowed: true,
+    };
+  }
+
+  if (mode === "blocked") {
+    return {
+      deploymentSignals,
+      mode,
+      reason: "PLATELETS_SQLITE_WRITE_MODE disables SQLite writes.",
+      writesAllowed: false,
+    };
+  }
+
+  if (deploymentSignals.length > 0) {
+    return {
+      deploymentSignals,
+      mode: "blocked",
+      reason:
+        "Serverless or multi-instance deployment signals were detected. SQLite writes require one persistent application process.",
+      writesAllowed: false,
+    };
+  }
+
+  return {
+    deploymentSignals,
+    mode: "single-process",
+    reason: null,
+    writesAllowed: true,
+  };
+}
+
 const DATABASE_SCHEMA = `
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS points (
@@ -219,6 +310,20 @@ export async function closeDatabase() {
 export async function withDatabaseWriteTransaction<T>(
   operation: (db: SqliteDatabase) => Promise<T>,
 ) {
+  const safety = getSqliteWriteSafetyStatus();
+
+  if (!safety.writesAllowed) {
+    throw new Error(
+      [
+        "SQLite writes are disabled for this deployment.",
+        safety.reason,
+        "Set PLATELETS_SQLITE_WRITE_MODE=single-process only when exactly one persistent server process owns the database file, or migrate writes to an external database.",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    );
+  }
+
   const previousTransaction = writeTransactionQueue;
   let releaseTransaction = () => {};
   writeTransactionQueue = new Promise<void>((resolve) => {
