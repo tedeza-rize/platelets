@@ -112,6 +112,8 @@ const koUi = {
   "AI 분석으로 돌아가기": "AI 분석으로 돌아가기",
   "AI에게 질문": "AI에게 질문",
   "API 방식": "API 방식",
+  "LLM provider preset": "LLM 제공자 프리셋",
+  "Custom URL": "직접 입력",
   "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.":
     "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.",
   "Chat Completions 호환": "Chat Completions 호환",
@@ -460,6 +462,8 @@ const enUi = {
   "AI 분석으로 돌아가기": "Back to AI analysis",
   "AI에게 질문": "Ask AI",
   "API 방식": "API mode",
+  "LLM provider preset": "LLM provider preset",
+  "Custom URL": "Custom URL",
   "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.":
     "Keep API keys in environment variables; only request mode and prompts are saved here.",
   "Chat Completions 호환": "Chat Completions compatible",
