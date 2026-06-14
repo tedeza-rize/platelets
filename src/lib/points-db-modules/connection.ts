@@ -190,6 +190,20 @@ const DATABASE_SCHEMA = `
     last_used_at TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    password_iterations INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    department TEXT NOT NULL,
+    role TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
   CREATE TABLE IF NOT EXISTS incident_push_subscriptions (
     endpoint TEXT PRIMARY KEY,
     subscription_json TEXT NOT NULL,
@@ -254,6 +268,7 @@ const DATABASE_SCHEMA = `
   CREATE INDEX IF NOT EXISTS points_coordinates_idx ON points(latitude, longitude);
   CREATE INDEX IF NOT EXISTS api_logs_event_idx ON api_logs(event_at DESC);
   CREATE INDEX IF NOT EXISTS api_logs_category_idx ON api_logs(category, event_at DESC);
+  CREATE INDEX IF NOT EXISTS users_role_idx ON users(role, username);
   CREATE INDEX IF NOT EXISTS hazard_events_event_idx ON hazard_events(event_type, issued_at DESC);
   CREATE INDEX IF NOT EXISTS hazard_events_coordinates_idx ON hazard_events(latitude, longitude);
   CREATE INDEX IF NOT EXISTS assembly_protests_date_idx ON assembly_protests(date, agency);
