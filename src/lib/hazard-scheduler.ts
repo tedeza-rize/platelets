@@ -38,7 +38,9 @@ export function startHazardEventScheduler() {
     state.isRunning = true;
 
     try {
-      if (!databaseFileExists() || !(await isSetupCompleteFromDatabaseFile())) {
+      if (
+        !(databaseFileExists() && (await isSetupCompleteFromDatabaseFile()))
+      ) {
         return;
       }
 

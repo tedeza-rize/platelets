@@ -266,7 +266,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
         error?: string;
         settings?: AiSettings;
       };
-      if (!response.ok || !payload.settings) {
+      if (!(response.ok && payload.settings)) {
         throw new Error(payload.error ?? t("AI 설정을 불러오지 못했습니다."));
       }
       setSettings(payload.settings);
@@ -298,7 +298,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
         error?: string;
         settings?: AiSettings;
       };
-      if (!response.ok || !payload.settings) {
+      if (!(response.ok && payload.settings)) {
         throw new Error(payload.error ?? t("AI 설정을 저장하지 못했습니다."));
       }
       setSettings(payload.settings);

@@ -65,7 +65,7 @@ self.addEventListener("push", (event) => {
     return;
   }
 
-  if (!payload?.title || !payload?.body) return;
+  if (!(payload?.title && payload?.body)) return;
 
   event.waitUntil(
     self.registration.showNotification(payload.title, {
@@ -145,11 +145,13 @@ self.addEventListener("notificationclick", (event) => {
   const targetUrl = event.notification.data?.url || "/incidents";
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window" }).then((clients) => {
-      const existing = clients.find((client) => "focus" in client);
-      return existing
-        ? existing.navigate(targetUrl).then((client) => client?.focus())
-        : self.clients.openWindow(targetUrl);
-    }),
+    (async () => {
+      const clients = await self.clients.matchAll({ type: "window" });
+      const existing = clients.find((windowClient) => "focus" in windowClient);
+      const focusedClient = existing
+        ? await existing.navigate(targetUrl)
+        : await self.clients.openWindow(targetUrl);
+      await focusedClient?.focus();
+    })(),
   );
 });

@@ -30,6 +30,44 @@ async function deleteServerSubscription(endpoint: string) {
   });
 }
 
+function initialNotificationState(existing: PushSubscription | null) {
+  if (Notification.permission === "denied") {
+    return "blocked";
+  }
+
+  return existing ? "enabled" : "disabled";
+}
+
+function notificationLabel(
+  state: NotificationState,
+  text: (key: string) => string,
+) {
+  const labels: Record<NotificationState, string> = {
+    blocked: text("notification.control.blocked"),
+    disabled: text("notification.control.enable"),
+    enabled: text("notification.control.disable"),
+    failed: text("notification.control.failed"),
+    loading: text("notification.control.loading"),
+    unsupported: text("notification.control.unsupported"),
+  };
+
+  return labels[state];
+}
+
+function NotificationIcon({ state }: { state: NotificationState }) {
+  if (state === "loading") {
+    return (
+      <LoaderCircle aria-hidden="true" className={styles.spinner} size={17} />
+    );
+  }
+
+  if (state === "enabled") {
+    return <BellOff aria-hidden="true" size={17} />;
+  }
+
+  return <Bell aria-hidden="true" size={17} />;
+}
+
 export function NotificationControl({
   dictionary,
 }: {
@@ -53,7 +91,7 @@ export function NotificationControl({
         enabled?: boolean;
         publicKey?: string;
       } | null;
-      if (!response.ok || !config?.enabled || !config.publicKey || disposed) {
+      if (!(response.ok && config?.enabled && config.publicKey) || disposed) {
         return;
       }
 
@@ -64,7 +102,7 @@ export function NotificationControl({
       }
 
       const registration = await navigator.serviceWorker.register("/sw.js");
-      if (!("Notification" in window) || !("PushManager" in window)) {
+      if (!("Notification" in window && "PushManager" in window)) {
         setState("unsupported");
         return;
       }
@@ -73,13 +111,7 @@ export function NotificationControl({
       if (disposed) return;
 
       setSubscription(existing);
-      setState(
-        Notification.permission === "denied"
-          ? "blocked"
-          : existing
-            ? "enabled"
-            : "disabled",
-      );
+      setState(initialNotificationState(existing));
     }
 
     initialize().catch(() => {
@@ -137,18 +169,7 @@ export function NotificationControl({
     }
   }
 
-  const label =
-    state === "enabled"
-      ? t("notification.control.disable")
-      : state === "loading"
-        ? t("notification.control.loading")
-        : state === "blocked"
-          ? t("notification.control.blocked")
-          : state === "unsupported"
-            ? t("notification.control.unsupported")
-            : state === "failed"
-              ? t("notification.control.failed")
-              : t("notification.control.enable");
+  const label = notificationLabel(state, t);
 
   return (
     <button
@@ -162,13 +183,7 @@ export function NotificationControl({
       title={label}
       type="button"
     >
-      {state === "loading" ? (
-        <LoaderCircle aria-hidden="true" className={styles.spinner} size={17} />
-      ) : state === "enabled" ? (
-        <BellOff aria-hidden="true" size={17} />
-      ) : (
-        <Bell aria-hidden="true" size={17} />
-      )}
+      <NotificationIcon state={state} />
       <span>{label}</span>
     </button>
   );

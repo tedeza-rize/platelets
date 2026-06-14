@@ -29,6 +29,25 @@ type RiskInfrastructureContext = {
   regionalStats: FireSafetyRegionalStat[];
 };
 
+function calculateResourceCoverageScore(
+  regionalStat: Pick<
+    FireSafetyRegionalStat,
+    "ambulanceCount" | "fireEngineCount"
+  > | null,
+) {
+  if (!regionalStat) {
+    return 0;
+  }
+
+  const resourceCount =
+    regionalStat.fireEngineCount + regionalStat.ambulanceCount;
+  if (resourceCount >= 50) {
+    return -5;
+  }
+
+  return resourceCount >= 25 ? -2 : 4;
+}
+
 function riskLevel(score: number): RiskLevel {
   if (score >= 70) return "high";
   if (score >= 40) return "medium";
@@ -122,13 +141,8 @@ export class RiskPredictionService {
       const casualtyScore = regionalStat
         ? Math.min(8, Math.round(Math.log1p(regionalStat.casualtyCount) * 1.2))
         : 0;
-      const resourceCoverageScore = regionalStat
-        ? regionalStat.fireEngineCount + regionalStat.ambulanceCount >= 50
-          ? -5
-          : regionalStat.fireEngineCount + regionalStat.ambulanceCount >= 25
-            ? -2
-            : 4
-        : 0;
+      const resourceCoverageScore =
+        calculateResourceCoverageScore(regionalStat);
       const operationalLoadScore = operationalLoad
         ? Math.min(12, Math.round(Math.log1p(operationalLoad.rowCount) * 2.5))
         : 0;

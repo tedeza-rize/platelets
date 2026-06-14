@@ -32,13 +32,17 @@ export function GET(request: Request) {
     });
   }
 
-  let cleanup = () => {};
+  let cleanup = () => {
+    // Assigned when the stream starts.
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let closed = false;
       let heartbeat: ReturnType<typeof setInterval> | null = null;
-      let unsubscribe = () => {};
+      let unsubscribe = () => {
+        // Assigned after subscribing to incident changes.
+      };
       const handleAbort = () => cleanup();
 
       cleanup = () => {

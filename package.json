@@ -9,7 +9,7 @@
     "download:bigdata119": "node scripts/download-bigdata119-samples.ts",
     "start": "next start",
     "mcp:points": "node scripts/points-mcp.ts",
-    "lint": "biome check && node scripts/check-encoding.ts",
+    "lint": "biome check --error-on-warnings && node scripts/check-encoding.ts",
     "format": "biome format --write",
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck && npm run test:unit",
@@ -31,10 +31,11 @@
     "pdfjs-dist": "^6.0.227",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.0",
+    "@biomejs/biome": "^2.5.0",
     "@playwright/test": "^1.60.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",

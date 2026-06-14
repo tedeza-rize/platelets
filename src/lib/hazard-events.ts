@@ -177,7 +177,7 @@ function mapEarthquakeRecord(record: KmaRecord): HazardEventInput | null {
   const magnitude = nullableText(record.mt);
   const sequence = text(record.tmSeq) || text(record.cnt) || text(record.tmEqk);
 
-  if (!issuedAt || !location) {
+  if (!(issuedAt && location)) {
     return null;
   }
 
@@ -207,7 +207,7 @@ function mapTsunamiRecord(record: KmaRecord): HazardEventInput | null {
   const longitude = toNumber(record.lon);
   const sequence = text(record.cnt) || text(record.tmEf) || text(record.tmFc);
 
-  if (!issuedAt || !location) {
+  if (!(issuedAt && location)) {
     return null;
   }
 

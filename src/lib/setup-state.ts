@@ -214,6 +214,16 @@ function hasPlainApiKeys(input: SetupState["apiKeys"]) {
   ].some((value) => Boolean(value) && !isSecretBox(value));
 }
 
+function ntpDetailKey(serverNtpOk: boolean, hasSelectedNtp: boolean) {
+  if (serverNtpOk) {
+    return "environment.ntp.ok";
+  }
+
+  return hasSelectedNtp
+    ? "environment.ntp.skewed"
+    : "environment.ntp.unavailable";
+}
+
 function accountFromPayload(
   role: SetupRole,
   input: SetupPayload[SetupRole],
@@ -490,15 +500,11 @@ export async function getSetupEnvironmentStatus(
         : "environment.sqlite.absent",
       detailValues: hasDatabase ? { path: databasePath } : undefined,
       id: "sqlite",
-      ok: !hasDatabase || !setupComplete,
+      ok: !(hasDatabase && setupComplete),
       titleKey: "environment.sqlite.title",
     },
     {
-      detailKey: serverNtpOk
-        ? "environment.ntp.ok"
-        : selectedNtp
-          ? "environment.ntp.skewed"
-          : "environment.ntp.unavailable",
+      detailKey: ntpDetailKey(serverNtpOk, Boolean(selectedNtp)),
       detailValues: selectedNtp
         ? {
             host: selectedNtp.host,

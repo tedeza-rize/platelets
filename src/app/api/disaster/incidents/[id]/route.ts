@@ -119,7 +119,7 @@ export async function PATCH(
     );
   }
 
-  if (!status && !shouldUpdateIncident) {
+  if (!(status || shouldUpdateIncident)) {
     return noStoreJson(
       {
         error:

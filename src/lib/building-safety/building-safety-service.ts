@@ -60,9 +60,11 @@ function readBuildingSafetyData(): BuildingSafetyDataFile {
     ) as unknown;
 
     if (
-      !isRecord(parsed) ||
-      !Array.isArray(parsed.profiles) ||
-      !Array.isArray(parsed.sources)
+      !(
+        isRecord(parsed) &&
+        Array.isArray(parsed.profiles) &&
+        Array.isArray(parsed.sources)
+      )
     ) {
       throw new Error("Invalid building safety data shape.");
     }
