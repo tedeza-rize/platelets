@@ -183,6 +183,7 @@ test("routes staff login and updates an account lifecycle", async ({
   request,
 }) => {
   await ensureSetupComplete(request);
+  await page.setViewportSize({ height: 800, width: 360 });
   const fieldUsername = `field.${browserName}.${Date.now().toString(36)}`;
 
   await page.goto("/login", { waitUntil: "domcontentloaded" });
@@ -193,6 +194,13 @@ test("routes staff login and updates an account lifecycle", async ({
   await expect(
     page.getByRole("heading", { name: "Staff accounts" }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 
   const created = await page.evaluate(async (username) => {
     const response = await fetch("/api/admin/users", {
@@ -224,6 +232,13 @@ test("routes staff login and updates an account lifecycle", async ({
   await expect(
     page.getByRole("heading", { name: "Field response" }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
 
   await page.evaluate(() =>
     fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
