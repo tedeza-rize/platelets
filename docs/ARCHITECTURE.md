@@ -11,6 +11,25 @@
 Read the relevant local Next.js documentation in `node_modules/next/dist/docs/`
 before changing framework code. Do not assume older Next.js behavior.
 
+## SQLite Deployment Boundary
+
+SQLite writes are safe only when exactly one persistent application process
+owns `data/points.sqlite`. `withDatabaseWriteTransaction` serializes writes with
+an in-process queue and `BEGIN IMMEDIATE`; that queue does not cross Vercel,
+AWS Lambda, Cloud Run, Azure Functions, or load-balanced Node.js processes.
+
+When common serverless or multi-instance environment signals are present,
+Platelets disables SQLite write transactions by default and fails fast with an
+operator-facing deployment error instead of allowing `SQLITE_BUSY` storms. Set
+`PLATELETS_SQLITE_WRITE_MODE=single-process` only for deployments where one
+long-lived process and one persistent disk own the database file. Set
+`PLATELETS_SQLITE_WRITE_MODE=blocked` to make a read-only instance explicit.
+
+Horizontal scaling requires moving write-owned state to a shared database such
+as PostgreSQL, or introducing an external single-writer job/lock service before
+more than one app instance can mutate datasets, incidents, setup state, logs,
+push subscriptions, or schedules.
+
 ## Directory Ownership
 
 | Path | Responsibility |
