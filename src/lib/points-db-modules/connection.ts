@@ -340,7 +340,9 @@ export async function withDatabaseWriteTransaction<T>(
   }
 
   const previousTransaction = writeTransactionQueue;
-  let releaseTransaction = () => {};
+  let releaseTransaction = () => {
+    // Assigned by the queue promise constructor below.
+  };
   writeTransactionQueue = new Promise<void>((resolve) => {
     releaseTransaction = resolve;
   });
@@ -354,7 +356,6 @@ export async function withDatabaseWriteTransaction<T>(
     transactionStarted = true;
     const result = await operation(db);
     await runSqlite(db, "COMMIT");
-    transactionStarted = false;
     return result;
   } catch (error) {
     if (transactionStarted) {
