@@ -12,10 +12,14 @@ export async function getDisasterDashboardConfig(): Promise<DisasterDashboardCon
     getOperationalSettings(),
     getRuntimeApiKeys(),
   ]);
+  const mapProvider =
+    operationalSettings.mapProvider === "vworld" && !runtimeApiKeys.vworldApiKey
+      ? "osm"
+      : operationalSettings.mapProvider;
 
   return {
     mapSettings: {
-      mapProvider: operationalSettings.mapProvider,
+      mapProvider,
       mapTileMode: operationalSettings.mapTileMode,
       osmTileSource: operationalSettings.osmTileSource,
     },

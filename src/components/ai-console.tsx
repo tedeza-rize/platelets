@@ -10,6 +10,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import {
+  AI_PROVIDER_PRESETS,
+  matchingAiProviderPreset,
+} from "@/lib/ai-provider-presets";
 import type { AiSettings } from "@/lib/ai-settings";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./ai-console.module.css";
@@ -225,6 +229,10 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const selectedProviderPreset = settings
+    ? (matchingAiProviderPreset(settings.baseUrl, settings.model)?.id ??
+      "custom")
+    : "custom";
 
   async function loginIfNeeded() {
     const nextPassword = password.trim();
@@ -376,6 +384,31 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
               />
             </label>
           </div>
+          <label className={styles.field}>
+            {t("LLM provider preset")}
+            <select
+              value={selectedProviderPreset}
+              onChange={(event) => {
+                const preset = AI_PROVIDER_PRESETS.find(
+                  (candidate) => candidate.id === event.target.value,
+                );
+
+                if (preset) {
+                  update("baseUrl", preset.baseUrl);
+                  if (preset.model) {
+                    update("model", preset.model);
+                  }
+                }
+              }}
+            >
+              <option value="custom">{t("Custom URL")}</option>
+              {AI_PROVIDER_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className={styles.field}>
             {t("OpenAI 호환 Base URL")}
             <input
