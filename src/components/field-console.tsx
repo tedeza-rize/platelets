@@ -23,6 +23,8 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
   const [tab, setTab] = useState<"list" | "report">("list");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function updateForm<TKey extends keyof typeof form>(
     key: TKey,
@@ -32,15 +34,25 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
   }
 
   const refresh = useCallback(async () => {
-    const response = await fetch("/api/disaster/incidents", {
-      cache: "no-store",
-    });
-    const payload = (await response.json().catch(() => null)) as {
-      incidents?: Incident[];
-    } | null;
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/disaster/incidents", {
+        cache: "no-store",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        incidents?: Incident[];
+      } | null;
 
-    setIncidents(payload?.incidents ?? []);
-  }, []);
+      if (!response.ok || !payload?.incidents) {
+        throw new Error(t("Could not load incidents."));
+      }
+
+      setIncidents(payload.incidents);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
     refresh().catch((requestError) =>
@@ -56,29 +68,31 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
     event.preventDefault();
     setError("");
     setNotice("");
+    setIsSubmitting(true);
 
-    const response = await fetch("/api/disaster/incidents", {
-      body: JSON.stringify({
-        ...form,
-        latitude: Number(form.latitude),
-        longitude: Number(form.longitude),
-      }),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
-    const payload = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
+    try {
+      const response = await fetch("/api/disaster/incidents", {
+        body: JSON.stringify({
+          ...form,
+          latitude: Number(form.latitude),
+          longitude: Number(form.longitude),
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
 
-    if (!response.ok) {
-      setError(payload?.error ?? t("Could not create incident."));
-      return;
+      if (!response.ok) {
+        setError(t("Could not create incident."));
+        return;
+      }
+
+      setForm(defaultIncident);
+      setNotice(t("Incident reported."));
+      setTab("list");
+      await refresh();
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setForm(defaultIncident);
-    setNotice(t("Incident reported."));
-    setTab("list");
-    await refresh();
   }
 
   return (
@@ -89,26 +103,63 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
             <h1>{t("Field response")}</h1>
             <p>{t("Review active incidents and send a quick report.")}</p>
           </div>
-          <button className={styles.secondary} onClick={refresh} type="button">
-            <RefreshCw aria-hidden="true" size={16} />
+          <button
+            className={styles.secondary}
+            disabled={isLoading}
+            onClick={refresh}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={isLoading ? styles.spin : undefined}
+              size={16}
+            />
             {t("Refresh")}
           </button>
         </header>
 
         {tab === "list" ? (
-          <section className={styles.incidentList}>
-            {incidents.map((incident) => (
-              <article className={styles.incident} key={incident.id}>
-                <strong>{incident.title}</strong>
-                <span>
-                  {t(incident.status)} · {t(incident.riskLevel)}
-                </span>
-                <p>{incident.address}</p>
-              </article>
-            ))}
+          <section aria-busy={isLoading} className={styles.incidentList}>
+            {isLoading ? (
+              <output className={styles.statePanel}>
+                <RefreshCw
+                  aria-hidden="true"
+                  className={styles.spin}
+                  size={20}
+                />
+                {t("Loading incidents...")}
+              </output>
+            ) : null}
+            {!isLoading && incidents.length === 0 ? (
+              <div className={styles.statePanel}>
+                <strong>{t("No active incidents.")}</strong>
+                <button
+                  className={styles.secondary}
+                  onClick={() => setTab("report")}
+                  type="button"
+                >
+                  <PlusCircle aria-hidden="true" size={16} />
+                  {t("Report incident")}
+                </button>
+              </div>
+            ) : null}
+            {!isLoading &&
+              incidents.map((incident) => (
+                <article className={styles.incident} key={incident.id}>
+                  <strong>{incident.title}</strong>
+                  <span>
+                    {t(incident.status)} · {t(incident.riskLevel)}
+                  </span>
+                  <p>{incident.address}</p>
+                </article>
+              ))}
           </section>
         ) : (
-          <form className={styles.card} onSubmit={create}>
+          <form
+            aria-busy={isSubmitting}
+            className={styles.card}
+            onSubmit={create}
+          >
             <label className={styles.field}>
               {t("Incident title")}
               <input
@@ -157,16 +208,24 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
               />
             </label>
             <div className={styles.actions}>
-              <button className={styles.primary} type="submit">
+              <button
+                className={styles.primary}
+                disabled={isSubmitting}
+                type="submit"
+              >
                 <PlusCircle aria-hidden="true" size={16} />
-                {t("Report incident")}
+                {t(isSubmitting ? "Reporting..." : "Report incident")}
               </button>
             </div>
           </form>
         )}
 
-        {notice ? <p className={styles.notice}>{notice}</p> : null}
-        {error ? <p className={styles.error}>{error}</p> : null}
+        {notice ? <output className={styles.notice}>{notice}</output> : null}
+        {error ? (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
       <nav className={styles.tabbar} aria-label={t("Field tabs")}>
         <button
@@ -183,8 +242,18 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
         >
           <PlusCircle aria-hidden="true" size={16} /> {t("Report")}
         </button>
-        <button data-active="false" onClick={refresh} type="button">
-          <RefreshCw aria-hidden="true" size={16} /> {t("Refresh")}
+        <button
+          data-active="false"
+          disabled={isLoading}
+          onClick={refresh}
+          type="button"
+        >
+          <RefreshCw
+            aria-hidden="true"
+            className={isLoading ? styles.spin : undefined}
+            size={16}
+          />{" "}
+          {t("Refresh")}
         </button>
       </nav>
     </main>
