@@ -37,6 +37,14 @@ const emptyForm = {
   username: "",
 };
 
+function submitLabelKey(isSaving: boolean, editingId: string) {
+  if (isSaving) {
+    return "Saving...";
+  }
+
+  return editingId ? "Save changes" : "Create account";
+}
+
 export function UserAdminConsole({
   currentUserId,
   dictionary,
@@ -55,6 +63,7 @@ export function UserAdminConsole({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState("");
 
   function updateForm<TKey extends keyof typeof form>(
     key: TKey,
@@ -71,7 +80,7 @@ export function UserAdminConsole({
         users?: UserAccount[];
       } | null;
 
-      if (!response.ok || !payload?.users) {
+      if (!(response.ok && payload?.users)) {
         throw new Error(t("Could not load users."));
       }
 
@@ -164,10 +173,7 @@ export function UserAdminConsole({
   }
 
   async function remove(id: string) {
-    if (!window.confirm(t("Delete this account?"))) {
-      return;
-    }
-
+    setPendingDeleteId("");
     setError("");
     setNotice("");
     setDeletingId(id);
@@ -315,13 +321,7 @@ export function UserAdminConsole({
               ) : (
                 <Plus aria-hidden="true" size={16} />
               )}
-              {t(
-                isSaving
-                  ? "Saving..."
-                  : editingId
-                    ? "Save changes"
-                    : "Create account",
-              )}
+              {t(submitLabelKey(isSaving, editingId))}
             </button>
             {editingId ? (
               <button
@@ -402,17 +402,40 @@ export function UserAdminConsole({
                             {t("Edit")}
                           </button>
                         ) : null}
-                        {canDelete(user) ? (
+                        {canDelete(user) && pendingDeleteId !== user.id ? (
                           <button
                             className={styles.danger}
                             disabled={Boolean(deletingId)}
-                            onClick={() => remove(user.id)}
+                            onClick={() => setPendingDeleteId(user.id)}
                             type="button"
                           >
                             <Trash2 aria-hidden="true" size={16} />
                             {t("Delete")}
                           </button>
-                        ) : (
+                        ) : null}
+                        {canDelete(user) && pendingDeleteId === user.id ? (
+                          <>
+                            <button
+                              className={styles.secondary}
+                              disabled={Boolean(deletingId)}
+                              onClick={() => setPendingDeleteId("")}
+                              type="button"
+                            >
+                              <X aria-hidden="true" size={16} />
+                              {t("Cancel")}
+                            </button>
+                            <button
+                              className={styles.danger}
+                              disabled={Boolean(deletingId)}
+                              onClick={() => remove(user.id)}
+                              type="button"
+                            >
+                              <Trash2 aria-hidden="true" size={16} />
+                              {t("Delete")}
+                            </button>
+                          </>
+                        ) : null}
+                        {canDelete(user) ? null : (
                           <span className={styles.protected}>
                             {t("Protected")}
                           </span>

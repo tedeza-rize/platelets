@@ -10,7 +10,7 @@ logo:
 type: favicon
 slug: "https://www.krds.go.kr/resources/img/guide/favicon_192.png"
 verified: "2026-06-14"
-omd: "0.1"
+md: "0.1"
 ds:
 name: KRDS-first TDS-assisted Design System
 url: "https://www.krds.go.kr/html/site/index.html"
@@ -407,7 +407,7 @@ DESIGN.md — KRDS-first TDS-assisted Design System
 
 이 디자인 시스템은 KRDS를 기본 디자인으로 사용합니다. KRDS가 제공하는 색상, 타이포그래피, 레이아웃, 접근성, 컴포넌트, 문체 규칙은 최상위 기준입니다. TDS는 KRDS에서 상대적으로 구체성이 부족한 모바일 상호작용, 인증 입력, 보안 키패드, 로딩 스켈레톤, 수치 표시, 점진적 정보 밀도, 일부 마이크로 인터랙션을 보완하기 위한 참고 체계로만 사용합니다.
 
-핵심 원칙은 다음과 같습니다.
+핵심 원칙은 다음입니다.
 
 KRDS는 법이고, TDS는 참고입니다. TDS에서 가져오는 것은 색상이나 브랜드 외형이 아니라 문제를 해결하는 방식입니다. 모든 시각 값은 KRDS 토큰으로 다시 입힙니다. Primary 색상은 언제나 KRDS Government Blue "#256EF4"입니다. Toss UI Blue "#3182F6"와 Toss Brand Blue "#0064FF"는 이 시스템의 인터페이스 색상으로 사용하지 않습니다.
 
@@ -478,6 +478,8 @@ Success| "#228738"| "#EAF6EC"| "#285D33"| 완료, 승인, 성공
 Information| "#0B78CB"| "#E7F4FE"| "#085691"| 진행 중, 안내, 정보
 Point| "#D63D4A"| "#FBEFF0"| "#7A1F26"| 신규, 중요, 제한적 강조
 Select Error| "#AB2B36"| "#FBEFF0"| "#7A1F26"| 셀렉트 오류 보더
+
+참고: Select Error는 Point 계열과 시각적 연속성을 유지하기 위해 Subtle/Deep 톤을 동일하게 사용하며, Base만 오류 맥락에 맞게 분리해 사용합니다.
 
 Danger, Warning, Success, Information, Point는 상태 의미를 전달할 때만 사용합니다. 상태 텍스트 없이 색상만으로 의미를 전달하지 않습니다.
 
@@ -653,7 +655,7 @@ TDS의 loading 유지 원칙을 참고합니다.
 - 버튼의 width는 로딩 중에도 변하지 않습니다.
 - 텍스트는 "처리 중" 또는 해당 과업에 맞는 현재 상태로 변경합니다.
 - spinner가 들어가더라도 텍스트를 완전히 제거하지 않는 것이 좋습니다.
-- "aria-busy="true""를 적용합니다.
+- `aria-busy="true"`를 적용합니다.
 - 중복 제출 방지를 위해 disabled 처리합니다.
 - 로딩이 3초 이상 지속되면 화면이나 영역 단위 안내를 제공합니다.
 
@@ -864,7 +866,7 @@ Horizontal Tab
 - Active indicator: "2px solid #256EF4"
 - Use: 페이지 내 섹션 전환
 
-Tabs는 keyboard left/right navigation을 지원해야 합니다. "role="tablist"", "role="tab"", "aria-selected", "aria-controls"를 사용합니다.
+Tabs는 keyboard left/right navigation을 지원해야 합니다. `role="tablist"`, `role="tab"`, `aria-selected="true"`, `aria-controls="panel-id"`를 사용합니다.
 
 Segmented Control
 

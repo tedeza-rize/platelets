@@ -1,7 +1,7 @@
 "use client";
 
 import { Ambulance, Flame, LoaderCircle, Route, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./map-shell.module.css";
 
@@ -122,6 +122,7 @@ export function EmergencyRoutingPanel({
   onRoute: (route: EmergencyRouteResult) => void;
   origin: Coordinate;
 }) {
+  const titleId = useId();
   const t = (key: string) => uiText(dictionary, key);
   const [incidentType, setIncidentType] = useState<"ambulance" | "fire">(
     "ambulance",
@@ -199,7 +200,7 @@ export function EmergencyRoutingPanel({
         route?: EmergencyRouteResult;
       };
 
-      if (!response.ok || !payload.route) {
+      if (!(response.ok && payload.route)) {
         throw new Error(payload.error ?? t("이송 경로 계산에 실패했습니다."));
       }
 
@@ -217,14 +218,11 @@ export function EmergencyRoutingPanel({
   }
 
   return (
-    <section
-      aria-labelledby="emergency-routing-title"
-      className={styles.emergencyPanel}
-    >
+    <section aria-labelledby={titleId} className={styles.emergencyPanel}>
       <header className={styles.emergencyPanelHeader}>
         <div>
           <span>{t("도로 이동시간 기반")}</span>
-          <h2 id="emergency-routing-title">{t("응급 출동·이송 추천")}</h2>
+          <h2 id={titleId}>{t("응급 출동·이송 추천")}</h2>
         </div>
         <button
           aria-label={t("응급 이송 패널 닫기")}

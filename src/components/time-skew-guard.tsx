@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./time-skew-guard.module.css";
 
@@ -80,10 +80,13 @@ function isDismissed() {
 function saveDismissed() {
   try {
     window.localStorage.setItem(DISMISS_STORAGE_KEY, "1");
-  } catch {}
+  } catch {
+    // Storage can be unavailable in privacy modes; dismissal remains in memory.
+  }
 }
 
 export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
+  const titleId = useId();
   const t = (key: string) => uiText(dictionary, key);
   const [warning, setWarning] = useState<WarningState | null>(null);
   const [suppressFutureWarnings, setSuppressFutureWarnings] = useState(false);
@@ -175,7 +178,7 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
       }
     }
 
-    checkTimeSkew().catch(() => {});
+    checkTimeSkew().catch(() => undefined);
 
     return () => {
       isDisposed = true;
@@ -189,13 +192,13 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
   return (
     <div className={styles.backdrop} role="presentation">
       <section
-        aria-labelledby="time-skew-title"
+        aria-labelledby={titleId}
         aria-modal="true"
         className={styles.modal}
         role="dialog"
       >
         <div className={styles.header}>
-          <h2 id="time-skew-title">{t("시간 동기화 경고")}</h2>
+          <h2 id={titleId}>{t("시간 동기화 경고")}</h2>
           <button
             aria-label={t("시간 경고 닫기")}
             className={styles.closeButton}
@@ -276,9 +279,9 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
                 <dt>NTP</dt>
                 <dd>
                   {warning.ntpServer ?? warning.ntpError ?? t("응답 없음")}
-                  {warning.ntpRoundTripDelayMs !== null
-                    ? `, RTT ${Math.round(warning.ntpRoundTripDelayMs)}ms`
-                    : ""}
+                  {warning.ntpRoundTripDelayMs === null
+                    ? ""
+                    : `, RTT ${Math.round(warning.ntpRoundTripDelayMs)}ms`}
                 </dd>
               </div>
             </>

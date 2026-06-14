@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     longitude: payload?.destination?.longitude,
   });
 
-  if (!origin || !destination) {
+  if (!(origin && destination)) {
     return noStoreJson({ error: KOREA_COORDINATE_ERROR }, { status: 400 });
   }
 

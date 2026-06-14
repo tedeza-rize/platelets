@@ -229,7 +229,7 @@ test("GET /api/assembly-protests returns normalized rows without raw text", asyn
     new Request("https://platelets.test/api/assembly-protests?date=2026-06-16"),
   );
   const body = (await response.json()) as {
-    protests: Array<Record<string, unknown>>;
+    protests: Record<string, unknown>[];
   };
 
   assert.equal(response.status, 200);
@@ -363,6 +363,7 @@ test("crawlAssemblyProtests fetches independent agency sources in parallel", asy
 test("crawlAssemblyProtests stores bounded coordinate resolver results", async () => {
   const originalFetch = globalThis.fetch;
   const html =
+    // biome-ignore lint/security/noSecrets: Encoded Korean fixture text is not a credential.
     "<table><tr><td>1</td><td>06.19 \uC624\uB298\uC758 \uC9D1\uD68C</td></tr></table>";
   globalThis.fetch = async () =>
     new Response(html, {
@@ -409,6 +410,7 @@ test("crawlAssemblyProtests stores bounded coordinate resolver results", async (
 test("crawlAssemblyProtests rejects coordinate resolver results outside Korea", async () => {
   const originalFetch = globalThis.fetch;
   const html =
+    // biome-ignore lint/security/noSecrets: Encoded Korean fixture text is not a credential.
     "<table><tr><td>1</td><td>06.20 \uC624\uB298\uC758 \uC9D1\uD68C</td></tr></table>";
   globalThis.fetch = async () =>
     new Response(html, {
@@ -518,6 +520,7 @@ test("crawlAssemblyProtests reuses cached default geocoding results", async () =
         {
           CPDS_CONTENT:
             "\uC77C\uC2DC : 10:00~11:00 \uC7A5\uC18C : \uCC3D\uC6D0\uAD11\uC7A5 \uC778\uC6D0 : 20\uBA85",
+          // biome-ignore lint/security/noSecrets: Encoded Korean fixture text is not a credential.
           CPDS_SUBJECT: "06.24 \uC624\uB298\uC758 \uC9D1\uD68C",
           IPDS_IDX: "cached-geocode",
         },

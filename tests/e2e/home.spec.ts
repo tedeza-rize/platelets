@@ -1,10 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import {
+  type APIRequestContext,
+  expect,
+  type Page,
+  test,
+} from "@playwright/test";
+
+const SEOUL_COORDINATES = {
+  latitude: 37.5665,
+  longitude: 126.978,
+} as const;
 
 test.describe.configure({ mode: "serial" });
 
-async function ensureSetupComplete(
-  request: import("@playwright/test").APIRequestContext,
-) {
+async function ensureSetupComplete(request: APIRequestContext) {
   const status = await request.get("/api/setup/status");
   const statusPayload = (await status.json()) as { installed?: boolean };
 
@@ -33,7 +42,7 @@ async function ensureSetupComplete(
 }
 
 async function signInAsStaff(
-  request: import("@playwright/test").APIRequestContext,
+  request: APIRequestContext,
   username: "admin" | "sudo",
 ) {
   const response = await request.post("/api/auth/login", {
@@ -46,7 +55,7 @@ async function signInAsStaff(
   expect(response.ok()).toBeTruthy();
 }
 
-async function showEnglishSetup(page: import("@playwright/test").Page) {
+async function showEnglishSetup(page: Page) {
   if (
     (await page
       .getByRole("heading", { name: "Platelets에 오신 것을 환영합니다" })
@@ -184,7 +193,7 @@ test("routes staff login and updates an account lifecycle", async ({
 }) => {
   await ensureSetupComplete(request);
   await page.setViewportSize({ height: 800, width: 360 });
-  const fieldUsername = `field.${browserName}.${Date.now().toString(36)}`;
+  const fieldUsername = `field.${browserName}.${randomUUID().slice(0, 8)}`;
 
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Username", { exact: true }).fill("admin");
@@ -221,9 +230,9 @@ test("routes staff login and updates an account lifecycle", async ({
   }, fieldUsername);
   expect(created).toBeTruthy();
 
-  await page.evaluate(() =>
-    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
-  );
+  await page.evaluate(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+  });
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Username", { exact: true }).fill(fieldUsername);
   await page.getByLabel("Password", { exact: true }).fill("StrongFieldPass1!");
@@ -240,9 +249,9 @@ test("routes staff login and updates an account lifecycle", async ({
     ),
   ).toBe(true);
 
-  await page.evaluate(() =>
-    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
-  );
+  await page.evaluate(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+  });
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Username", { exact: true }).fill("sudo");
   await page.getByLabel("Password", { exact: true }).fill("StrongSudoPass1!");
@@ -260,9 +269,9 @@ test("routes staff login and updates an account lifecycle", async ({
   await expect(accountRow).toContainText("Dispatcher E2E");
   await expect(accountRow).toContainText("Dispatcher");
 
-  await page.evaluate(() =>
-    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
-  );
+  await page.evaluate(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+  });
   await page.goto("/login", { waitUntil: "domcontentloaded" });
   await page.getByLabel("Username", { exact: true }).fill(fieldUsername);
   await page.getByLabel("Password", { exact: true }).fill("UpdatedFieldPass1!");
@@ -279,8 +288,7 @@ test("shows a mobile bottom sheet for map selections", async ({
   await page.context().grantPermissions(["geolocation"]);
   await page.context().setGeolocation({
     accuracy: 25,
-    latitude: 37.5665,
-    longitude: 126.978,
+    ...SEOUL_COORDINATES,
   });
   await page.goto("/", { waitUntil: "domcontentloaded" });
 

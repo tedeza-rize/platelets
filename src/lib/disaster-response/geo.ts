@@ -27,8 +27,10 @@ export function estimatedUrbanEtaMinutes(distance: number) {
 
 export function assertKoreaCoordinate(coordinate: Coordinate) {
   if (
-    !Number.isFinite(coordinate.latitude) ||
-    !Number.isFinite(coordinate.longitude) ||
+    !(
+      Number.isFinite(coordinate.latitude) &&
+      Number.isFinite(coordinate.longitude)
+    ) ||
     coordinate.latitude < 32 ||
     coordinate.latitude > 39 ||
     coordinate.longitude < 124 ||

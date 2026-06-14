@@ -46,7 +46,9 @@ export function publishIncidentChange(input: IncidentChangeInput) {
   for (const listener of hub.listeners) {
     try {
       listener(change);
-    } catch {}
+    } catch {
+      // One failing listener must not prevent delivery to remaining clients.
+    }
   }
 
   return change;

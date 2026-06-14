@@ -458,7 +458,7 @@ function dayWithinRange(params: {
 
 function titleRangeMatchesDate(title: string, date: string) {
   const parts = dateParts(date);
-  if (!parts || !title.includes("~")) return false;
+  if (!(parts && title.includes("~"))) return false;
 
   const compact = title.replace(/\s+/g, "");
   const numericRange = compact.match(/(\d{2})(\d{2}).*~.*?(\d{2})(\d{2})/);
@@ -791,7 +791,7 @@ function extractBoardPosts(html: string, baseUrl: string, date: string) {
   for (const row of extractRows(html)) {
     const cells = extractCells(row);
     const title = cells.find((cell) => ASSEMBLY_TEXT_PATTERN.test(cell)) ?? "";
-    if (!title || !titleMatchesDate(title, date)) continue;
+    if (!(title && titleMatchesDate(title, date))) continue;
 
     const detailUrl = extractDetailUrl(row, baseUrl);
     posts.push({

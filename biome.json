@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -17,11 +17,122 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "all",
+      "correctness": {
+        "noNodejsModules": "off",
+        "noProcessGlobal": "off",
+        "noUnresolvedImports": "off",
+        "useImportExtensions": "off"
+      },
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "useImportsFirst": "error"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": {
+            "maxAllowedComplexity": 30
+          }
+        },
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": {
+            "maxLines": 150,
+            "skipBlankLines": true
+          }
+        },
+        "noUselessUndefined": "error",
+        "noVoid": "off",
+        "useMaxParams": "off",
+        "useOptionalChain": "error",
+        "useSimplifiedLogicExpression": "error"
+      },
+      "suspicious": {
+        "noConsole": "off",
+        "noEmptyBlockStatements": "error",
+        "noAlert": "error",
+        "noBitwiseOperators": "off",
+        "noEvolvingTypes": "error",
+        "noLeakedRender": "error",
+        "noNestedPromises": "error",
+        "noShadow": "error",
+        "noSkippedTests": "off",
+        "noUnnecessaryConditions": "off",
+        "useAwait": "off"
+      },
+      "style": {
+        "noDefaultExport": "off",
+        "noContinue": "off",
+        "noExcessiveLinesPerFile": {
+          "level": "error",
+          "options": {
+            "maxLines": 500,
+            "skipBlankLines": true
+          }
+        },
+        "noExportedImports": "off",
+        "noHexColors": "off",
+        "noImplicitBoolean": "off",
+        "noJsxLiterals": "error",
+        "noMagicNumbers": "off",
+        "noNestedTernary": "error",
+        "noProcessEnv": "off",
+        "noTernary": "off",
+        "noParameterAssign": "error",
+        "useCollapsedIf": "error",
+        "useBlockStatements": "off",
+        "useComponentExportOnlyModules": "off",
+        "useConsistentArrayType": "error",
+        "useConsistentMethodSignatures": "error",
+        "useConsistentTypeDefinitions": {
+          "level": "error",
+          "options": {
+            "style": "type"
+          }
+        },
+        "useDefaultSwitchClause": "off",
+        "useErrorCause": "error",
+        "useExplicitLengthCheck": "error",
+        "useExportsLast": "off",
+        "useGlobalThis": "off",
+        "useNamingConvention": "off",
+        "useNumericSeparators": "off",
+        "useReadonlyClassProperties": "error",
+        "useDestructuring": "off"
+      },
+      "performance": {
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noSecrets": {
+          "level": "error",
+          "options": {
+            "entropyThreshold": 80
+          }
+        }
+      }
     },
     "domains": {
-      "next": "recommended",
-      "react": "recommended"
+      "drizzle": "none",
+      "next": "all",
+      "playwright": "all",
+      "project": "all",
+      "qwik": "none",
+      "react": "all",
+      "reactNative": "none",
+      "solid": "none",
+      "svelte": "none",
+      "tailwind": "none",
+      "test": "all",
+      "turborepo": "none",
+      "types": "all",
+      "vue": "none"
     }
   },
   "assist": {
@@ -30,5 +141,64 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "scripts/points-mcp.ts",
+        "src/app/api/points/route.ts",
+        "src/components/disaster-dashboard.module.css",
+        "src/components/disaster-dashboard.tsx",
+        "src/components/management-console.tsx",
+        "src/components/map-shell.module.css",
+        "src/components/map-shell.tsx",
+        "src/components/setup-wizard.module.css",
+        "src/components/setup-wizard.tsx",
+        "src/components/user-admin-console.tsx",
+        "src/data/seoul-citydata-areas.ts",
+        "src/lib/assembly-protests.ts",
+        "src/lib/dataset-import.ts",
+        "src/lib/i18n.ts",
+        "src/lib/map-shell-core.ts",
+        "src/lib/medical-dataset-import.ts",
+        "src/lib/points-db.ts",
+        "tests/e2e/home.spec.ts",
+        "tests/unit/assembly-protests.test.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveCognitiveComplexity": "off",
+            "noExcessiveLinesPerFunction": "off"
+          },
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/app/offline/page.tsx",
+        "src/components/ai-console.tsx",
+        "src/components/disaster-dashboard.tsx",
+        "src/components/emergency-routing-panel.tsx",
+        "src/components/field-console.tsx",
+        "src/components/license-browser.tsx",
+        "src/components/log-console.tsx",
+        "src/components/management-console.tsx",
+        "src/components/map-shell-controls.tsx",
+        "src/components/setup-wizard.tsx",
+        "src/components/time-skew-guard.tsx",
+        "src/components/user-admin-console.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noJsxLiterals": "off"
+          }
+        }
+      }
+    }
+  ]
 }

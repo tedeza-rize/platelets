@@ -338,7 +338,7 @@ export async function searchVworldLocations(params: {
   const limit = Math.min(Math.max(params.limit ?? 5, 1), 20);
   const searchMode = params.searchMode ?? "both";
 
-  if (!query || !apiKey) return [];
+  if (!(query && apiKey)) return [];
 
   const results: MapSearchResult[] = [];
   const seen = new Set<string>();
