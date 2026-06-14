@@ -75,6 +75,11 @@
   margin-top: 14px;
 }
 
+.formTitle {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+}
+
 .primary,
 .secondary,
 .danger {
@@ -115,6 +120,19 @@
   color: #be123c;
   font-weight: 700;
   margin: 12px 0 0;
+}
+
+.tableActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.protected {
+  color: #536173;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .table {

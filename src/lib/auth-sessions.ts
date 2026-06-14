@@ -58,10 +58,11 @@ async function writeSessions(sessions: StoredAccessSession[]) {
 export type AccessSession = Omit<StoredAccessSession, "tokenHash">;
 
 export async function createAccessSession(password: string, username = "") {
-  const user = username.trim()
-    ? await authenticateUser(username, password)
-    : null;
-  const role = user?.role ?? (await getStoredAccessRole(password));
+  const hasUsername = username.trim().length > 0;
+  const user = hasUsername ? await authenticateUser(username, password) : null;
+  const role = hasUsername
+    ? (user?.role ?? null)
+    : await getStoredAccessRole(password);
 
   if (!role) {
     return null;
@@ -129,6 +130,17 @@ export async function revokeAccessSession(token: string) {
   const tokenHash = hashToken(token);
   const sessions = (await readSessions()).filter(
     (session) => !safeEqual(session.tokenHash, tokenHash),
+  );
+  await writeSessions(sessions);
+}
+
+export async function revokeUserAccessSessions(userId: string) {
+  if (!userId) {
+    return;
+  }
+
+  const sessions = (await readSessions()).filter(
+    (session) => session.userId !== userId,
   );
   await writeSessions(sessions);
 }

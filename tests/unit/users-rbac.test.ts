@@ -16,6 +16,8 @@ const { incidentService } = await import(
   "@/lib/disaster-response/incident-service"
 );
 const adminUsersRoute = await import("@/app/api/admin/users/route");
+const adminUserRoute = await import("@/app/api/admin/users/[id]/route");
+const incidentRoute = await import("@/app/api/disaster/incidents/[id]/route");
 
 const sudoPassword = "StrongSudoPass1!";
 const adminPassword = "StrongAdminPass1!";
@@ -39,10 +41,21 @@ async function ensureSetup() {
   });
 }
 
-function requestWithSession(token: string) {
-  return new Request("http://platelets.local/api/admin/users", {
-    headers: { cookie: `${authSessions.SESSION_COOKIE_NAME}=${token}` },
-  });
+function requestWithSession(
+  token: string,
+  input: { body?: unknown; method?: string; path?: string } = {},
+) {
+  return new Request(
+    `http://platelets.local${input.path ?? "/api/admin/users"}`,
+    {
+      body: input.body === undefined ? undefined : JSON.stringify(input.body),
+      headers: {
+        "content-type": "application/json",
+        cookie: `${authSessions.SESSION_COOKIE_NAME}=${token}`,
+      },
+      method: input.method,
+    },
+  );
 }
 
 test("setup creates sudo and admin user accounts", async () => {
@@ -80,6 +93,17 @@ test("staff username login creates a role-aware session", async () => {
   assert.equal(session?.name, "Field Worker");
 });
 
+test("username login cannot fall back to setup passwords", async () => {
+  await ensureSetup();
+
+  const session = await authSessions.createAccessSession(
+    adminPassword,
+    "missing-user",
+  );
+
+  assert.equal(session, null);
+});
+
 test("admin users API requires an admin-capable session", async () => {
   await ensureSetup();
   const denied = await adminUsersRoute.GET(
@@ -99,6 +123,147 @@ test("admin users API requires an admin-capable session", async () => {
 
   assert.equal(allowed.status, 200);
   assert.equal(Array.isArray(payload.users), true);
+});
+
+test("incident mutation routes require and record a staff session", async () => {
+  await ensureSetup();
+  const denied = await incidentRoute.PATCH(
+    new Request("http://platelets.local/api/disaster/incidents/missing", {
+      body: JSON.stringify({ status: "closed" }),
+      headers: { "content-type": "application/json" },
+      method: "PATCH",
+    }),
+    { params: Promise.resolve({ id: "missing" }) },
+  );
+  assert.equal(denied.status, 401);
+
+  const field = await users.authenticateUser("field.one", "StrongFieldPass1!");
+  const session = await authSessions.createAccessSession(
+    "StrongFieldPass1!",
+    "field.one",
+  );
+  assert.ok(field);
+  assert.ok(session);
+
+  const incident = await incidentService.createIncident(
+    {
+      address: "서울특별시 중구 세종대로 110",
+      description: "Authenticated route test",
+      latitude: 37.5665,
+      longitude: 126.978,
+      riskLevel: "medium",
+      title: "Authenticated incident",
+      type: "fire",
+    },
+    { id: field.id, name: field.name, role: field.role },
+  );
+  const updated = await incidentRoute.PATCH(
+    requestWithSession(session.token, {
+      body: { status: "dispatched" },
+      method: "PATCH",
+      path: `/api/disaster/incidents/${incident.id}`,
+    }),
+    { params: Promise.resolve({ id: incident.id }) },
+  );
+  assert.equal(updated.status, 200);
+
+  const events = await incidentService.listIncidentEvents(incident.id);
+  const statusEvent = events.find((event) => event.type === "status");
+  assert.equal(statusEvent?.actorName, "Field Worker");
+
+  const deleted = await incidentRoute.DELETE(
+    requestWithSession(session.token, {
+      method: "DELETE",
+      path: `/api/disaster/incidents/${incident.id}`,
+    }),
+    { params: Promise.resolve({ id: incident.id }) },
+  );
+  assert.equal(deleted.status, 200);
+});
+
+test("account deletion protects the current and sudo accounts", async () => {
+  await ensureSetup();
+  const admin = await users.authenticateUser("admin", adminPassword);
+  const sudo = await users.authenticateUser("sudo", sudoPassword);
+  assert.ok(admin);
+  assert.ok(sudo);
+
+  const adminSession = await authSessions.createAccessSession(
+    adminPassword,
+    "admin",
+  );
+  assert.ok(adminSession);
+
+  const selfDelete = await adminUserRoute.DELETE(
+    requestWithSession(adminSession.token, { method: "DELETE" }),
+    { params: Promise.resolve({ id: admin.id }) },
+  );
+  assert.equal(selfDelete.status, 409);
+  assert.deepEqual(await selfDelete.json(), { errorCode: "self_delete" });
+
+  const sudoDelete = await adminUserRoute.DELETE(
+    requestWithSession(adminSession.token, { method: "DELETE" }),
+    { params: Promise.resolve({ id: sudo.id }) },
+  );
+  assert.equal(sudoDelete.status, 403);
+  assert.deepEqual(await sudoDelete.json(), { errorCode: "sudo_required" });
+
+  const sudoSession = await authSessions.createAccessSession(
+    sudoPassword,
+    "sudo",
+  );
+  assert.ok(sudoSession);
+  const protectedDelete = await adminUserRoute.DELETE(
+    requestWithSession(sudoSession.token, { method: "DELETE" }),
+    { params: Promise.resolve({ id: sudo.id }) },
+  );
+  assert.equal(protectedDelete.status, 409);
+  assert.deepEqual(await protectedDelete.json(), {
+    errorCode: "self_delete",
+  });
+});
+
+test("role and password updates revoke the target user's sessions", async () => {
+  await ensureSetup();
+  const target = await users.createUser({
+    department: "Mapo",
+    email: "session-target@example.com",
+    name: "Session Target",
+    password: "StrongTargetPass1!",
+    phone: "",
+    role: "field_worker",
+    username: "session.target",
+  });
+  const targetSession = await authSessions.createAccessSession(
+    "StrongTargetPass1!",
+    target.username,
+  );
+  const adminSession = await authSessions.createAccessSession(
+    adminPassword,
+    "admin",
+  );
+  assert.ok(targetSession);
+  assert.ok(adminSession);
+
+  const updated = await adminUserRoute.PATCH(
+    requestWithSession(adminSession.token, {
+      body: {
+        password: "UpdatedTargetPass1!",
+        role: "dispatcher",
+      },
+      method: "PATCH",
+      path: `/api/admin/users/${target.id}`,
+    }),
+    { params: Promise.resolve({ id: target.id }) },
+  );
+  assert.equal(updated.status, 200);
+  assert.equal(await authSessions.getAccessSession(targetSession.token), null);
+
+  const relogin = await authSessions.createAccessSession(
+    "UpdatedTargetPass1!",
+    target.username,
+  );
+  assert.equal(relogin?.role, "dispatcher");
 });
 
 test("incident events record the acting staff member", async () => {

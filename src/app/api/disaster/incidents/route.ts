@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getRequestAccessSession } from "@/lib/access-control";
+import { requireAccessSession } from "@/lib/access-control";
 import { dispatchIncidentAlerts } from "@/lib/disaster-response/incident-alerts";
 import { incidentService } from "@/lib/disaster-response/incident-service";
 import type {
@@ -29,19 +29,17 @@ function riskLevel(value: unknown): RiskLevel {
     : "medium";
 }
 
-async function requestActor(request: Request): Promise<IncidentActor | null> {
-  const session = await getRequestAccessSession(request);
-
-  return session
-    ? { id: session.userId, name: session.name, role: session.role }
-    : null;
-}
-
 export async function GET() {
   return noStoreJson({ incidents: await incidentService.listIncidents() });
 }
 
 export async function POST(request: Request) {
+  const [session, forbidden] = await requireAccessSession(
+    request,
+    "field_worker",
+  );
+  if (forbidden) return forbidden;
+
   const limited = enforceRateLimit(request, {
     bucket: "disaster-incidents",
     limit: 20,
@@ -74,10 +72,11 @@ export async function POST(request: Request) {
       title: typeof payload.title === "string" ? payload.title : undefined,
       type: incidentType(payload.type),
     };
-    const incident = await incidentService.createIncident(
-      input,
-      await requestActor(request),
-    );
+    const incident = await incidentService.createIncident(input, {
+      id: session.userId,
+      name: session.name,
+      role: session.role,
+    } satisfies IncidentActor);
     after(() => dispatchIncidentAlerts(incident));
 
     return noStoreJson({ incident }, { status: 201 });
