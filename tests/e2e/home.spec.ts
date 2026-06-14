@@ -163,6 +163,55 @@ test("loads the integrated disaster response map", async ({
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
 });
 
+test("routes staff login to admin and field workspaces", async ({
+  browserName,
+  page,
+  request,
+}) => {
+  await ensureSetupComplete(request);
+  const fieldUsername = `field.${browserName}.${Date.now().toString(36)}`;
+
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page.getByLabel("Password", { exact: true }).fill("StrongAdminPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+  await expect(
+    page.getByRole("heading", { name: "Staff accounts" }),
+  ).toBeVisible();
+
+  const created = await page.evaluate(async (username) => {
+    const response = await fetch("/api/admin/users", {
+      body: JSON.stringify({
+        department: "Jongno",
+        email: `${username}@example.com`,
+        name: "Field E2E",
+        password: "StrongFieldPass1!",
+        phone: "010-0000-0000",
+        role: "field_worker",
+        username,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    return response.ok;
+  }, fieldUsername);
+  expect(created).toBeTruthy();
+
+  await page.evaluate(() =>
+    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
+  );
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Username", { exact: true }).fill(fieldUsername);
+  await page.getByLabel("Password", { exact: true }).fill("StrongFieldPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/field$/);
+  await expect(
+    page.getByRole("heading", { name: "Field response" }),
+  ).toBeVisible();
+});
+
 test("shows a mobile bottom sheet for map selections", async ({
   page,
   request,

@@ -28,6 +28,9 @@ const incident: Incident = {
 };
 
 const incidentEvent: IncidentEvent = {
+  actorId: null,
+  actorName: null,
+  actorRole: null,
   createdAt: "2026-06-13T00:01:00.000Z",
   fromStatus: null,
   id: "event-report-test",

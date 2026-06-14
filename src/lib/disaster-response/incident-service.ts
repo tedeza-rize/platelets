@@ -4,6 +4,7 @@ import { incidentRepository } from "@/lib/disaster-response/incident-repository"
 import type {
   CreateIncidentInput,
   Incident,
+  IncidentActor,
   IncidentStatus,
   IncidentType,
   RiskLevel,
@@ -75,7 +76,10 @@ export class IncidentService {
     return incidentRepository.listIncidentEvents(id);
   }
 
-  async createIncident(input: CreateIncidentInput) {
+  async createIncident(
+    input: CreateIncidentInput,
+    actor?: IncidentActor | null,
+  ) {
     if (!INCIDENT_TYPES.has(input.type)) {
       throw new Error("지원하지 않는 사고 유형입니다.");
     }
@@ -90,33 +94,44 @@ export class IncidentService {
     });
 
     const now = new Date().toISOString();
-    const incident = await incidentRepository.createIncident({
-      address: boundedText(input.address, "좌표 기반 신고 위치", 240),
-      createdAt: now,
-      description: boundedText(
-        input.description,
-        "상세 설명이 없습니다.",
-        1200,
-      ),
-      latitude: input.latitude,
-      longitude: input.longitude,
-      occurredAt: validDateOrNow(input.occurredAt, now),
-      riskLevel: input.riskLevel,
-      status: "reported",
-      title: boundedText(input.title, "신규 사고 신고", 120),
-      type: input.type,
-    });
+    const incident = await incidentRepository.createIncident(
+      {
+        address: boundedText(input.address, "좌표 기반 신고 위치", 240),
+        createdAt: now,
+        description: boundedText(
+          input.description,
+          "상세 설명이 없습니다.",
+          1200,
+        ),
+        latitude: input.latitude,
+        longitude: input.longitude,
+        occurredAt: validDateOrNow(input.occurredAt, now),
+        riskLevel: input.riskLevel,
+        status: "reported",
+        title: boundedText(input.title, "신규 사고 신고", 120),
+        type: input.type,
+      },
+      actor,
+    );
     publishIncidentChange({ incidentId: incident.id, mutation: "created" });
 
     return incident;
   }
 
-  async updateIncidentStatus(id: string, status: IncidentStatus) {
+  async updateIncidentStatus(
+    id: string,
+    status: IncidentStatus,
+    actor?: IncidentActor | null,
+  ) {
     if (!INCIDENT_STATUSES.has(status)) {
       throw new Error("지원하지 않는 사고 상태입니다.");
     }
 
-    const incident = await incidentRepository.updateIncidentStatus(id, status);
+    const incident = await incidentRepository.updateIncidentStatus(
+      id,
+      status,
+      actor,
+    );
 
     if (incident) {
       publishIncidentChange({ incidentId: id, mutation: "updated" });
@@ -125,7 +140,11 @@ export class IncidentService {
     return incident;
   }
 
-  async updateIncident(id: string, input: UpdateIncidentInput) {
+  async updateIncident(
+    id: string,
+    input: UpdateIncidentInput,
+    actor?: IncidentActor | null,
+  ) {
     const current = await incidentRepository.getIncident(id);
 
     if (!current) {
@@ -147,17 +166,21 @@ export class IncidentService {
     const longitude = input.longitude ?? current.longitude;
     assertKoreaCoordinate({ latitude, longitude });
 
-    const incident = await incidentRepository.updateIncident(id, {
-      ...editableIncidentFields(current),
-      address: boundedText(input.address, current.address, 240),
-      description: boundedText(input.description, current.description, 1200),
-      latitude,
-      longitude,
-      occurredAt: validDateOrFallback(input.occurredAt, current.occurredAt),
-      riskLevel,
-      title: boundedText(input.title, current.title, 120),
-      type,
-    });
+    const incident = await incidentRepository.updateIncident(
+      id,
+      {
+        ...editableIncidentFields(current),
+        address: boundedText(input.address, current.address, 240),
+        description: boundedText(input.description, current.description, 1200),
+        latitude,
+        longitude,
+        occurredAt: validDateOrFallback(input.occurredAt, current.occurredAt),
+        riskLevel,
+        title: boundedText(input.title, current.title, 120),
+        type,
+      },
+      actor,
+    );
 
     if (incident) {
       publishIncidentChange({ incidentId: id, mutation: "updated" });
@@ -166,8 +189,8 @@ export class IncidentService {
     return incident;
   }
 
-  async deleteIncident(id: string) {
-    const deleted = await incidentRepository.deleteIncident(id);
+  async deleteIncident(id: string, actor?: IncidentActor | null) {
+    const deleted = await incidentRepository.deleteIncident(id, actor);
 
     if (deleted) {
       publishIncidentChange({ incidentId: id, mutation: "deleted" });

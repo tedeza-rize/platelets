@@ -1,13 +1,15 @@
-import { getAccessSessionRole, SESSION_COOKIE_NAME } from "@/lib/auth-sessions";
+import { getAccessSession, SESSION_COOKIE_NAME } from "@/lib/auth-sessions";
 import { noStoreJson } from "@/lib/http";
 
-export type AccessRole = "admin" | "sudo";
+export type AccessRole = "admin" | "dispatcher" | "field_worker" | "sudo";
 
 export const ACCESS_TOKEN_HEADER = "x-platelets-admin-token";
 
 const ACCESS_ROLE_LEVEL = {
-  admin: 1,
-  sudo: 2,
+  field_worker: 1,
+  dispatcher: 2,
+  admin: 3,
+  sudo: 4,
 } as const satisfies Record<AccessRole, number>;
 
 function requestToken(request: Request) {
@@ -37,13 +39,17 @@ function requestCookie(request: Request, name: string) {
 export async function getRequestAccessRole(
   request: Request,
 ): Promise<AccessRole | null> {
+  return (await getRequestAccessSession(request))?.role ?? null;
+}
+
+export async function getRequestAccessSession(request: Request) {
   const token = requestToken(request);
 
   if (!token) {
     return null;
   }
 
-  return getAccessSessionRole(token);
+  return getAccessSession(token);
 }
 
 export function canAccessRole(

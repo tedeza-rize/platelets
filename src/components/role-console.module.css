@@ -1,0 +1,194 @@
+.page {
+  min-height: 100vh;
+  background: #f6f8fb;
+  color: #142033;
+  padding: 24px;
+}
+
+.shell {
+  margin: 0 auto;
+  max-width: 1120px;
+}
+
+.narrowShell {
+  margin: 0 auto;
+  max-width: 480px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  font-size: 1.7rem;
+  margin: 0 0 6px;
+}
+
+.header p {
+  margin: 0;
+  color: #536173;
+}
+
+.card,
+.tableCard {
+  background: #ffffff;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgb(16 30 54 / 8%);
+  padding: 18px;
+}
+
+.grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.field textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.primary,
+.secondary,
+.danger {
+  align-items: center;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 800;
+  gap: 8px;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+}
+
+.primary {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.secondary {
+  background: #e8eef6;
+  color: #142033;
+}
+
+.danger {
+  background: #be123c;
+  color: #ffffff;
+}
+
+.notice {
+  color: #0f766e;
+  font-weight: 700;
+  margin: 12px 0 0;
+}
+
+.error {
+  color: #be123c;
+  font-weight: 700;
+  margin: 12px 0 0;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px;
+  text-align: left;
+}
+
+.table th {
+  color: #536173;
+  font-size: 0.85rem;
+}
+
+.incidentList {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.incident {
+  background: #ffffff;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.incident strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tabbar {
+  background: #ffffff;
+  border-top: 1px solid #dce4ee;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  left: 0;
+  position: sticky;
+  right: 0;
+}
+
+.tabbar button {
+  background: transparent;
+  border: 0;
+  color: #536173;
+  font-weight: 800;
+  padding: 12px 8px;
+}
+
+.tabbar button[data-active="true"] {
+  color: #0f766e;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 16px 14px 0;
+  }
+
+  .header {
+    display: block;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tableCard {
+    overflow-x: auto;
+  }
+}
