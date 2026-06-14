@@ -21,7 +21,8 @@ and exposes summarized data to OpenAI-compatible models and a local MCP server.
   fallback
 - OpenAI Responses API and Chat Completions-compatible proxy configuration
 - Read-only MCP tools for bounded facility summaries and grounding snapshots
-- Public, admin, and sudo access boundaries
+- Public, dispatcher, field worker, admin, and sudo access boundaries with
+  staff account login
 
 ## Environment
 
@@ -184,6 +185,9 @@ gh pr merge --merge --delete-branch
 - AI analysis: `/ai`
 - AI provider preset, model, proxy, reasoning, verbosity, and system prompt
   settings: `/sudo/ai`
+- Staff login and routing: `/login`
+- Field worker mobile workspace: `/field`
+- Staff account management: `/admin/users`
 - Local MCP server: `npm run mcp:points`
 
 The AI and MCP payloads intentionally contain bounded summaries rather than

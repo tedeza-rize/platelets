@@ -2,14 +2,18 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { AccessRole } from "@/lib/access-control";
 import { getAppSetting, setAppSetting } from "@/lib/points-db";
 import { getStoredAccessRole } from "@/lib/setup-state";
+import { authenticateUser } from "@/lib/users";
 
 export const SESSION_COOKIE_NAME = "platelets_session";
 
 type StoredAccessSession = {
   createdAt: string;
   expiresAt: string;
+  name: string;
   role: AccessRole;
   tokenHash: string;
+  userId: string | null;
+  username: string | null;
 };
 
 const SESSION_SETTINGS_KEY = "access-sessions";
@@ -37,17 +41,27 @@ async function readSessions() {
     [],
   );
 
-  return sessions.filter(
-    (session) => new Date(session.expiresAt).getTime() > now,
-  );
+  return sessions
+    .filter((session) => new Date(session.expiresAt).getTime() > now)
+    .map((session) => ({
+      ...session,
+      name: session.name ?? (session.role === "sudo" ? "sudo" : "admin"),
+      userId: session.userId ?? null,
+      username: session.username ?? null,
+    }));
 }
 
 async function writeSessions(sessions: StoredAccessSession[]) {
   await setAppSetting(SESSION_SETTINGS_KEY, sessions);
 }
 
-export async function createAccessSession(password: string) {
-  const role = await getStoredAccessRole(password);
+export type AccessSession = Omit<StoredAccessSession, "tokenHash">;
+
+export async function createAccessSession(password: string, username = "") {
+  const user = username.trim()
+    ? await authenticateUser(username, password)
+    : null;
+  const role = user?.role ?? (await getStoredAccessRole(password));
 
   if (!role) {
     return null;
@@ -58,17 +72,29 @@ export async function createAccessSession(password: string) {
   const session: StoredAccessSession = {
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + SESSION_TTL_MS).toISOString(),
+    name: user?.name ?? (role === "sudo" ? "sudo" : "admin"),
     role,
     tokenHash: hashToken(token),
+    userId: user?.id ?? null,
+    username: user?.username ?? null,
   };
   const sessions = await readSessions();
   sessions.push(session);
   await writeSessions(sessions);
 
-  return { expiresAt: session.expiresAt, role, token };
+  return {
+    expiresAt: session.expiresAt,
+    name: session.name,
+    role,
+    token,
+    userId: session.userId,
+    username: session.username,
+  };
 }
 
-export async function getAccessSessionRole(token: string) {
+export async function getAccessSession(
+  token: string,
+): Promise<AccessSession | null> {
   if (!token) {
     return null;
   }
@@ -79,7 +105,20 @@ export async function getAccessSessionRole(token: string) {
     safeEqual(candidate.tokenHash, tokenHash),
   );
 
-  return session?.role ?? null;
+  if (!session) return null;
+
+  return {
+    createdAt: session.createdAt,
+    expiresAt: session.expiresAt,
+    name: session.name,
+    role: session.role,
+    userId: session.userId,
+    username: session.username,
+  };
+}
+
+export async function getAccessSessionRole(token: string) {
+  return (await getAccessSession(token))?.role ?? null;
 }
 
 export async function revokeAccessSession(token: string) {

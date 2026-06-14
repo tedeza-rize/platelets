@@ -27,6 +27,7 @@ import {
   getServerTimeStatusForServers,
   TIME_SKEW_THRESHOLD_MS,
 } from "@/lib/time-sync";
+import { ensureSetupUsers } from "@/lib/users";
 
 export type SetupRole = "admin" | "sudo";
 
@@ -344,6 +345,18 @@ export async function completeSetup(payload: SetupPayload) {
     licenseAcceptedAt: completedAt,
   };
 
+  await ensureSetupUsers({
+    admin: {
+      email: state.accounts.admin.email,
+      name: state.accounts.admin.fullName,
+      password: payload.admin.password,
+    },
+    sudo: {
+      email: state.accounts.sudo.email,
+      name: state.accounts.sudo.fullName,
+      password: payload.sudo.password,
+    },
+  });
   await setAppSetting(SETUP_STATE_KEY, state);
   return state;
 }
