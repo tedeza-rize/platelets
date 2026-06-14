@@ -338,6 +338,51 @@ type KakaoLocalSearchResponse = {
   };
 };
 
+type VworldSearchMode = "address" | "both" | "keyword";
+
+type VworldAddressResponse = {
+  response?: {
+    error?: {
+      code?: string;
+      text?: string;
+    };
+    result?:
+      | {
+          point?: {
+            x?: string;
+            y?: string;
+          };
+        }
+      | Array<{
+          text?: string;
+        }>;
+    status?: string;
+  };
+};
+
+type VworldSearchResponse = {
+  response?: {
+    error?: {
+      code?: string;
+      text?: string;
+    };
+    result?: {
+      items?: Array<{
+        address?: {
+          parcel?: string;
+          road?: string;
+        };
+        point?: {
+          x?: string;
+          y?: string;
+        };
+        title?: string;
+      }>;
+    };
+    status?: string;
+  };
+};
+
 async function getDatabase(): Promise<SqliteDatabase> {
   return new Database(databasePath, {
     fileMustExist: true,
@@ -926,6 +971,14 @@ function kakaoRestApiKey() {
   );
 }
 
+function vworldApiKey() {
+  return (
+    process.env.VWORLD_API_KEY?.trim() ??
+    process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ??
+    null
+  );
+}
+
 function kakaoLocalEndpoint(kind: KakaoLocalSearchKind) {
   return kind === "address"
     ? "https://dapi.kakao.com/v2/local/search/address.json"
@@ -1000,6 +1053,252 @@ async function kakaoLocalCoordinate(params: {
   }
 
   return { error: "no-coordinate-result-inside-korea", result: null };
+}
+
+function coordinateFromVworldPoint(
+  point: { x?: string; y?: string } | undefined,
+) {
+  const longitude = Number(point?.x);
+  const latitude = Number(point?.y);
+  const coordinates = { latitude, longitude };
+
+  return Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    isWithinKoreaCoordinates(coordinates)
+    ? coordinates
+    : null;
+}
+
+function vworldAddressText(item: {
+  address?: { parcel?: string; road?: string };
+  title?: string;
+}) {
+  return item.address?.road ?? item.address?.parcel ?? item.title ?? null;
+}
+
+async function vworldAddressCoordinate(params: {
+  query: string;
+  type: "parcel" | "road";
+}) {
+  const apiKey = vworldApiKey();
+  const query = params.query.trim().slice(0, 160);
+
+  if (!query) return { error: "query-required", result: null };
+  if (!apiKey) return { error: "vworld-api-key-missing", result: null };
+
+  const url = new URL("https://api.vworld.kr/req/address");
+  url.searchParams.set("service", "address");
+  url.searchParams.set("request", "getCoord");
+  url.searchParams.set("version", "2.0");
+  url.searchParams.set("crs", "EPSG:4326");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("errorformat", "json");
+  url.searchParams.set("type", params.type);
+  url.searchParams.set("address", query);
+  url.searchParams.set("key", apiKey);
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    return {
+      error: `VWorld failed with HTTP ${response.status}`,
+      result: null,
+    };
+  }
+
+  const payload = (await response.json()) as VworldAddressResponse;
+  const coordinates = coordinateFromVworldPoint(
+    Array.isArray(payload.response?.result)
+      ? undefined
+      : payload.response?.result?.point,
+  );
+
+  if (payload.response?.status !== "OK" || !coordinates) {
+    return {
+      error:
+        payload.response?.error?.text ??
+        payload.response?.status ??
+        "no-coordinate-result-inside-korea",
+      result: null,
+    };
+  }
+
+  return {
+    error: null,
+    result: {
+      ...coordinates,
+      matchedAddress: query,
+      query,
+      searchKind: params.type,
+      source: `vworld-address-${params.type}`,
+    },
+  };
+}
+
+async function vworldSearchLocations(params: {
+  limit: number;
+  query: string;
+  searchMode: VworldSearchMode;
+}) {
+  const apiKey = vworldApiKey();
+  const query = params.query.trim().slice(0, 160);
+  const limit = clamp(params.limit, 1, 20);
+
+  if (!query) return { error: "query-required", results: [] };
+  if (!apiKey) return { error: "vworld-api-key-missing", results: [] };
+
+  const requests =
+    params.searchMode === "address"
+      ? [
+          {
+            category: "road",
+            source: "vworld-search-address-road",
+            type: "address",
+          },
+          {
+            category: "parcel",
+            source: "vworld-search-address-parcel",
+            type: "address",
+          },
+        ]
+      : [
+          { source: "vworld-search-place", type: "place" },
+          {
+            category: "road",
+            source: "vworld-search-address-road",
+            type: "address",
+          },
+          {
+            category: "parcel",
+            source: "vworld-search-address-parcel",
+            type: "address",
+          },
+          {
+            category: "L4",
+            source: "vworld-search-district",
+            type: "district",
+          },
+        ];
+  const results = [];
+  const seen = new Set<string>();
+
+  for (const request of requests) {
+    if (results.length >= limit) break;
+
+    const url = new URL("https://api.vworld.kr/req/search");
+    url.searchParams.set("service", "search");
+    url.searchParams.set("request", "search");
+    url.searchParams.set("version", "2.0");
+    url.searchParams.set("crs", "EPSG:4326");
+    url.searchParams.set("format", "json");
+    url.searchParams.set("errorformat", "json");
+    url.searchParams.set("page", "1");
+    url.searchParams.set("size", String(limit));
+    url.searchParams.set("query", query);
+    url.searchParams.set("type", request.type);
+    url.searchParams.set("key", apiKey);
+
+    if (request.category) {
+      url.searchParams.set("category", request.category);
+    }
+
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) continue;
+
+    const payload = (await response.json()) as VworldSearchResponse;
+    const items = payload.response?.result?.items ?? [];
+
+    for (const item of items) {
+      const coordinates = coordinateFromVworldPoint(item.point);
+      const matchedAddress = vworldAddressText(item);
+      if (!coordinates) continue;
+
+      const key = `${coordinates.latitude}:${coordinates.longitude}:${matchedAddress}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      results.push({
+        ...coordinates,
+        matchedAddress,
+        query,
+        source: request.source,
+        title: item.title ?? null,
+      });
+
+      if (results.length >= limit) break;
+    }
+  }
+
+  return { error: null, results };
+}
+
+async function vworldReverseCoordinate(params: {
+  latitude: number;
+  longitude: number;
+  type: "both" | "parcel" | "road";
+}) {
+  const apiKey = vworldApiKey();
+  const coordinates = {
+    latitude: params.latitude,
+    longitude: params.longitude,
+  };
+
+  if (!apiKey) return { error: "vworld-api-key-missing", result: null };
+  if (!isWithinKoreaCoordinates(coordinates)) {
+    return { error: "coordinate-outside-korea", result: null };
+  }
+
+  const url = new URL("https://api.vworld.kr/req/address");
+  url.searchParams.set("service", "address");
+  url.searchParams.set("request", "getAddress");
+  url.searchParams.set("version", "2.0");
+  url.searchParams.set("crs", "EPSG:4326");
+  url.searchParams.set("format", "json");
+  url.searchParams.set("errorformat", "json");
+  url.searchParams.set("type", params.type);
+  url.searchParams.set("point", `${params.longitude},${params.latitude}`);
+  url.searchParams.set("key", apiKey);
+
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    return {
+      error: `VWorld failed with HTTP ${response.status}`,
+      result: null,
+    };
+  }
+
+  const payload = (await response.json()) as VworldAddressResponse;
+  const addresses = Array.isArray(payload.response?.result)
+    ? payload.response.result
+        .map((entry) => entry.text?.trim())
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+
+  if (payload.response?.status !== "OK" || addresses.length === 0) {
+    return {
+      error:
+        payload.response?.error?.text ??
+        payload.response?.status ??
+        "no-address-result",
+      result: null,
+    };
+  }
+
+  return {
+    error: null,
+    result: {
+      addresses: addresses.slice(0, 5),
+      coordinates,
+      provider: "vworld",
+    },
+  };
 }
 
 function isKakaoDirectionSummary(
@@ -1173,7 +1472,7 @@ server.registerTool(
   "geocode_place",
   {
     description:
-      "Resolve one Korean place, landmark, station exit, plaza, or address query to coordinates using Kakao Local. Returns no raw provider payload.",
+      "Resolve one Korean place, landmark, station exit, plaza, or address query to coordinates using Kakao Local. Use vworld_search_locations when Kakao is unavailable or more map search coverage is needed. Returns no raw provider payload.",
     inputSchema: {
       query: z.string().min(1).max(160),
       searchMode: z
@@ -1188,6 +1487,73 @@ server.registerTool(
       geocoding: await kakaoLocalCoordinate({
         query: args.query,
         searchMode: args.searchMode,
+      }),
+    }),
+);
+
+server.registerTool(
+  "vworld_geocode_address",
+  {
+    description:
+      "Resolve one Korean road or parcel address to coordinates using VWorld Geocoder API 2.0. Returns no raw provider payload.",
+    inputSchema: {
+      query: z.string().min(1).max(160),
+      type: z.enum(["road", "parcel"]).optional().default("road"),
+    },
+    title: "VWorld Geocode Address",
+  },
+  async (args) =>
+    asToolResult({
+      geocoding: await vworldAddressCoordinate({
+        query: args.query,
+        type: args.type,
+      }),
+    }),
+);
+
+server.registerTool(
+  "vworld_search_locations",
+  {
+    description:
+      "Search Korean places, road addresses, parcel addresses, and districts using VWorld Search API 2.0. Returns bounded normalized map results only.",
+    inputSchema: {
+      limit: z.number().int().min(1).max(20).optional().default(5),
+      query: z.string().min(1).max(160),
+      searchMode: z
+        .enum(["both", "keyword", "address"])
+        .optional()
+        .default("both"),
+    },
+    title: "VWorld Search Locations",
+  },
+  async (args) =>
+    asToolResult(
+      await vworldSearchLocations({
+        limit: args.limit,
+        query: args.query,
+        searchMode: args.searchMode,
+      }),
+    ),
+);
+
+server.registerTool(
+  "vworld_reverse_geocode",
+  {
+    description:
+      "Resolve Korean coordinates to road and parcel addresses using VWorld Geocoder API 2.0. Returns no raw provider payload.",
+    inputSchema: {
+      latitude: z.number().min(32).max(39),
+      longitude: z.number().min(124).max(132),
+      type: z.enum(["both", "road", "parcel"]).optional().default("both"),
+    },
+    title: "VWorld Reverse Geocode",
+  },
+  async (args) =>
+    asToolResult({
+      reverseGeocoding: await vworldReverseCoordinate({
+        latitude: args.latitude,
+        longitude: args.longitude,
+        type: args.type,
       }),
     }),
 );

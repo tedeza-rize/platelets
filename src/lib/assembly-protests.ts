@@ -11,7 +11,7 @@ import {
   type CoordinatePair,
   isWithinKoreaCoordinates,
 } from "@/lib/coordinates";
-import { searchKakaoLocalCoordinates } from "@/lib/geocoding";
+import { searchMapCoordinates } from "@/lib/geocoding";
 import {
   type AssemblyProtestInput,
   type AssemblyProtestUpdateResult,
@@ -1037,14 +1037,14 @@ async function tryKakaoAssemblyQuery(
   searchMode: GeocodePlaceToolArguments["searchMode"] = "both",
 ) {
   if (searchMode === "address") {
-    return searchKakaoLocalCoordinates({
+    return searchMapCoordinates({
       action: "assembly-protests:geocode",
       kind: "address",
       query,
     });
   }
 
-  const keyword = await searchKakaoLocalCoordinates({
+  const keyword = await searchMapCoordinates({
     action: "assembly-protests:geocode",
     kind: "keyword",
     query,
@@ -1053,7 +1053,7 @@ async function tryKakaoAssemblyQuery(
   return searchMode === "keyword"
     ? keyword
     : (keyword ??
-        (await searchKakaoLocalCoordinates({
+        (await searchMapCoordinates({
           action: "assembly-protests:geocode",
           kind: "address",
           query,
