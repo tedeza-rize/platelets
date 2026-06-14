@@ -1,10 +1,31 @@
 "use client";
 
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import type { UserAccount, UserRole } from "@/lib/users";
 import styles from "./role-console.module.css";
+
+type UserErrorCode =
+  | "invalid_input"
+  | "last_admin"
+  | "not_found"
+  | "protected_account"
+  | "self_delete"
+  | "self_role_change"
+  | "session_required"
+  | "sudo_required";
+
+const errorMessageKeys: Record<UserErrorCode, string> = {
+  invalid_input: "Check the account information and try again.",
+  last_admin: "Keep at least one administrator account.",
+  not_found: "The account could not be found.",
+  protected_account: "The bootstrap sudo account is protected.",
+  self_delete: "You cannot delete your own account.",
+  self_role_change: "You cannot change your own role.",
+  session_required: "Sign in again to continue.",
+  sudo_required: "Only a sudo administrator can manage sudo accounts.",
+};
 
 const emptyForm = {
   department: "",
@@ -17,13 +38,18 @@ const emptyForm = {
 };
 
 export function UserAdminConsole({
+  currentUserId,
   dictionary,
+  viewerRole,
 }: {
+  currentUserId: string;
   dictionary: AppDictionary;
+  viewerRole: "admin" | "sudo";
 }) {
   const t = useCallback((key: string) => uiText(dictionary, key), [dictionary]);
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -37,12 +63,11 @@ export function UserAdminConsole({
   const refresh = useCallback(async () => {
     const response = await fetch("/api/admin/users", { cache: "no-store" });
     const payload = (await response.json().catch(() => null)) as {
-      error?: string;
       users?: UserAccount[];
     } | null;
 
     if (!response.ok || !payload?.users) {
-      throw new Error(payload?.error ?? t("Could not load users."));
+      throw new Error(t("Could not load users."));
     }
 
     setUsers(payload.users);
@@ -58,42 +83,109 @@ export function UserAdminConsole({
     );
   }, [refresh]);
 
-  async function create(event: React.FormEvent) {
+  function apiErrorMessage(
+    errorCode: UserErrorCode | undefined,
+    fallbackKey: string,
+  ) {
+    return t(errorCode ? errorMessageKeys[errorCode] : fallbackKey);
+  }
+
+  function beginEdit(user: UserAccount) {
+    setEditingId(user.id);
+    setForm({
+      department: user.department,
+      email: user.email,
+      name: user.name,
+      password: "",
+      phone: user.phone,
+      role: user.role,
+      username: user.username,
+    });
+    setError("");
+    setNotice("");
+  }
+
+  function cancelEdit() {
+    setEditingId("");
+    setForm(emptyForm);
+    setError("");
+  }
+
+  async function save(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setNotice("");
 
-    const response = await fetch("/api/admin/users", {
-      body: JSON.stringify(form),
-      headers: { "Content-Type": "application/json" },
-      method: "POST",
-    });
+    const response = await fetch(
+      editingId ? `/api/admin/users/${editingId}` : "/api/admin/users",
+      {
+        body: JSON.stringify(form),
+        headers: { "Content-Type": "application/json" },
+        method: editingId ? "PATCH" : "POST",
+      },
+    );
     const payload = (await response.json().catch(() => null)) as {
-      error?: string;
+      errorCode?: UserErrorCode;
+      sessionRevoked?: boolean;
     } | null;
 
     if (!response.ok) {
-      setError(payload?.error ?? t("Could not save user."));
+      setError(
+        apiErrorMessage(
+          payload?.errorCode,
+          editingId ? "Could not update user." : "Could not save user.",
+        ),
+      );
+      return;
+    }
+
+    if (editingId === currentUserId && payload?.sessionRevoked) {
+      window.location.assign("/login");
       return;
     }
 
     setForm(emptyForm);
-    setNotice(t("User saved."));
+    setEditingId("");
+    setNotice(t(editingId ? "User updated." : "User saved."));
     await refresh();
   }
 
   async function remove(id: string) {
+    if (!window.confirm(t("Delete this account?"))) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
     const response = await fetch(`/api/admin/users/${id}`, {
       method: "DELETE",
     });
+    const payload = (await response.json().catch(() => null)) as {
+      errorCode?: UserErrorCode;
+    } | null;
 
     if (!response.ok) {
-      setError(t("Could not delete user."));
+      setError(apiErrorMessage(payload?.errorCode, "Could not delete user."));
       return;
     }
 
     setNotice(t("User deleted."));
     await refresh();
+  }
+
+  const editingUser = users.find((user) => user.id === editingId);
+  const adminCount = users.filter(
+    (user) => user.role === "admin" || user.role === "sudo",
+  ).length;
+
+  function canEdit(user: UserAccount) {
+    return viewerRole === "sudo" || user.role !== "sudo";
+  }
+
+  function canDelete(user: UserAccount) {
+    if (user.id === currentUserId || user.username === "sudo") return false;
+    if (viewerRole !== "sudo" && user.role === "sudo") return false;
+    return (user.role !== "admin" && user.role !== "sudo") || adminCount > 1;
   }
 
   return (
@@ -110,12 +202,18 @@ export function UserAdminConsole({
           </button>
         </header>
 
-        <form className={styles.card} onSubmit={create}>
+        <form className={styles.card} onSubmit={save}>
+          {editingUser ? (
+            <h2 className={styles.formTitle}>
+              {t("Edit account")}: {editingUser.name}
+            </h2>
+          ) : null}
           <div className={styles.grid}>
             <label className={styles.field}>
               {t("Username")}
               <input
                 onChange={(event) => updateForm("username", event.target.value)}
+                readOnly={editingUser?.username === "sudo"}
                 required
                 value={form.username}
               />
@@ -138,10 +236,10 @@ export function UserAdminConsole({
               />
             </label>
             <label className={styles.field}>
-              {t("Temporary password")}
+              {t(editingId ? "New password (optional)" : "Temporary password")}
               <input
                 onChange={(event) => updateForm("password", event.target.value)}
-                required
+                required={!editingId}
                 type="password"
                 value={form.password}
               />
@@ -173,17 +271,38 @@ export function UserAdminConsole({
                 <option value="dispatcher">{t("Dispatcher")}</option>
                 <option value="field_worker">{t("Field worker")}</option>
                 <option value="admin">{t("Administrator")}</option>
+                {viewerRole === "sudo" ? (
+                  <option value="sudo">{t("sudo")}</option>
+                ) : null}
               </select>
             </label>
           </div>
           <div className={styles.actions}>
             <button className={styles.primary} type="submit">
-              <Plus aria-hidden="true" size={16} />
-              {t("Create account")}
+              {editingId ? (
+                <Save aria-hidden="true" size={16} />
+              ) : (
+                <Plus aria-hidden="true" size={16} />
+              )}
+              {t(editingId ? "Save changes" : "Create account")}
             </button>
+            {editingId ? (
+              <button
+                className={styles.secondary}
+                onClick={cancelEdit}
+                type="button"
+              >
+                <X aria-hidden="true" size={16} />
+                {t("Cancel")}
+              </button>
+            ) : null}
           </div>
-          {notice ? <p className={styles.notice}>{notice}</p> : null}
-          {error ? <p className={styles.error}>{error}</p> : null}
+          {notice ? <output className={styles.notice}>{notice}</output> : null}
+          {error ? (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          ) : null}
         </form>
 
         <section className={styles.tableCard}>
@@ -207,14 +326,32 @@ export function UserAdminConsole({
                   <td>{user.department || "-"}</td>
                   <td>{user.phone || "-"}</td>
                   <td>
-                    <button
-                      className={styles.danger}
-                      onClick={() => remove(user.id)}
-                      type="button"
-                    >
-                      <Trash2 aria-hidden="true" size={16} />
-                      {t("Delete")}
-                    </button>
+                    <div className={styles.tableActions}>
+                      {canEdit(user) ? (
+                        <button
+                          className={styles.secondary}
+                          onClick={() => beginEdit(user)}
+                          type="button"
+                        >
+                          <Pencil aria-hidden="true" size={16} />
+                          {t("Edit")}
+                        </button>
+                      ) : null}
+                      {canDelete(user) ? (
+                        <button
+                          className={styles.danger}
+                          onClick={() => remove(user.id)}
+                          type="button"
+                        >
+                          <Trash2 aria-hidden="true" size={16} />
+                          {t("Delete")}
+                        </button>
+                      ) : (
+                        <span className={styles.protected}>
+                          {t("Protected")}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

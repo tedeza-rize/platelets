@@ -2,7 +2,7 @@
 
 import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./role-console.module.css";
 
@@ -12,6 +12,11 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    setIsReady(true);
+  }, []);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -70,7 +75,11 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
             />
           </label>
           <div className={styles.actions}>
-            <button className={styles.primary} type="submit">
+            <button
+              className={styles.primary}
+              disabled={!isReady}
+              type="submit"
+            >
               <LogIn aria-hidden="true" size={18} />
               {t("Sign in")}
             </button>

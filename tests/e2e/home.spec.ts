@@ -177,7 +177,7 @@ test("loads the integrated disaster response map", async ({
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
 });
 
-test("routes staff login to admin and field workspaces", async ({
+test("routes staff login and updates an account lifecycle", async ({
   browserName,
   page,
   request,
@@ -224,6 +224,35 @@ test("routes staff login to admin and field workspaces", async ({
   await expect(
     page.getByRole("heading", { name: "Field response" }),
   ).toBeVisible();
+
+  await page.evaluate(() =>
+    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
+  );
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Username", { exact: true }).fill("sudo");
+  await page.getByLabel("Password", { exact: true }).fill("StrongSudoPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/admin\/users$/);
+
+  await page.getByRole("button", { name: "Refresh" }).click();
+  const accountRow = page.getByRole("row").filter({ hasText: fieldUsername });
+  await accountRow.getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel("Name", { exact: true }).fill("Dispatcher E2E");
+  await page.getByLabel("New password (optional)").fill("UpdatedFieldPass1!");
+  await page.getByRole("combobox", { name: "Role" }).selectOption("dispatcher");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("User updated.")).toBeVisible();
+  await expect(accountRow).toContainText("Dispatcher E2E");
+  await expect(accountRow).toContainText("Dispatcher");
+
+  await page.evaluate(() =>
+    fetch("/api/auth/logout", { method: "POST" }).then(() => undefined),
+  );
+  await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Username", { exact: true }).fill(fieldUsername);
+  await page.getByLabel("Password", { exact: true }).fill("UpdatedFieldPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
 });
 
 test("shows a mobile bottom sheet for map selections", async ({
