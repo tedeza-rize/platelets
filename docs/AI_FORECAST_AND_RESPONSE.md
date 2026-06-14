@@ -36,10 +36,11 @@ External public data:
 Current application data:
 
 - `points`: fire stations/119 safety centers, police stations, and AED locations.
+- `points`: hospitals and NMC emergency medical institutions, including
+  emergency-room operation flags and real-time bed/capability fields when the
+  NMC emergency-specific API is available.
 - `hazard_events`: earthquake and tsunami events already imported from KMA.
 - `dataset_updates`: source freshness and geocoding coverage.
-
-Hospital/ER data is not yet ingested. Do not present hospital capability ranking as implemented until a dataset is added.
 
 ## Model Inputs
 
@@ -89,13 +90,36 @@ For hospitals, ranking must consider patient type and capability:
 - Cardiac symptoms should prioritize emergency cardiac capability.
 - If the user does not select a patient type, show a default recommendation sorted by likely response speed and general emergency suitability.
 
-Important: The current repository does not yet have a hospital/ER capability dataset. Add one before implementing hospital ranking. Minimum hospital fields:
+Current implementation:
+
+- `src/lib/medical-dataset-import.ts` imports NMC hospital FullData,
+  moonlight-child-hospital data, and NMC emergency medical institution data.
+- Emergency institution records merge basic institution information,
+  real-time emergency bed data, and severe-condition capability data by HPID
+  when the NMC emergency-specific endpoints are available.
+- If the emergency-specific API is blocked, the importer derives candidates
+  from hospital FullData records with `dutyEryn=1`. This fallback preserves
+  emergency-room candidates but does not provide the same real-time bed fields.
+- `src/lib/emergency-recommendation.ts` ranks nearby emergency institutions by
+  scenario-specific weights for travel time, specialty evidence, bed evidence,
+  critical-care evidence, availability, and source freshness.
+- `/api/emergency/recommendations` returns both a dispatch-station candidate
+  and scenario-aware hospital recommendations for browser use.
+- Kakao Mobility ETA is used when configured. If the Kakao route call is not
+  available, the recommendation falls back to a road-distance estimate rather
+  than dropping the candidate.
+
+Minimum hospital fields used by the ranking path:
 
 - `id`, `name`, `address`, `latitude`, `longitude`, `phone`
 - `emergencyRoomAvailable`
 - `departments`
 - `bedCounts` by type, including general ER, ICU, pediatric, neonatal, trauma, isolation
 - `updatedAt`, `source`, `raw`
+
+This is a rule-based operational recommender, not a trained demand-forecasting
+model. Keep future forecast claims separate from the implemented hospital
+ranking behavior.
 
 ## Kakao Directions API
 
@@ -154,7 +178,11 @@ Available tools:
   police notices. Raw board text is never returned.
 - `list_points`: bounded point listing for small context windows. Prefer bbox and low limits.
 - `nearest_points`: straight-line nearest resources for an incident coordinate.
-- `rank_response_points`: route-aware ranking for existing response points. Uses Kakao directions when configured.
+- `rank_response_points`: route-aware ranking for existing non-hospital
+  response points. Uses Kakao directions when configured.
+- `recommend_emergency_hospitals`: scenario-aware hospital recommendation
+  using road-time evidence and stored NMC emergency institution capability
+  fields.
 
 LLM usage rules:
 
@@ -164,8 +192,12 @@ LLM usage rules:
   resolution.
 - Prefer `nearest_points` or `list_points` with a bounding box.
 - Treat route duration as operationally stronger than straight-line distance.
-- Do not claim hospital suitability is implemented until hospital/ER capability data is imported.
-- For patient-type-specific hospital recommendations, first check that hospital capability fields exist.
+- Use `recommend_emergency_hospitals` for patient-type-specific hospital
+  recommendations. Use `rank_response_points` for generic response resources
+  such as fire stations or police stations.
+- When explaining a hospital recommendation, distinguish confirmed NMC
+  emergency institution fields from fallback hospital FullData candidates that
+  only prove emergency-room operation.
 
 ## HTTP Points API
 
@@ -208,6 +240,7 @@ Point detail:
 - Add 119 call reception data import and regional/time aggregation.
 - Add special-day and weather feature pipelines.
 - Add forecast table and API for region/time risk.
-- Add hospital/ER capability ingestion.
+- Expand hospital/ER capability validation, operator-facing caveats, and
+  freshness monitoring for real-time NMC fields.
 - Add a route-ranking API for browser UI, backed by the same Kakao directions logic used by MCP.
 - Render forecast heatmaps and incident response recommendations on the map.
