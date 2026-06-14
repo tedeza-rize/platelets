@@ -3,7 +3,6 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { deflateRawSync } from "node:zlib";
 import type { AssemblyProtestInput } from "@/lib/points-db";
 
 const dataDirectory = mkdtempSync(
@@ -63,6 +62,48 @@ function protest(
     startsAt: "2026-06-13T10:00:00+09:00",
     ...patch,
   };
+}
+
+function buildTextPdf(lines: string[]) {
+  const escapePdfText = (value: string) =>
+    value.replace(/[\\()]/g, (match) => `\\${match}`);
+  const content = [
+    "BT",
+    "/F1 12 Tf",
+    "72 720 Td",
+    ...lines.flatMap((line, index) => [
+      index === 0 ? "" : "0 -18 Td",
+      `(${escapePdfText(line)}) Tj`,
+    ]),
+    "ET",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+
+  for (const [index, object] of objects.entries()) {
+    offsets.push(Buffer.byteLength(pdf));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  }
+
+  const xrefOffset = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  pdf += offsets
+    .slice(1)
+    .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+    .join("");
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
+  return Buffer.from(pdf);
 }
 
 test("replaceAssemblyProtestsForDate replaces one date without touching another date", async () => {
@@ -428,24 +469,14 @@ test("buildAssemblyGeocodingCandidates uses the first march segment", () => {
   );
 });
 
-test("extractTextFromAssemblyAttachment reads simple PDF text streams", async () => {
-  const stream = deflateRawSync(
-    Buffer.from(
-      "BT (\uC77C\uC2DC : 10:00~12:00) Tj (\uC7A5\uC18C : \uC11C\uC6B8\uAD11\uC7A5) Tj ET",
-    ),
-  );
-  const buffer = Buffer.concat([
-    Buffer.from("%PDF-1.7\n1 0 obj\n<< /Filter /FlateDecode >>\nstream\n"),
-    stream,
-    Buffer.from("\nendstream\nendobj\n%%EOF"),
-  ]);
-
+test("extractTextFromAssemblyAttachment reads valid PDF text with PDF.js", async () => {
+  const buffer = buildTextPdf(["Time: 10:00~12:00", "Place: Seoul Plaza"]);
   const text = await assemblyProtests.extractTextFromAssemblyAttachment({
     buffer,
     contentType: "application/pdf",
     url: "https://example.test/assembly.pdf",
   });
 
-  assert.match(text, /\uC77C\uC2DC : 10:00~12:00/);
-  assert.match(text, /\uC7A5\uC18C : \uC11C\uC6B8\uAD11\uC7A5/);
+  assert.match(text, /Time: 10:00~12:00/);
+  assert.match(text, /Place: Seoul Plaza/);
 });

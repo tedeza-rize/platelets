@@ -18,6 +18,7 @@
     "test:ci": "npm run lint && npm run test && npm run build && npm run test:e2e"
   },
   "dependencies": {
+    "@e965/xlsx": "^0.20.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@rhwp/core": "^0.7.15",
     "better-sqlite3": "^12.10.0",
@@ -27,6 +28,7 @@
     "maplibre-gl": "^5.24.0",
     "next": "16.2.7",
     "openai": "^6.42.0",
+    "pdfjs-dist": "^6.0.227",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "web-push": "^3.6.7"
