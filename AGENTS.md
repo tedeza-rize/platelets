@@ -37,6 +37,8 @@ These are not suggestions. There are no exceptions, including "small" or "obviou
 | Before you... | Read |
 | --- | --- |
 | Touch anything (always) | This file, `README.md` |
+| Write or modify TypeScript/React code | `CODING_STYLE.md` |
+| Change user-facing UI, CSS, or visual design | `DESIGN.md` |
 | Write/modify Next.js routes, layouts, server code | The relevant guide in `node_modules/next/dist/docs/` |
 | Change architecture, add modules, move directories | `docs/ARCHITECTURE.md` |
 | Implement a feature or fix | `docs/DEVELOPMENT_GUIDE.md` |
