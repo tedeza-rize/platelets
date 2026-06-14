@@ -1,6 +1,10 @@
-import { requireAccessRole } from "@/lib/access-control";
+import {
+  deleteManagedUser,
+  type UserManagementErrorCode,
+  updateManagedUser,
+} from "@/features/users/user-account-service";
+import { requireAccessSession } from "@/lib/access-control";
 import { noStoreJson } from "@/lib/http";
-import { deleteUser, updateUser } from "@/lib/users";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +13,7 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const forbidden = await requireAccessRole(request, "admin");
+  const [session, forbidden] = await requireAccessSession(request, "admin");
   if (forbidden) return forbidden;
 
   const payload = (await request.json().catch(() => null)) as Record<
@@ -18,35 +22,68 @@ export async function PATCH(
   > | null;
 
   if (!payload) {
-    return noStoreJson({ error: "User payload is required." }, { status: 400 });
+    return noStoreJson({ errorCode: "invalid_input" }, { status: 400 });
   }
 
-  try {
-    const { id } = await context.params;
-    const user = await updateUser(id, payload);
-
-    return user
-      ? noStoreJson({ user })
-      : noStoreJson({ error: "User was not found." }, { status: 404 });
-  } catch (error) {
-    return noStoreJson(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 400 },
-    );
+  if (
+    !session.userId ||
+    (session.role !== "admin" && session.role !== "sudo")
+  ) {
+    return noStoreJson({ errorCode: "session_required" }, { status: 401 });
   }
+
+  const { id } = await context.params;
+  const [result, error] = await updateManagedUser(
+    { id: session.userId, role: session.role },
+    id,
+    payload,
+  );
+
+  return error
+    ? noStoreJson(
+        { errorCode: error.code },
+        { status: userErrorStatus(error.code) },
+      )
+    : noStoreJson(result);
 }
 
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const forbidden = await requireAccessRole(request, "admin");
+  const [session, forbidden] = await requireAccessSession(request, "admin");
   if (forbidden) return forbidden;
 
-  const { id } = await context.params;
-  const deleted = await deleteUser(id);
+  if (
+    !session.userId ||
+    (session.role !== "admin" && session.role !== "sudo")
+  ) {
+    return noStoreJson({ errorCode: "session_required" }, { status: 401 });
+  }
 
-  return deleted
-    ? noStoreJson({ deleted: true })
-    : noStoreJson({ error: "User was not found." }, { status: 404 });
+  const { id } = await context.params;
+  const [result, error] = await deleteManagedUser(
+    { id: session.userId, role: session.role },
+    id,
+  );
+
+  return error
+    ? noStoreJson(
+        { errorCode: error.code },
+        { status: userErrorStatus(error.code) },
+      )
+    : noStoreJson(result);
+}
+
+function userErrorStatus(code: UserManagementErrorCode) {
+  if (code === "not_found") return 404;
+  if (code === "protected_account" || code === "sudo_required") return 403;
+  if (
+    code === "last_admin" ||
+    code === "self_delete" ||
+    code === "self_role_change"
+  ) {
+    return 409;
+  }
+  return 400;
 }

@@ -7,13 +7,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, {
-    bucket: "auth-login",
-    limit: 5,
-    windowMs: 60_000,
-  });
-  if (limited) return limited;
-
   const payload = (await request.json().catch(() => null)) as {
     password?: unknown;
     username?: unknown;
@@ -21,6 +14,22 @@ export async function POST(request: Request) {
   const password = String(payload?.password ?? "");
   const username =
     typeof payload?.username === "string" ? payload.username : "";
+  const normalizedUsername =
+    username.trim().toLowerCase().slice(0, 40) || "legacy";
+  const globalLimit = enforceRateLimit(request, {
+    bucket: "auth-login-global",
+    limit: 30,
+    windowMs: 60_000,
+  });
+  if (globalLimit) return globalLimit;
+
+  const accountLimit = enforceRateLimit(request, {
+    bucket: `auth-login-account:${normalizedUsername}`,
+    limit: 5,
+    windowMs: 60_000,
+  });
+  if (accountLimit) return accountLimit;
+
   const session = await createAccessSession(password, username);
 
   if (!session) {
