@@ -1,3 +1,7 @@
+import {
+  allDatabase as allSqlite,
+  getDatabaseRow as getSqlite,
+} from "@/lib/database/query";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import type {
   EmergencyPoint,
@@ -6,7 +10,6 @@ import type {
   PointSearchOptions,
 } from "@/lib/points-db";
 import { getDatabase } from "@/lib/points-db-modules/connection";
-import { allSqlite, getSqlite } from "@/lib/sqlite";
 
 type PointRow = {
   address: string;

@@ -10,11 +10,13 @@ process.env.KAKAO_REST_API_KEY = "kakao-test-key";
 process.env.VWORLD_API_KEY = "vworld-test-key";
 
 const pointsDb = await import("@/lib/points-db");
+const databaseQuery = await import("@/lib/database/query");
 const geocoding = await import("@/lib/geocoding");
 
 test("searchMapCoordinates falls back to VWorld when Kakao quota is exhausted", async () => {
   const db = await pointsDb.getDatabase();
-  db.prepare(
+  await databaseQuery.runDatabase(
+    db,
     `INSERT INTO api_usage_windows (
       provider,
       registered_at,
@@ -23,13 +25,14 @@ test("searchMapCoordinates falls back to VWorld when Kakao quota is exhausted", 
       used_count,
       monthly_limit
     ) VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(
-    "kakao-local",
-    "2026-06-14T00:00:00.000Z",
-    "2026-06-14T00:00:00.000Z",
-    "2999-01-01T00:00:00.000Z",
-    100_000,
-    100_000,
+    [
+      "kakao-local",
+      "2026-06-14T00:00:00.000Z",
+      "2026-06-14T00:00:00.000Z",
+      "2999-01-01T00:00:00.000Z",
+      100_000,
+      100_000,
+    ],
   );
 
   const originalFetch = globalThis.fetch;
