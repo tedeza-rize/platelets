@@ -14,7 +14,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "seoul-realtime-population",
     license: "공공누리 제1유형: 출처표시, 상업적 이용 및 변경 가능",
     notes:
-      "서울 실시간 인구데이터 API는 한 번에 1개 장소만 조회한다. API 키는 SEOUL_OPEN_API_KEY 환경변수에만 보관한다.",
+      "서울 실시간 인구데이터 API는 한 번에 1개 장소만 조회한다. API 키는 암호화된 setup 또는 sudo 설정에 보관한다.",
     provider: "서울특별시 / 서울 열린데이터광장",
     sourceName:
       "서울시 실시간 인구데이터, 서울시 주요 121장소 목록, 서울시 주요 121장소 영역",
@@ -25,7 +25,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "vworld-map-tiles",
     license: "브이월드 이용약관 및 오픈API 이용정책 준수",
     notes:
-      "브이월드 API 키는 설치 설정 DB 또는 NEXT_PUBLIC_VWORLD_API_KEY 환경변수로 주입한다. 레스터 모드는 https://api.vworld.kr/req/wmts/1.0.0/... 타일을 사용한다. 벡터 모드는 기본 지도 소스를 https://api.vworld.kr/req/wmts/vector/getTile/... 벡터 타일로 유지하며, 네이티브 MapLibre용 브이월드 3D 건물 타일이 없을 때 3D 모드는 OpenFreeMap/OpenStreetMap 건물 extrusion을 함께 사용할 수 있다. 지도 attribution을 유지한다.",
+      "브이월드 API 키는 암호화된 setup 또는 sudo 설정에서 읽는다. 레스터 모드는 https://api.vworld.kr/req/wmts/1.0.0/... 타일을 사용한다. 벡터 모드는 기본 지도 소스를 https://api.vworld.kr/req/wmts/vector/getTile/... 벡터 타일로 유지하며, 네이티브 MapLibre용 브이월드 3D 건물 타일이 없을 때 3D 모드는 OpenFreeMap/OpenStreetMap 건물 extrusion을 함께 사용할 수 있다. 지도 attribution을 유지한다.",
     provider: "공간정보산업진흥원 / 브이월드",
     sourceName: "브이월드 WMTS 배경지도, 교통, POI 벡터 타일",
     sourceUrl: "https://www.vworld.kr/",
@@ -36,7 +36,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "vworld-geocoder-search",
     license: "VWorld terms of use and Open API policy apply.",
     notes:
-      "VWorld API keys are loaded from encrypted setup settings or VWORLD_API_KEY/NEXT_PUBLIC_VWORLD_API_KEY environment variables. Public API and MCP responses expose bounded normalized coordinates and addresses only, not raw provider payloads.",
+      "VWorld API keys are loaded from encrypted setup or sudo settings. Public API and MCP responses expose bounded normalized coordinates and addresses only, not raw provider payloads.",
     provider: "Spatial Information Industry Promotion Institute / VWorld",
     sourceName: "VWorld Geocoder API 2.0 and Search API 2.0",
     sourceUrl: "https://www.vworld.kr/",
@@ -85,7 +85,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "kakao-mobility-directions",
     license: "카카오모빌리티 API 이용약관 및 쿼터 정책 준수",
     notes:
-      "KAKAO_MOBILITY_REST_API_KEY는 서버 환경변수 또는 암호화된 애플리케이션 설정 DB에만 보관한다. 응답 경로와 ETA는 요청 시점 교통·도로 정보에 따라 달라질 수 있다.",
+      "카카오모빌리티 API 키는 암호화된 setup 또는 sudo 설정에만 보관한다. 응답 경로와 ETA는 요청 시점 교통·도로 정보에 따라 달라질 수 있다.",
     provider: "카카오모빌리티",
     sourceName: "Kakao Mobility 길찾기 API",
     sourceUrl: "https://developers.kakaomobility.com/docs/navi-api/directions/",
@@ -95,7 +95,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "its-national-traffic",
     license: "공공데이터포털 및 ITS 오픈데이터 이용조건 확인 필요",
     notes:
-      "ITS_OPEN_API_KEY 또는 MOLIT_ITS_API_KEY는 서버 환경변수로만 보관한다. API 응답의 도로 구간 속도와 통행시간은 요청 시점과 영역에 따라 달라지며, 키가 없거나 표본이 없으면 기준 A* 경로 시간을 사용한다.",
+      "국가교통정보 API 키는 암호화된 sudo 설정에 보관한다. API 응답의 도로 구간 속도와 통행시간은 요청 시점과 영역에 따라 달라지며, 키가 없거나 표본이 없으면 기준 A* 경로 시간을 사용한다.",
     provider: "국토교통부 / 국가교통정보센터",
     sourceName: "국토교통부_교통소통정보, ITS 국가교통정보센터 교통소통정보",
     sourceUrl: "https://www.data.go.kr/data/15040463/openapi.do",
@@ -115,7 +115,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "openai-responses",
     license: "OpenAI 서비스 약관·API 데이터 정책 또는 호환 제공자의 약관 준수",
     notes:
-      "OpenAI API keys are stored in server environment variables or the encrypted application settings database. AI receives summarized facility search results, dataset aggregates, and recent hazard summaries instead of raw records, and responses are reference information.",
+      "AI provider API keys are stored in the encrypted setup or sudo settings database. AI receives summarized facility search results, dataset aggregates, and recent hazard summaries instead of raw records, and responses are reference information.",
     provider: "OpenAI 또는 관리자가 지정한 OpenAI 호환 제공자",
     sourceName: "OpenAI Responses API",
     sourceUrl: "https://developers.openai.com/api/docs/guides/text",
@@ -125,7 +125,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "kakao-local-geocoding",
     license: "카카오 Developers 이용약관 및 Local API 정책 준수",
     notes:
-      "주소 좌표 변환에만 사용하며 KAKAO_REST_API_KEY는 서버 환경변수 또는 암호화된 애플리케이션 설정 DB에만 보관한다. 원문 API 응답은 sudo/debug 용도 외 공개하지 않는다.",
+      "주소 좌표 변환에만 사용하며 카카오 로컬 API 키는 암호화된 setup 또는 sudo 설정에만 보관한다. 원문 API 응답은 sudo/debug 용도 외 공개하지 않는다.",
     provider: "카카오",
     sourceName: "Kakao Local 주소 검색 API",
     sourceUrl: "https://developers.kakao.com/docs/latest/ko/local/dev-guide",
@@ -401,7 +401,7 @@ export const DATA_LICENSE_ENTRIES = [
     license:
       "NMC: 이용허락범위 제한 없음, HIRA: 공공데이터포털 개별 이용조건 준수, MOIS: 이용허락범위 제한 없음",
     notes:
-      "NMC FullData를 우선 사용한다. NMC가 403이면 HIRA 약국정보서비스를 시도하고, HIRA도 차단되면 행정안전부 건강_약국 조회서비스를 시도한다. 행정안전부 좌표는 EPSG:5174 중부원점TM을 WGS84 근사 좌표로 변환한다. 모든 서비스의 PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관하며, 활용신청이 승인되지 않으면 403이 발생할 수 있다.",
+      "NMC FullData를 우선 사용한다. NMC가 403이면 HIRA 약국정보서비스를 시도하고, HIRA도 차단되면 행정안전부 건강_약국 조회서비스를 시도한다. 행정안전부 좌표는 EPSG:5174 중부원점TM을 WGS84 근사 좌표로 변환한다. 모든 서비스의 공공데이터 API 키는 암호화된 setup 또는 sudo 설정에 보관하며, 활용신청이 승인되지 않으면 403이 발생할 수 있다.",
     provider:
       "국립중앙의료원 / 건강보험심사평가원 / 행정안전부 / 공공데이터포털",
     sourceName:
@@ -427,7 +427,7 @@ export const DATA_LICENSE_ENTRIES = [
     id: "hospitals",
     license: "이용허락범위 제한 없음",
     notes:
-      "병의원 FullData와 달빛어린이병원 목록을 기관 ID로 병합한다. PUBLIC_DATA_API_KEY는 서버 환경변수로만 보관한다.",
+      "병의원 FullData와 달빛어린이병원 목록을 기관 ID로 병합한다. 공공데이터 API 키는 암호화된 setup 또는 sudo 설정에 보관한다.",
     provider: "국립중앙의료원 / 공공데이터포털",
     sourceName: "전국 병·의원 찾기 서비스",
     sourceUrl: "https://www.data.go.kr/data/15000736/openapi.do",

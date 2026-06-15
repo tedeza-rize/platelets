@@ -20,10 +20,9 @@ AWS Lambda, Cloud Run, Azure Functions, or load-balanced Node.js processes.
 
 When common serverless or multi-instance environment signals are present,
 Platelets disables SQLite write transactions by default and fails fast with an
-operator-facing deployment error instead of allowing `SQLITE_BUSY` storms. Set
-`PLATELETS_SQLITE_WRITE_MODE=single-process` only for deployments where one
-long-lived process and one persistent disk own the database file. Set
-`PLATELETS_SQLITE_WRITE_MODE=blocked` to make a read-only instance explicit.
+operator-facing deployment error instead of allowing `SQLITE_BUSY` storms.
+There is no environment override: multi-instance deployments must use
+PostgreSQL, MySQL, or MariaDB.
 
 Horizontal scaling requires moving write-owned state to a shared database such
 as PostgreSQL, or introducing an external single-writer job/lock service before
@@ -131,7 +130,7 @@ That fallback has institution and emergency-operation data but no live beds.
 The self-hosted route option downloads an OSM road graph through Overpass and
 runs A*. Edges honor `oneway`, roundabouts, motorway direction, private access,
 road class, and speed. It is bounded to South Korea and 70 km. When
-`ITS_OPEN_API_KEY` or `MOLIT_ITS_API_KEY` is configured, the route result calls
+the national traffic API key is configured in the sudo console, the route result calls
 the National Transport Information Center traffic API for nearby road speed
 samples and adjusts the A* ETA with a bounded multiplier. Without a key or
 usable samples, the route keeps the baseline A* duration and marks traffic as
@@ -232,9 +231,9 @@ nearest-point, ranking, and grounding tools. Tool results exclude raw JSON.
 - Public: summarized map, hazards, congestion, recommendation, and routing
 - Admin: AI query access
 - Sudo: imports, schedules, detailed logs, quotas, NTP, and AI configuration
-- Secrets: API keys are encrypted in SQLite with AES-256-GCM using
-  `PLATELETS_SECRET_KEY` or a generated local secret file; real keys still must
-  never be committed
+- Secrets: API keys are encrypted with AES-256-GCM using the generated local
+  `data/.platelets-secret-key` file; the data directory and key must be backed
+  up together and real keys must never be committed
 - External routing: South Korea coordinates and per-process rate limits
 - AI proxy: HTTPS only; credentials in URLs and private DNS/IP targets blocked
 - HTML: popup builders escape source text; AI output renders as plain text
