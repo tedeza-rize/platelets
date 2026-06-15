@@ -72,7 +72,10 @@ only when one persistent Node.js process owns the database file. Serverless or
 multi-instance signals disable SQLite writes unless
 `PLATELETS_SQLITE_WRITE_MODE=single-process` is set explicitly for a verified
 single-process deployment. Prefer PostgreSQL, MySQL, or MariaDB before running
-multiple writable app instances.
+multiple writable app instances. A sudo operator can move an installed system
+to another supported engine from `/sudo`. Platelets verifies the target first,
+copies every managed table in one source snapshot and one target transaction,
+and changes the active database only after the copy succeeds.
 
 For Nginx, Apache, and load balancer requirements, including forwarded headers
 and Server-Sent Events buffering, see

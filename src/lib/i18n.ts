@@ -409,6 +409,29 @@ const koUi = {
   "운영 설정": "운영 설정",
   "운영 설정 저장 실패": "운영 설정 저장 실패",
   "운영 설정을 저장했습니다.": "운영 설정을 저장했습니다.",
+  "databaseMigration.completed":
+    "데이터베이스 이전을 완료했습니다. {count}개 행을 복사했습니다.",
+  "databaseMigration.confirm":
+    "대상 데이터베이스의 기존 Platelets 데이터를 교체하는 데 동의합니다.",
+  "databaseMigration.connectionString": "대상 연결 주소",
+  "databaseMigration.current": "현재 DB: {engine}",
+  "databaseMigration.description":
+    "현재 데이터를 대상 DB로 복사한 뒤, 모두 성공한 경우에만 대상 DB로 전환합니다.",
+  "databaseMigration.engine.mariadb": "MariaDB",
+  "databaseMigration.engine.mysql": "MySQL",
+  "databaseMigration.engine.postgresql": "PostgreSQL",
+  "databaseMigration.engine.sqlite": "SQLite",
+  "databaseMigration.failed":
+    "데이터베이스 이전에 실패했습니다. 기존 DB는 그대로 유지됩니다.",
+  "databaseMigration.migrate": "데이터베이스 이전",
+  "databaseMigration.sqliteDescription":
+    "서버의 data/points.sqlite 파일로 이전합니다.",
+  "databaseMigration.sqliteTarget": "로컬 SQLite",
+  "databaseMigration.target": "대상 데이터베이스",
+  "databaseMigration.test": "대상 연결 확인",
+  "databaseMigration.testFailed": "대상 데이터베이스에 연결하지 못했습니다.",
+  "databaseMigration.testReady": "대상 데이터베이스 연결을 확인했습니다.",
+  "databaseMigration.title": "데이터베이스 이전",
   "지진 API 폴링 간격(ms)": "지진 API 폴링 간격(ms)",
   "notification.control.blocked": "브라우저에서 재난 알림이 차단되었습니다.",
   "notification.control.disable": "재난 알림 끄기",
@@ -907,6 +930,29 @@ const enUi = {
   "운영 설정": "Operational settings",
   "운영 설정 저장 실패": "Could not save operational settings",
   "운영 설정을 저장했습니다.": "Operational settings saved.",
+  "databaseMigration.completed":
+    "Database migration completed. {count} rows were copied.",
+  "databaseMigration.confirm":
+    "I agree to replace existing Platelets data in the target database.",
+  "databaseMigration.connectionString": "Target connection URL",
+  "databaseMigration.current": "Current DB: {engine}",
+  "databaseMigration.description":
+    "Copies current data to the target and switches only after every table succeeds.",
+  "databaseMigration.engine.mariadb": "MariaDB",
+  "databaseMigration.engine.mysql": "MySQL",
+  "databaseMigration.engine.postgresql": "PostgreSQL",
+  "databaseMigration.engine.sqlite": "SQLite",
+  "databaseMigration.failed":
+    "Database migration failed. The current database remains active.",
+  "databaseMigration.migrate": "Migrate database",
+  "databaseMigration.sqliteDescription":
+    "Migrates to the server's data/points.sqlite file.",
+  "databaseMigration.sqliteTarget": "Local SQLite",
+  "databaseMigration.target": "Target database",
+  "databaseMigration.test": "Test target connection",
+  "databaseMigration.testFailed": "Could not connect to the target database.",
+  "databaseMigration.testReady": "Target database connection is ready.",
+  "databaseMigration.title": "Database migration",
   "지진 API 폴링 간격(ms)": "Earthquake API polling interval (ms)",
   "notification.control.blocked":
     "Disaster notifications are blocked in this browser.",

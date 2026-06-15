@@ -169,6 +169,12 @@ repository APIs through engine-specific clients and schema DDL. Facility,
 route, and risk services can likewise be connected to public-safety big-data
 pipelines, Kakao/OSM route adapters, or ML model adapters.
 
+The first-run setup stores the selected engine once. Sudo database migration
+copies the allowlisted application tables in bounded batches while holding a
+consistent source snapshot and a target transaction. The active database
+configuration is replaced only after the target schema and all copied rows
+succeed, so a failed migration leaves the current database active.
+
 ## Assembly And Protest Notices
 
 Daily public assembly/protest notices are stored separately from durable map
