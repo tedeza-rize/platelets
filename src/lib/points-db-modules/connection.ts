@@ -29,61 +29,14 @@ const SERVERLESS_DEPLOYMENT_SIGNALS = [
   "WEBSITE_INSTANCE_ID",
 ] as const;
 
-function clean(value: string | undefined) {
-  return value?.trim().toLowerCase() ?? "";
-}
-
 function detectedDeploymentSignals() {
   return SERVERLESS_DEPLOYMENT_SIGNALS.filter((name) =>
     Boolean(process.env[name]?.trim()),
   );
 }
 
-function explicitWriteMode() {
-  const mode = clean(process.env.PLATELETS_SQLITE_WRITE_MODE);
-
-  if (
-    mode === "single-process" ||
-    mode === "single-writer" ||
-    mode === "local"
-  ) {
-    return "single-process";
-  }
-
-  if (
-    mode === "blocked" ||
-    mode === "multi-instance" ||
-    mode === "read-only" ||
-    mode === "readonly" ||
-    mode === "serverless"
-  ) {
-    return "blocked";
-  }
-
-  return null;
-}
-
 export function getSqliteWriteSafetyStatus(): SqliteWriteSafetyStatus {
-  const mode = explicitWriteMode();
   const deploymentSignals = detectedDeploymentSignals();
-
-  if (mode === "single-process") {
-    return {
-      deploymentSignals,
-      mode,
-      reason: null,
-      writesAllowed: true,
-    };
-  }
-
-  if (mode === "blocked") {
-    return {
-      deploymentSignals,
-      mode,
-      reason: "PLATELETS_SQLITE_WRITE_MODE disables SQLite writes.",
-      writesAllowed: false,
-    };
-  }
 
   if (deploymentSignals.length > 0) {
     return {
@@ -162,7 +115,7 @@ function assertWritesAllowed(db: DatabaseClient) {
       [
         "SQLite writes are disabled for this deployment.",
         safety.reason,
-        "Set PLATELETS_SQLITE_WRITE_MODE=single-process only when exactly one persistent server process owns the database file, or select an external database.",
+        "Select PostgreSQL, MySQL, or MariaDB for multi-instance deployments.",
       ]
         .filter(Boolean)
         .join(" "),

@@ -4,8 +4,8 @@ import { noStoreJson } from "@/lib/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  const config = getWebPushConfig();
+export async function GET() {
+  const config = await getWebPushConfig();
 
   return noStoreJson({
     enabled: config.enabled,

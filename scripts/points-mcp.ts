@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import Database from "better-sqlite3";
 import { z } from "zod/v4";
+import { loadMcpRuntimeApiKeys } from "./mcp-runtime-config.ts";
 
 const DATASET_SOURCE_IDS = [
   "fire-stations",
@@ -133,9 +134,9 @@ const POINT_COLUMNS = `
   u.fetched_at
 `;
 const projectRoot = process.cwd();
-const configuredDataDirectory = process.env.PLATELETS_DATA_DIR;
-const dataDirectory = resolveDataDirectory(configuredDataDirectory);
+const dataDirectory = path.join(projectRoot, "data");
 const databasePath = path.join(dataDirectory, "points.sqlite");
+const runtimeApiKeys = loadMcpRuntimeApiKeys(databasePath, dataDirectory);
 const forecastDocPath = path.join(
   projectRoot,
   "docs",
@@ -143,16 +144,6 @@ const forecastDocPath = path.join(
 );
 
 type SqliteDatabase = Database.Database;
-
-function resolveDataDirectory(configuredDirectory: string | undefined) {
-  if (!configuredDirectory) {
-    return path.join(projectRoot, "data");
-  }
-
-  return path.isAbsolute(configuredDirectory)
-    ? configuredDirectory
-    : path.join(projectRoot, configuredDirectory);
-}
 
 function emergencyBedAvailability(emergencyBeds: number | null) {
   if (emergencyBeds === null) {
@@ -1005,19 +996,11 @@ async function recommendEmergencyHospitalsForMcp(options: {
 }
 
 function kakaoRestApiKey() {
-  return (
-    process.env.KAKAO_REST_API_KEY?.trim() ??
-    process.env.KAKAO_LOCAL_REST_API_KEY?.trim() ??
-    null
-  );
+  return runtimeApiKeys.kakaoRestApiKey;
 }
 
 function vworldApiKey() {
-  return (
-    process.env.VWORLD_API_KEY?.trim() ??
-    process.env.NEXT_PUBLIC_VWORLD_API_KEY?.trim() ??
-    null
-  );
+  return runtimeApiKeys.vworldApiKey;
 }
 
 function kakaoLocalEndpoint(kind: KakaoLocalSearchKind) {
@@ -1746,7 +1729,7 @@ server.registerTool(
   "rank_response_points",
   {
     description:
-      "Rank nearby response points for an incident. If KAKAO_REST_API_KEY is set, route duration is used; otherwise straight-line distance is used.",
+      "Rank nearby response points for an incident. If Kakao Local is configured in Platelets, route duration is used; otherwise straight-line distance is used.",
     inputSchema: {
       latitude: z.number().min(32).max(39),
       limit: z.number().int().min(1).max(10).optional().default(5),

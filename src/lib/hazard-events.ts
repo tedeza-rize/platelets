@@ -110,7 +110,7 @@ async function fetchKmaRecords(
 
   if (!serviceKey) {
     throw new Error(
-      "PUBLIC_DATA_API_KEY, DATA_GO_KR_API_KEY, or DATA_GO_KR_SERVICE_KEY is required to update earthquake events.",
+      "The public data API key is not configured for earthquake updates.",
     );
   }
 
