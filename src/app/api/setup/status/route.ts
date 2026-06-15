@@ -3,7 +3,7 @@ import {
   deleteSetupDatabaseFile,
   getSetupEnvironmentStatus,
   isSetupCompleteFromDatabaseFile,
-} from "@/lib/setup-state";
+} from "@/lib/setup-environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

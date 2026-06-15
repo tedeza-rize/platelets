@@ -1,14 +1,19 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import {
+  type DatabaseConfig,
+  deleteStoredDatabaseConfig,
+  getDatabaseConfig,
+  isDatabaseConfigEnvironmentManaged,
+  normalizeDatabaseConfig,
+  saveDatabaseConfig,
+  testDatabaseConfig,
+} from "@/lib/database/config";
 import { isPasswordValid } from "@/lib/password-policy";
 import {
   closeDatabase,
   databaseFileExists,
   getAppSetting,
   getDatabase,
-  getDatabaseFilePath,
-  getDataDirectoryPath,
   setAppSetting,
 } from "@/lib/points-db";
 import {
@@ -17,16 +22,6 @@ import {
   protectSecret,
   revealSecret,
 } from "@/lib/secret-box";
-import {
-  closeSqliteDatabase,
-  getSqlite,
-  openSqliteDatabase,
-} from "@/lib/sqlite";
-import {
-  DEFAULT_NTP_SERVERS,
-  getServerTimeStatusForServers,
-  TIME_SKEW_THRESHOLD_MS,
-} from "@/lib/time-sync";
 import { ensureSetupUsers } from "@/lib/users";
 
 export type SetupRole = "admin" | "sudo";
@@ -48,6 +43,11 @@ export type SetupApiKeys = {
   publicDataApiKey: string;
   seoulOpenApiKey: string;
   vworldApiKey: string;
+};
+
+export type SetupDatabaseSelection = {
+  connectionString?: string;
+  engine?: DatabaseConfig["engine"];
 };
 
 type StoredSetupApiKeys = Omit<
@@ -81,6 +81,7 @@ export type SetupPayload = {
     password: string;
   };
   apiKeys: Partial<SetupApiKeys>;
+  database?: SetupDatabaseSelection;
   licenseAccepted: boolean;
   sudo: {
     email: string;
@@ -89,15 +90,7 @@ export type SetupPayload = {
   };
 };
 
-type SetupEnvironmentCheck = {
-  detailKey: string;
-  detailValues?: Record<string, number | string>;
-  id: string;
-  ok: boolean;
-  titleKey: string;
-};
-
-const SETUP_STATE_KEY = "setup-state";
+export const SETUP_STATE_KEY = "setup-state";
 const PASSWORD_ITERATIONS = 210_000;
 const PASSWORD_KEY_LENGTH = 32;
 const ROLE_LABELS: Record<SetupRole, string> = {
@@ -214,16 +207,6 @@ function hasPlainApiKeys(input: SetupState["apiKeys"]) {
   ].some((value) => Boolean(value) && !isSecretBox(value));
 }
 
-function ntpDetailKey(serverNtpOk: boolean, hasSelectedNtp: boolean) {
-  if (serverNtpOk) {
-    return "environment.ntp.ok";
-  }
-
-  return hasSelectedNtp
-    ? "environment.ntp.skewed"
-    : "environment.ntp.unavailable";
-}
-
 function accountFromPayload(
   role: SetupRole,
   input: SetupPayload[SetupRole],
@@ -247,33 +230,6 @@ function accountFromPayload(
   };
 }
 
-async function readSetupStateFromDatabaseFile() {
-  const databasePath = getDatabaseFilePath();
-
-  if (!fs.existsSync(databasePath)) {
-    return null;
-  }
-
-  try {
-    const db = openSqliteDatabase(databasePath, { readonly: true });
-
-    try {
-      const row = await getSqlite<{ value_json: string }>(
-        db,
-        "SELECT value_json FROM app_settings WHERE key = ?",
-        [SETUP_STATE_KEY],
-      );
-      return row?.value_json
-        ? (JSON.parse(row.value_json) as SetupState)
-        : null;
-    } finally {
-      await closeSqliteDatabase(db);
-    }
-  } catch {
-    return null;
-  }
-}
-
 export async function getSetupState() {
   if (!databaseFileExists()) {
     return null;
@@ -285,11 +241,6 @@ export async function getSetupState() {
 
 export async function isSetupComplete() {
   return Boolean(await getSetupState());
-}
-
-export async function isSetupCompleteFromDatabaseFile() {
-  const state = await readSetupStateFromDatabaseFile();
-  return Boolean(state?.completedAt);
 }
 
 export async function getConfiguredApiKeys() {
@@ -342,8 +293,11 @@ export async function completeSetup(payload: SetupPayload) {
     throw new Error("License agreement must be accepted.");
   }
 
-  await getDatabase();
-
+  const databaseConfig = isDatabaseConfigEnvironmentManaged()
+    ? getDatabaseConfig()
+    : normalizeDatabaseConfig(
+        payload.database ?? { connectionString: "", engine: "sqlite" },
+      );
   const completedAt = new Date().toISOString();
   const state: SetupState = {
     accounts: {
@@ -354,6 +308,27 @@ export async function completeSetup(payload: SetupPayload) {
     completedAt,
     licenseAcceptedAt: completedAt,
   };
+
+  await testDatabaseConfig(databaseConfig);
+
+  let savedDatabaseConfig = false;
+
+  try {
+    if (!isDatabaseConfigEnvironmentManaged()) {
+      saveDatabaseConfig(databaseConfig);
+      savedDatabaseConfig = true;
+      await closeDatabase();
+    }
+
+    await getDatabase();
+  } catch (error) {
+    if (savedDatabaseConfig) {
+      await closeDatabase();
+      deleteStoredDatabaseConfig();
+    }
+
+    throw error;
+  }
 
   await ensureSetupUsers({
     admin: {
@@ -369,162 +344,4 @@ export async function completeSetup(payload: SetupPayload) {
   });
   await setAppSetting(SETUP_STATE_KEY, state);
   return state;
-}
-
-function checkReadableWritableDataDirectory(dataDirectory: string) {
-  try {
-    fs.mkdirSync(dataDirectory, { recursive: true });
-    fs.accessSync(dataDirectory, fs.constants.R_OK | fs.constants.W_OK);
-    const probePath = path.join(
-      dataDirectory,
-      `.platelets-write-check-${process.pid}-${Date.now()}`,
-    );
-    fs.writeFileSync(probePath, "ok", { flag: "wx" });
-    fs.readFileSync(probePath, "utf8");
-    fs.rmSync(probePath, { force: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function canDeleteDatabaseFile(databasePath: string) {
-  if (!fs.existsSync(databasePath)) {
-    return false;
-  }
-
-  try {
-    fs.accessSync(databasePath, fs.constants.R_OK | fs.constants.W_OK);
-    fs.accessSync(path.dirname(databasePath), fs.constants.W_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function removeSetupDatabaseFile(targetPath: string) {
-  const maxAttempts = 10;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      fs.rmSync(targetPath, { force: true });
-      return;
-    } catch (error) {
-      if (!fs.existsSync(targetPath) || attempt === maxAttempts - 1) {
-        throw error;
-      }
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(50 * 2 ** attempt, 500)),
-      );
-    }
-  }
-}
-
-export async function deleteSetupDatabaseFile() {
-  const setupState = await readSetupStateFromDatabaseFile();
-  const setupComplete = Boolean(setupState?.completedAt);
-
-  if (setupComplete) {
-    throw new Error("Setup is already complete.");
-  }
-
-  const databasePath = getDatabaseFilePath();
-
-  if (!fs.existsSync(databasePath)) {
-    return;
-  }
-
-  await closeDatabase();
-
-  if (!fs.existsSync(databasePath)) {
-    return;
-  }
-
-  if (!canDeleteDatabaseFile(databasePath)) {
-    throw new Error("SQLite database file cannot be deleted.");
-  }
-
-  for (const targetPath of [
-    `${databasePath}-wal`,
-    `${databasePath}-shm`,
-    databasePath,
-  ]) {
-    await removeSetupDatabaseFile(targetPath);
-  }
-}
-
-export async function getSetupEnvironmentStatus(
-  options: { serverReceivedAt?: Date } = {},
-) {
-  const dataDirectory = getDataDirectoryPath();
-  const databasePath = getDatabaseFilePath();
-  const writableDataDirectory =
-    checkReadableWritableDataDirectory(dataDirectory);
-  const hasDatabase = databaseFileExists();
-  const setupState = hasDatabase
-    ? await readSetupStateFromDatabaseFile()
-    : null;
-  const setupComplete = Boolean(setupState?.completedAt);
-  const databaseCanDelete =
-    hasDatabase && !setupComplete && canDeleteDatabaseFile(databasePath);
-  const timeStatus = await getServerTimeStatusForServers(
-    Array.from(DEFAULT_NTP_SERVERS),
-    { serverReceivedAt: options.serverReceivedAt },
-  );
-  const selectedNtp = timeStatus.ntp.selected;
-  const serverNtpOffsetMs = selectedNtp?.offsetMs ?? null;
-  const serverNtpOk =
-    serverNtpOffsetMs !== null &&
-    Math.abs(serverNtpOffsetMs) <= TIME_SKEW_THRESHOLD_MS;
-  const checks: SetupEnvironmentCheck[] = [
-    {
-      detailKey: "environment.node.detail",
-      detailValues: { version: process.version },
-      id: "node",
-      ok: true,
-      titleKey: "environment.node.title",
-    },
-    {
-      detailKey: writableDataDirectory
-        ? "environment.dataDirectory.writable"
-        : "environment.dataDirectory.notWritable",
-      detailValues: writableDataDirectory ? undefined : { path: dataDirectory },
-      id: "data-directory",
-      ok: writableDataDirectory,
-      titleKey: "environment.dataDirectory.title",
-    },
-    {
-      detailKey: hasDatabase
-        ? "environment.sqlite.exists"
-        : "environment.sqlite.absent",
-      detailValues: hasDatabase ? { path: databasePath } : undefined,
-      id: "sqlite",
-      ok: !(hasDatabase && setupComplete),
-      titleKey: "environment.sqlite.title",
-    },
-    {
-      detailKey: ntpDetailKey(serverNtpOk, Boolean(selectedNtp)),
-      detailValues: selectedNtp
-        ? {
-            host: selectedNtp.host,
-            offsetSeconds: ((serverNtpOffsetMs ?? 0) / 1000).toFixed(2),
-            thresholdSeconds: (TIME_SKEW_THRESHOLD_MS / 1000).toFixed(0),
-          }
-        : {
-            thresholdSeconds: (TIME_SKEW_THRESHOLD_MS / 1000).toFixed(0),
-          },
-      id: "server-ntp-clock",
-      ok: serverNtpOk,
-      titleKey: "environment.ntp.title",
-    },
-  ];
-
-  return {
-    checks,
-    databaseCanDelete,
-    databaseExists: hasDatabase,
-    ready: checks.every((check) => check.ok),
-    time: timeStatus,
-  };
 }

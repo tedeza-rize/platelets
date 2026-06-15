@@ -133,6 +133,10 @@ export function getDatabaseConfig(): DatabaseConfig {
   );
 }
 
+export function isDatabaseConfigEnvironmentManaged() {
+  return environmentDatabaseConfig() !== null;
+}
+
 export function hasStoredDatabaseConfig() {
   return fs.existsSync(databaseConfigPath());
 }

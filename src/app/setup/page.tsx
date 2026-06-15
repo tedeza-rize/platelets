@@ -4,7 +4,7 @@ import { getRequestLocale } from "@/lib/request-preferences";
 import {
   getSetupEnvironmentStatus,
   isSetupCompleteFromDatabaseFile,
-} from "@/lib/setup-state";
+} from "@/lib/setup-environment";
 
 export const dynamic = "force-dynamic";
 

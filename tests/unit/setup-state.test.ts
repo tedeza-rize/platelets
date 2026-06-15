@@ -8,6 +8,7 @@ const dataDirectory = mkdtempSync(path.join(tmpdir(), "platelets-setup-db-"));
 process.env.PLATELETS_DATA_DIR = dataDirectory;
 
 const pointsDb = await import("@/lib/points-db");
+const setupEnvironment = await import("@/lib/setup-environment");
 const setupState = await import("@/lib/setup-state");
 
 const validPassword = "Platelets!2026";
@@ -16,7 +17,7 @@ test("deleteSetupDatabaseFile closes and removes an open incomplete database", a
   await pointsDb.getDatabase();
   assert.equal(existsSync(pointsDb.getDatabaseFilePath()), true);
 
-  await setupState.deleteSetupDatabaseFile();
+  await setupEnvironment.deleteSetupDatabaseFile();
 
   assert.equal(existsSync(pointsDb.getDatabaseFilePath()), false);
 });

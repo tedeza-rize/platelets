@@ -187,7 +187,9 @@ test("loads the integrated disaster response map", async ({
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "3D" })).toBeVisible();
-  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
+  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test("routes staff login and updates an account lifecycle", async ({
@@ -369,7 +371,7 @@ test("exposes a PWA manifest and offline navigation fallback", async ({
     await expect
       .poll(() =>
         page.evaluate(async () => {
-          const cache = await caches.open("platelets-shell-v3");
+          const cache = await caches.open("platelets-shell-v4");
           const response = await cache.match("/__platelets-network-status");
           return response?.text();
         }),

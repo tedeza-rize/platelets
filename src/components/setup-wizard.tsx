@@ -52,6 +52,13 @@ type ApiKeysForm = {
   vworldApiKey: string;
 };
 
+type DatabaseEngine = "mariadb" | "mysql" | "postgresql" | "sqlite";
+
+type DatabaseForm = {
+  connectionString: string;
+  engine: DatabaseEngine;
+};
+
 type CheckTextValues = Record<string, number | string>;
 
 type EnvironmentCheck = {
@@ -89,6 +96,10 @@ type SetupTimeStatus = {
 type StatusPayload = {
   environment: {
     checks: EnvironmentCheck[];
+    database: {
+      engine: DatabaseEngine;
+      managedByEnvironment: boolean;
+    };
     databaseCanDelete: boolean;
     databaseExists: boolean;
     ready: boolean;
@@ -124,6 +135,18 @@ const initialApiKeys: ApiKeysForm = {
   vworldApiKey: "",
 };
 
+const initialDatabase: DatabaseForm = {
+  connectionString: "",
+  engine: "sqlite",
+};
+
+const databaseEngineOptions: DatabaseEngine[] = [
+  "sqlite",
+  "postgresql",
+  "mysql",
+  "mariadb",
+];
+
 const setupCopy = {
   en: {
     "api.failed": "API key check failed.",
@@ -137,6 +160,20 @@ const setupCopy = {
     "brand.wizardAria": "Platelets setup wizard",
     "controls.language": "Language",
     "controls.theme": "Theme",
+    "database.alreadyInstalled": "Setup is already complete.",
+    "database.connectionString": "Connection URL",
+    "database.connectionStringHelp":
+      "Use a service account URL. It is encrypted before being saved on this server.",
+    "database.engine.mariadb": "MariaDB",
+    "database.engine.mysql": "MySQL",
+    "database.engine.postgresql": "PostgreSQL",
+    "database.engine.sqlite": "SQLite",
+    "database.failed": "Database connection check failed.",
+    "database.field.engine": "Database engine",
+    "database.ready": "Database connection is ready.",
+    "database.test": "Test database",
+    "database.testing": "Testing database",
+    "database.title": "Database selection",
     "environment.checking.detail": "Reading runtime and filesystem status.",
     "environment.checking.title": "Checking server",
     "environment.clock.browserSkewed":
@@ -160,8 +197,11 @@ const setupCopy = {
     "environment.dataDirectory.title": "Writable data folder",
     "environment.dataDirectory.writable":
       "The data folder can be read and written.",
+    "environment.database.external":
+      "The selected external database will be checked before installation.",
+    "environment.database.title": "Selected database",
     "environment.lead":
-      "Confirm the deployment can create and use the local database.",
+      "Confirm the deployment can create and use the selected database.",
     "environment.node.detail": "Node {version}",
     "environment.node.title": "Node.js runtime",
     "environment.ntp.ok":
@@ -193,7 +233,7 @@ const setupCopy = {
     "finish.info":
       "The installer stores credential hashes, never plain passwords. Existing environment variables remain valid as deployment fallbacks.",
     "finish.lead":
-      "Platelets will create the SQLite database, store the setup configuration, and open the home map.",
+      "Platelets will create the selected database schema, store the setup configuration, and open the home map.",
     "finish.title": "Create database",
     "install.failed": "Installation failed.",
     "json.failed":
@@ -222,7 +262,7 @@ const setupCopy = {
     "password.requirement.uppercase": "Includes an uppercase letter",
     "setup.aria": "Platelets setup wizard",
     "start.info":
-      "This assistant creates the local SQLite database, stores operator credentials, and saves server-side API keys for this deployment.",
+      "This assistant creates the selected database, stores operator credentials, and saves server-side API keys for this deployment.",
     "start.lead":
       "Set up this self-hosted emergency response CMS before the map becomes available.",
     "start.title": "Welcome to Platelets",
@@ -249,6 +289,10 @@ const setupCopy = {
     "validation.account.passwordConfirm": "Passwords do not match.",
     "validation.api": "Test the API key configuration before continuing.",
     "validation.api.openaiBaseUrl": "Enter a valid HTTPS URL.",
+    "validation.database.connectionString":
+      "Enter a valid connection URL for the selected database.",
+    "validation.database.test":
+      "Test the database connection before continuing.",
     "validation.environment":
       "Resolve the server environment checks before continuing.",
     "validation.license": "Accept the terms to continue.",
@@ -376,10 +420,25 @@ type SetupCopyKey = keyof SetupCopy;
 type ThemeMode = "dark" | "light";
 type AccountFieldErrors = Partial<Record<keyof AccountForm, string>>;
 type ApiFieldErrors = Partial<Record<keyof ApiKeysForm, string>>;
+type DatabaseFieldErrors = Partial<Record<keyof DatabaseForm, string>>;
 
 const setupCopyOverrides = {
   en: {},
   ko: {
+    "database.alreadyInstalled": "이미 설치가 완료되었습니다.",
+    "database.connectionString": "연결 주소",
+    "database.connectionStringHelp":
+      "서비스 계정 연결 주소를 입력하세요. 서버에 저장하기 전에 암호화됩니다.",
+    "database.engine.mariadb": "MariaDB",
+    "database.engine.mysql": "MySQL",
+    "database.engine.postgresql": "PostgreSQL",
+    "database.engine.sqlite": "SQLite",
+    "database.failed": "데이터베이스 연결 확인에 실패했습니다.",
+    "database.field.engine": "데이터베이스 종류",
+    "database.ready": "데이터베이스 연결을 사용할 수 있습니다.",
+    "database.test": "데이터베이스 확인",
+    "database.testing": "데이터베이스 확인 중",
+    "database.title": "데이터베이스 선택",
     "environment.clock.browserSkewed":
       "이 브라우저의 시간이 서버와 맞지 않습니다. 기기 시간을 자동 설정으로 맞춘 뒤 다시 시도하세요.",
     "environment.clock.ok": "서버와 브라우저 시간이 정상 범위입니다.",
@@ -392,11 +451,23 @@ const setupCopyOverrides = {
     "environment.dataDirectory.notWritable":
       "이 폴더에 읽기/쓰기 권한을 부여하세요: {path}",
     "environment.dataDirectory.writable": "데이터 폴더를 읽고 쓸 수 있습니다.",
+    "environment.database.external":
+      "설치 전에 선택한 외부 데이터베이스 연결을 확인합니다.",
+    "environment.database.title": "선택한 데이터베이스",
+    "environment.lead":
+      "배포 환경이 선택한 데이터베이스를 만들고 사용할 수 있는지 확인합니다.",
     "environment.sqlite.absent": "설치 중 SQLite DB 파일을 생성할 수 있습니다.",
     "environment.sqlite.delete": "DB 파일 삭제",
     "environment.sqlite.deleteFailed": "DB 파일을 삭제하지 못했습니다.",
     "environment.sqlite.deleting": "DB 파일 삭제 중",
     "environment.sqlite.exists": "SQLite DB 파일이 이미 있습니다: {path}",
+    "finish.lead":
+      "Platelets가 선택한 데이터베이스 스키마를 만들고, 설치 설정을 저장한 뒤 홈 지도를 엽니다.",
+    "start.info":
+      "이 도우미는 선택한 데이터베이스를 만들고, 운영자 계정과 서버 API 키를 저장합니다.",
+    "validation.database.connectionString":
+      "선택한 데이터베이스에 맞는 연결 주소를 입력하세요.",
+    "validation.database.test": "계속하기 전에 데이터베이스 연결을 확인하세요.",
   },
 } satisfies Record<Locale, Partial<SetupCopy>>;
 
@@ -487,6 +558,44 @@ function validateApiKeys(apiKeys: ApiKeysForm, copy: SetupCopy) {
   }
 
   return null;
+}
+
+function isDatabaseConnectionUrl(engine: DatabaseEngine, value: string) {
+  if (engine === "sqlite") {
+    return true;
+  }
+
+  try {
+    const url = new URL(value);
+    const expectedProtocols =
+      engine === "postgresql"
+        ? new Set(["postgres:", "postgresql:"])
+        : new Set(["mysql:"]);
+
+    return expectedProtocols.has(url.protocol) && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function getDatabaseFieldErrors(
+  database: DatabaseForm,
+  copy: SetupCopy,
+): DatabaseFieldErrors {
+  return {
+    connectionString: isDatabaseConnectionUrl(
+      database.engine,
+      database.connectionString.trim(),
+    )
+      ? undefined
+      : copy["validation.database.connectionString"],
+  };
+}
+
+function validateDatabase(database: DatabaseForm, copy: SetupCopy) {
+  const errors = getDatabaseFieldErrors(database, copy);
+
+  return errors.connectionString ?? null;
 }
 
 function formatSeconds(valueMs: number) {
@@ -681,6 +790,13 @@ function ContinueIcon({
   );
 }
 
+function databaseFromStatus(status: StatusPayload | null): DatabaseForm {
+  return {
+    connectionString: "",
+    engine: status?.environment.database.engine ?? initialDatabase.engine,
+  };
+}
+
 export function SetupWizard({
   initialLocale,
   initialStatus = null,
@@ -697,11 +813,20 @@ export function SetupWizard({
   const [sudo, setSudo] = useState<AccountForm>(initialAccount);
   const [admin, setAdmin] = useState<AccountForm>(initialAccount);
   const [apiKeys, setApiKeys] = useState<ApiKeysForm>(initialApiKeys);
+  const [database, setDatabase] = useState<DatabaseForm>(() =>
+    databaseFromStatus(initialStatus),
+  );
   const [status, setStatus] = useState<StatusPayload | null>(initialStatus);
   const [clientClockCheck, setClientClockCheck] =
     useState<EnvironmentCheck | null>(null);
   const [apiTested, setApiTested] = useState(false);
   const [apiTestMessage, setApiTestMessage] = useState<string | null>(null);
+  const [databaseTested, setDatabaseTested] = useState(
+    () => databaseFromStatus(initialStatus).engine === "sqlite",
+  );
+  const [databaseTestMessage, setDatabaseTestMessage] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
@@ -749,6 +874,11 @@ export function SetupWizard({
 
         if (!isDisposed) {
           setStatus(payload);
+          if (payload.environment.database.managedByEnvironment) {
+            const serverDatabase = databaseFromStatus(payload);
+            setDatabase(serverDatabase);
+            setDatabaseTested(true);
+          }
           setClientClockCheck(
             buildClientServerClockCheck(payload, startedAt, receivedAt),
           );
@@ -799,6 +929,12 @@ export function SetupWizard({
     environmentChecks.length > 0 &&
     Boolean(clientClockCheck) &&
     environmentChecks.every((check) => check.ok);
+  const databaseManagedByEnvironment = Boolean(
+    status?.environment.database.managedByEnvironment,
+  );
+  const databaseNeedsTest =
+    database.engine !== "sqlite" && !databaseManagedByEnvironment;
+  const databaseReady = !databaseNeedsTest || databaseTested;
 
   const stepError = useMemo(() => {
     if (activeStep.id === "license" && !acceptedTerms) {
@@ -806,6 +942,16 @@ export function SetupWizard({
     }
     if (activeStep.id === "environment" && !environmentReady) {
       return copy["validation.environment"];
+    }
+    if (activeStep.id === "environment" && !databaseManagedByEnvironment) {
+      const databaseValidationError = validateDatabase(database, copy);
+
+      if (databaseValidationError) {
+        return databaseValidationError;
+      }
+    }
+    if (activeStep.id === "environment" && !databaseReady) {
+      return copy["validation.database.test"];
     }
     if (activeStep.id === "sudo") {
       return validateAccount(sudo, copy);
@@ -830,6 +976,9 @@ export function SetupWizard({
     admin,
     apiKeys,
     apiTested,
+    database,
+    databaseManagedByEnvironment,
+    databaseReady,
     environmentReady,
     sudo,
     copy,
@@ -848,6 +997,20 @@ export function SetupWizard({
   function updateApiKeys(patch: Partial<ApiKeysForm>) {
     setApiKeys((current) => ({ ...current, ...patch }));
     setApiTested(false);
+  }
+
+  function updateDatabase(patch: Partial<DatabaseForm>) {
+    setDatabase((current) => {
+      const next = { ...current, ...patch };
+
+      if (patch.engine === "sqlite") {
+        return { ...next, connectionString: "" };
+      }
+
+      return next;
+    });
+    setDatabaseTested(patch.engine === "sqlite");
+    setDatabaseTestMessage(null);
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -883,6 +1046,54 @@ export function SetupWizard({
       setApiTested(true);
       setApiTestMessage(copy["api.ready"]);
     } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : String(requestError),
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function testDatabase() {
+    const databaseValidationError = validateDatabase(database, copy);
+
+    if (databaseValidationError) {
+      setError(databaseValidationError);
+      setDatabaseTested(false);
+      return;
+    }
+
+    setIsBusy(true);
+    setError(null);
+    setDatabaseTestMessage(null);
+
+    try {
+      const response = await fetch("/api/setup/test-database", {
+        body: JSON.stringify({ database }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload = await readJsonResponse<{
+        errorKey?: string;
+        ok?: boolean;
+      }>(response, copy["json.failed"]);
+
+      if (!(response.ok && payload.ok)) {
+        const errorKey = payload.errorKey;
+
+        throw new Error(
+          errorKey && Object.hasOwn(copy, errorKey)
+            ? copy[errorKey as SetupCopyKey]
+            : copy["database.failed"],
+        );
+      }
+
+      setDatabaseTested(true);
+      setDatabaseTestMessage(copy["database.ready"]);
+    } catch (requestError) {
+      setDatabaseTested(false);
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -945,6 +1156,7 @@ export function SetupWizard({
         body: JSON.stringify({
           admin,
           apiKeys,
+          database,
           licenseAccepted: acceptedTerms,
           sudo,
         }),
@@ -1183,6 +1395,67 @@ export function SetupWizard({
                     </div>
                   )}
                 </div>
+                <section className={styles.databasePanel}>
+                  <h2>{copy["database.title"]}</h2>
+                  <fieldset className={styles.databaseOptions}>
+                    <legend>{copy["database.field.engine"]}</legend>
+                    {databaseEngineOptions.map((engine) => (
+                      <button
+                        aria-pressed={database.engine === engine}
+                        disabled={databaseManagedByEnvironment || isBusy}
+                        key={engine}
+                        onClick={() => updateDatabase({ engine })}
+                        type="button"
+                      >
+                        {copy[`database.engine.${engine}` as SetupCopyKey]}
+                      </button>
+                    ))}
+                  </fieldset>
+                  {database.engine !== "sqlite" &&
+                    !databaseManagedByEnvironment && (
+                      <Field
+                        error={
+                          showCurrentStepValidation || database.connectionString
+                            ? getDatabaseFieldErrors(database, copy)
+                                .connectionString
+                            : undefined
+                        }
+                        label={copy["database.connectionString"]}
+                      >
+                        <input
+                          autoComplete="off"
+                          onChange={(event) =>
+                            updateDatabase({
+                              connectionString: event.target.value,
+                            })
+                          }
+                          type="password"
+                          value={database.connectionString}
+                        />
+                      </Field>
+                    )}
+                  {database.engine !== "sqlite" &&
+                    !databaseManagedByEnvironment && (
+                      <p className={styles.helpText}>
+                        {copy["database.connectionStringHelp"]}
+                      </p>
+                    )}
+                  {databaseNeedsTest ? (
+                    <button
+                      className={styles.secondaryButton}
+                      disabled={!isHydrated || isBusy}
+                      onClick={testDatabase}
+                      type="button"
+                    >
+                      {isBusy
+                        ? copy["database.testing"]
+                        : copy["database.test"]}
+                    </button>
+                  ) : null}
+                  {databaseTestMessage ? (
+                    <p className={styles.successText}>{databaseTestMessage}</p>
+                  ) : null}
+                </section>
               </>
             )}
 
