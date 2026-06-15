@@ -6,13 +6,14 @@ import Link from "next/link";
 import { useId } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./error-state.module.css";
+import { offlineImageB64 } from "./offline-image-b64";
 
 export type ErrorKind = "maintenance" | "notFound" | "offline" | "server";
 
 const ERROR_IMAGES: Record<ErrorKind, string> = {
   maintenance: "/error-illustrations/maintenance.png",
   notFound: "/error-illustrations/not-found.png",
-  offline: "/error-illustrations/offline.png",
+  offline: offlineImageB64,
   server: "/error-illustrations/server-error.png",
 };
 
