@@ -43,6 +43,8 @@ PLATELETS_SUDO_TOKEN=
 OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.openai.com/v1
 PLATELETS_DATA_DIR=data
+PLATELETS_DBMS=sqlite
+PLATELETS_DATABASE_URL=
 PLATELETS_SQLITE_WRITE_MODE=single-process
 PLATELETS_SECRET_KEY=
 PLATELETS_INCIDENT_WEBHOOK_URLS=
@@ -66,10 +68,14 @@ credentials and encrypted API key configuration in SQLite, then sends the
 operator to the integrated disaster dashboard. `PLATELETS_DATA_DIR` can point
 deployments or tests at a different data directory. `PLATELETS_SECRET_KEY`
 overrides the local encryption key file used to protect stored setup secrets.
-SQLite writes are supported only when one persistent Node.js process owns the
-database file. Serverless or multi-instance signals disable writes unless
+SQLite remains the default database engine. `PLATELETS_DBMS` also accepts
+`postgresql`, `mysql`, or `mariadb`; external engines require a matching
+`PLATELETS_DATABASE_URL` such as `postgresql://user:pass@host/db` or
+`mysql://user:pass@host/db`. SQLite writes are supported only when one
+persistent Node.js process owns the database file. Serverless or
+multi-instance signals disable SQLite writes unless
 `PLATELETS_SQLITE_WRITE_MODE=single-process` is set explicitly for a verified
-single-process deployment. Use an external database architecture before running
+single-process deployment. Prefer PostgreSQL, MySQL, or MariaDB before running
 multiple writable app instances.
 
 For Nginx, Apache, and load balancer requirements, including forwarded headers

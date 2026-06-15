@@ -38,7 +38,8 @@ push subscriptions, or schedules.
 | `src/components/` | Client UI, map controls, admin tools, and AI forms |
 | `src/components/disaster-dashboard/` | Presentational widgets for the disaster dashboard, with data and actions supplied by the dashboard controller |
 | `src/lib/points-db.ts` | Public database facade, shared domain types, settings, logs, and import persistence |
-| `src/lib/points-db-modules/` | SQLite connection/schema ownership and focused point query repositories |
+| `src/lib/database/` | Database engine adapters, SQL dialect helpers, and shared schema initialization |
+| `src/lib/points-db-modules/` | Database connection ownership and focused point query repositories |
 | `src/lib/dataset-import.ts` | General public-data imports and geocoding |
 | `src/lib/medical-dataset-import.ts` | Childcare and NMC medical imports |
 | `src/lib/emergency-recommendation.ts` | Scenario weights and hospital scoring |
@@ -162,11 +163,11 @@ separate fire engine, ambulance, and rescue truck counts for decision support.
 The dashboard reuses `/api/routing/route` for the dispatch path from the
 recommended fire station to the incident, then keeps a straight reserve line if
 the road route provider fails or times out.
-The incident repository is the SQLite
-adapter boundary that can later be replaced by PostgreSQL while keeping route
-handlers and UI flows stable. Facility, route, and risk services can likewise
-be connected to public-safety big-data pipelines, Kakao/OSM route adapters, or
-ML model adapters.
+The database boundary now routes through a shared adapter layer. SQLite remains
+the local default, while PostgreSQL and MySQL/MariaDB can use the same
+repository APIs through engine-specific clients and schema DDL. Facility,
+route, and risk services can likewise be connected to public-safety big-data
+pipelines, Kakao/OSM route adapters, or ML model adapters.
 
 ## Assembly And Protest Notices
 
