@@ -3,6 +3,24 @@ import type { DatabaseClient } from "@/lib/database/types";
 
 const SCHEMA_VERSION = 1;
 
+export const DATABASE_TABLES = [
+  "app_schema_versions",
+  "app_settings",
+  "users",
+  "points",
+  "dataset_updates",
+  "dataset_import_progress",
+  "api_usage_windows",
+  "api_logs",
+  "admin_update_cooldowns",
+  "incident_push_subscriptions",
+  "hazard_events",
+  "assembly_protests",
+  "assembly_geocode_cache",
+  "disaster_incidents",
+  "disaster_incident_events",
+] as const;
+
 function types(db: DatabaseClient) {
   let autoId = "BIGINT AUTO_INCREMENT PRIMARY KEY";
   let timestamp = "DATETIME(3)";

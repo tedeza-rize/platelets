@@ -343,6 +343,32 @@
   font-size: 0.86rem;
 }
 
+.confirmRow {
+  min-height: 44px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.confirmRow input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  accent-color: #225ea8;
+}
+
+.error {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 .progressBackdrop {
   position: fixed;
   inset: 0;
