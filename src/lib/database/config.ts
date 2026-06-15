@@ -91,20 +91,6 @@ export function normalizeDatabaseConfig(input: {
   };
 }
 
-function environmentDatabaseConfig(): DatabaseConfig | null {
-  const engineValue = process.env.PLATELETS_DBMS?.trim();
-  const connectionString = process.env.PLATELETS_DATABASE_URL?.trim();
-
-  if (!(engineValue || connectionString)) {
-    return null;
-  }
-
-  return normalizeDatabaseConfig({
-    connectionString,
-    engine: engineValue || "postgresql",
-  });
-}
-
 function storedDatabaseConfig(): DatabaseConfig | null {
   const configPath = databaseConfigPath();
 
@@ -127,14 +113,7 @@ function storedDatabaseConfig(): DatabaseConfig | null {
 }
 
 export function getDatabaseConfig(): DatabaseConfig {
-  return (
-    environmentDatabaseConfig() ??
-    storedDatabaseConfig() ?? { connectionString: "", engine: "sqlite" }
-  );
-}
-
-export function isDatabaseConfigEnvironmentManaged() {
-  return environmentDatabaseConfig() !== null;
+  return storedDatabaseConfig() ?? { connectionString: "", engine: "sqlite" };
 }
 
 export function hasStoredDatabaseConfig() {
@@ -142,10 +121,6 @@ export function hasStoredDatabaseConfig() {
 }
 
 export function saveDatabaseConfig(config: DatabaseConfig) {
-  if (environmentDatabaseConfig()) {
-    throw new Error("Database selection is managed by environment variables.");
-  }
-
   const normalized = normalizeDatabaseConfig(config);
   const dataDirectory = getDataDirectoryPath();
   const configPath = databaseConfigPath();
@@ -166,10 +141,6 @@ export function saveDatabaseConfig(config: DatabaseConfig) {
 }
 
 export function deleteStoredDatabaseConfig() {
-  if (environmentDatabaseConfig()) {
-    return;
-  }
-
   fs.rmSync(databaseConfigPath(), { force: true });
 }
 

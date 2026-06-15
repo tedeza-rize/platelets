@@ -2,8 +2,6 @@ import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   type DatabaseConfig,
   deleteStoredDatabaseConfig,
-  getDatabaseConfig,
-  isDatabaseConfigEnvironmentManaged,
   normalizeDatabaseConfig,
   saveDatabaseConfig,
   testDatabaseConfig,
@@ -293,11 +291,9 @@ export async function completeSetup(payload: SetupPayload) {
     throw new Error("License agreement must be accepted.");
   }
 
-  const databaseConfig = isDatabaseConfigEnvironmentManaged()
-    ? getDatabaseConfig()
-    : normalizeDatabaseConfig(
-        payload.database ?? { connectionString: "", engine: "sqlite" },
-      );
+  const databaseConfig = normalizeDatabaseConfig(
+    payload.database ?? { connectionString: "", engine: "sqlite" },
+  );
   const completedAt = new Date().toISOString();
   const state: SetupState = {
     accounts: {
@@ -314,11 +310,9 @@ export async function completeSetup(payload: SetupPayload) {
   let savedDatabaseConfig = false;
 
   try {
-    if (!isDatabaseConfigEnvironmentManaged()) {
-      saveDatabaseConfig(databaseConfig);
-      savedDatabaseConfig = true;
-      await closeDatabase();
-    }
+    saveDatabaseConfig(databaseConfig);
+    savedDatabaseConfig = true;
+    await closeDatabase();
 
     await getDatabase();
   } catch (error) {
