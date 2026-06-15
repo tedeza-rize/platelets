@@ -148,7 +148,10 @@ export function FieldConsole({ dictionary }: { dictionary: AppDictionary }) {
                 <article className={styles.incident} key={incident.id}>
                   <strong>{incident.title}</strong>
                   <span>
-                    {t(incident.status)} · {t(incident.riskLevel)}
+                    {uiText(dictionary, "format.statusRisk", {
+                      risk: t(incident.riskLevel),
+                      status: t(incident.status),
+                    })}
                   </span>
                   <p>{incident.address}</p>
                 </article>

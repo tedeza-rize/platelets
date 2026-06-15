@@ -170,7 +170,9 @@ test("redirects first-run deployments to the setup wizard", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Install" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("Platelets 통합 재난 지도")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Platelets integrated disaster map" }),
+  ).toBeVisible();
 });
 
 test("loads the integrated disaster response map", async ({
@@ -180,8 +182,10 @@ test("loads the integrated disaster response map", async ({
   await ensureSetupComplete(request);
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("Platelets 통합 재난 지도")).toBeVisible();
-  await expect(page.getByRole("button", { name: "대시보드" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Platelets integrated disaster map" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "3D" })).toBeVisible();
   await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible();
 });
@@ -389,21 +393,21 @@ test("shows BigData119 operational evidence and resource recommendations", async
   await ensureSetupComplete(request);
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("119 신고·출동 데이터")).toBeVisible({
+  await expect(page.getByText("119 call and dispatch data")).toBeVisible({
     timeout: 15_000,
   });
   await expect(
     page.getByText("소방안전 빅데이터: 전북 119신고접수"),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "자원배치" }).click();
+  await page.getByRole("button", { name: "Resources" }).click();
 
-  await expect(page.getByText("자원 배치 지원")).toBeVisible();
+  await expect(page.getByText("Resource placement support")).toBeVisible();
   await expect
     .poll(() => page.getByText(/위험도 \d+점/).count())
     .toBeGreaterThan(0);
   await expect
-    .poll(() => page.getByText(/구조차 \d+대/).count())
+    .poll(() => page.getByText(/Rescue trucks: \d+/).count())
     .toBeGreaterThan(0);
   await expect
     .poll(() => page.getByText(/119 신고·출동 운영 부하/).count())
@@ -436,12 +440,12 @@ test("renders a dispatch road route when the route API succeeds", async ({
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText("소방서 추천")).toBeVisible({
+  await expect(page.getByText("Fire station recommendation")).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByText("자체 A* 도로 경로 1.2km · 3분")).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(
+    page.getByText("Internal A* road route 1.2km · 3 min"),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("incident API records create, edit, and status history", async ({

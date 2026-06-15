@@ -932,6 +932,7 @@ function riskAreasData(riskAreas: RiskArea[]) {
 function bigData119Data(
   points: BigData119MapPoint[],
   visibleKinds: Record<BigData119PointKind, boolean>,
+  text: DashboardText,
 ) {
   return featureCollection(
     points
@@ -942,7 +943,7 @@ function bigData119Data(
           id: point.id,
           isSample: point.isSample,
           kind: point.kind,
-          label: BIGDATA119_KIND_LABEL[point.kind],
+          label: text(BIGDATA119_KIND_LABEL[point.kind]),
           name: point.name,
           sourceId: point.sourceId,
         }),
@@ -950,7 +951,7 @@ function bigData119Data(
   );
 }
 
-function userLocationData(location: UserLocation | null) {
+function userLocationData(location: UserLocation | null, text: DashboardText) {
   if (!location) {
     return EMPTY_FEATURE_COLLECTION;
   }
@@ -963,14 +964,17 @@ function userLocationData(location: UserLocation | null) {
       {
         accuracy: location.accuracy,
         id: "current-user-location",
-        label: "내 위치",
+        label: text("내 위치"),
         locatedAt: location.locatedAt,
       },
     ),
   ]);
 }
 
-function reportLocationData(location: ReportLocation | null) {
+function reportLocationData(
+  location: ReportLocation | null,
+  text: DashboardText,
+) {
   if (!location) {
     return EMPTY_FEATURE_COLLECTION;
   }
@@ -983,7 +987,7 @@ function reportLocationData(location: ReportLocation | null) {
       {
         address: location.address,
         id: "draft-report-location",
-        label: "신고 예정 위치",
+        label: text("dashboard.sheet.reportLocationTitle"),
       },
     ),
   ]);
@@ -1047,7 +1051,7 @@ function propertyText(
   return null;
 }
 
-function formatBuildingClass(value: string | null) {
+function formatBuildingClass(value: string | null, text: DashboardText) {
   if (!value) {
     return null;
   }
@@ -1067,10 +1071,10 @@ function formatBuildingClass(value: string | null) {
     yes: "건물",
   };
 
-  return labels[value] ?? value.replace(/_/g, " ");
+  return labels[value] ? text(labels[value]) : value.replace(/_/g, " ");
 }
 
-function formatBuildingHeight(value: string | null) {
+function formatBuildingHeight(value: string | null, formatLocale: string) {
   if (!value) {
     return null;
   }
@@ -1081,7 +1085,7 @@ function formatBuildingHeight(value: string | null) {
     return value;
   }
 
-  return `${numeric.toLocaleString("ko-KR", {
+  return `${numeric.toLocaleString(formatLocale, {
     maximumFractionDigits: 1,
   })}m`;
 }
@@ -1141,7 +1145,7 @@ function buildingDisplayAddress(
 function createReportLocation(
   coordinates: [number, number],
   address?: string | null,
-  fallbackLabel = "지도 선택 위치",
+  fallbackLabel?: string,
 ): ReportLocation {
   const latitude = Number(coordinates[1].toFixed(6));
   const longitude = Number(coordinates[0].toFixed(6));
@@ -1149,7 +1153,7 @@ function createReportLocation(
   return {
     address:
       address ??
-      `${fallbackLabel} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`,
+      `${fallbackLabel ?? ""} (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`.trim(),
     latitude,
     longitude,
   };
@@ -1160,6 +1164,7 @@ function buildBuildingReportAddress(
   poiProperties: BuildingFeatureProperties | null,
   safetyProfile: BuildingSafetyProfile | null,
   coordinates: [number, number],
+  text: DashboardText,
 ) {
   const name = buildingDisplayName(
     buildingProperties,
@@ -1174,7 +1179,7 @@ function buildBuildingReportAddress(
   const fallback = createReportLocation(
     coordinates,
     null,
-    "건물 선택 위치",
+    text("dashboard.popup.buildingSelection"),
   ).address;
 
   if (name && address) {
@@ -1197,6 +1202,8 @@ function buildBuildingPopupHtml(
   poiProperties: BuildingFeatureProperties | null,
   coordinates: [number, number],
   safetyProfile: BuildingSafetyProfile | null,
+  text: DashboardText,
+  formatLocale: string,
 ) {
   const name = buildingDisplayName(
     buildingProperties,
@@ -1205,12 +1212,15 @@ function buildBuildingPopupHtml(
   );
   const buildingType = formatBuildingClass(
     propertyText(buildingProperties, ["building", "type", "class"]),
+    text,
   );
   const poiType = formatBuildingClass(
     propertyText(poiProperties, ["subclass", "class", "type"]),
+    text,
   );
   const height = formatBuildingHeight(
     propertyText(buildingProperties, ["height", "render_height"]),
+    formatLocale,
   );
   const levels = propertyText(buildingProperties, [
     "building:levels",
@@ -1223,13 +1233,16 @@ function buildBuildingPopupHtml(
   );
   const coordinateLabel = `${coordinates[1].toFixed(5)}, ${coordinates[0].toFixed(5)}`;
   const rows = [
-    ["주소", address],
-    ["분류", poiType ?? buildingType],
-    ["건물 용도", buildingType],
-    ["높이", height],
-    ["층수", levels ? `${levels}층` : null],
-    ["좌표", coordinateLabel],
-    ["데이터", "OpenStreetMap / OpenMapTiles"],
+    [text("dashboard.sheet.address"), address],
+    [text("dashboard.sheet.category"), poiType ?? buildingType],
+    [text("dashboard.popup.buildingUse"), buildingType],
+    [text("dashboard.popup.height"), height],
+    [
+      text("dashboard.popup.floors"),
+      levels ? text("dashboard.popup.floorCount", { count: levels }) : null,
+    ],
+    [text("dashboard.sheet.coordinates"), coordinateLabel],
+    [text("dashboard.popup.data"), "OpenStreetMap / OpenMapTiles"],
   ].filter((row): row is [string, string] => Boolean(row[1]));
   const rowsHtml = rows
     .map(
@@ -1239,11 +1252,13 @@ function buildBuildingPopupHtml(
         )}</dt><dd>${escapeHtml(value)}</dd></div>`,
     )
     .join("");
-  const title = name ? `[건물·시설] ${name}` : "[건물] 이름 정보 없음";
+  const title = name
+    ? text("dashboard.popup.buildingNamedTitle", { name })
+    : text("dashboard.popup.buildingUnknownTitle");
   const subtitle =
     safetyProfile?.dataStatus === "sample"
-      ? "샘플 안전 프로필"
-      : (poiType ?? buildingType ?? "공개 지도 건물 데이터");
+      ? text("dashboard.popup.sampleSafetyProfile")
+      : (poiType ?? buildingType ?? text("dashboard.popup.publicBuildingData"));
   const searchQuery = name ?? address ?? coordinateLabel;
   const sectionText =
     safetyProfile && safetyProfile.section.length > 0
@@ -1284,51 +1299,53 @@ function buildBuildingPopupHtml(
     : escapeHtml(safetyProfile?.sourceLabel ?? "");
   const profileHtml = safetyProfile
     ? `<section class="${styles.popupSafety}">
-        <strong>건물 단면도·비상구 프로필</strong>
+        <strong>${escapeHtml(text("dashboard.popup.safetyProfileTitle"))}</strong>
         <p>${escapeHtml(
           safetyProfile.dataStatus === "sample"
-            ? "발표용 샘플 도면 정보입니다. 실제 비상구/단면도는 승인된 시설·플랫폼 데이터 연동 후 교체해야 합니다."
-            : "검증된 건물 안전 데이터입니다.",
+            ? text("dashboard.popup.sampleSafetyDescription")
+            : text("dashboard.popup.verifiedSafetyDescription"),
         )}</p>
         <dl class="${styles.popupDetails}">
           ${
             sectionText
-              ? `<div class="${styles.popupRow}"><dt>단면 요약</dt><dd>${escapeHtml(
+              ? `<div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.sectionSummary"))}</dt><dd>${escapeHtml(
                   sectionText,
                 )}</dd></div>`
               : ""
           }
-          <div class="${styles.popupRow}"><dt>비상구</dt><dd>${escapeHtml(
+          <div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.exits"))}</dt><dd>${escapeHtml(
             safetyProfile.exits
               .map((exit) => `${exit.floor} ${exit.label}(${exit.direction})`)
               .join(", "),
           )}</dd></div>
-          <div class="${styles.popupRow}"><dt>대피 장소</dt><dd>${escapeHtml(
+          <div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.assemblyPoint"))}</dt><dd>${escapeHtml(
             safetyProfile.nearestAssemblyPoint,
           )}</dd></div>
           ${
             evacuationRouteText
-              ? `<div class="${styles.popupRow}"><dt>피난 경로</dt><dd>${escapeHtml(
+              ? `<div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.evacuationRoutes"))}</dt><dd>${escapeHtml(
                   evacuationRouteText,
                 )}</dd></div>`
               : ""
           }
-          <div class="${styles.popupRow}"><dt>층별 구조</dt><dd>${escapeHtml(
+          <div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.floorStructure"))}</dt><dd>${escapeHtml(
             safetyProfile.floors
               .map(
                 (floor) =>
                   `${floor.floor}: ${floor.keySpaces.join("/")}${
                     floor.hazards.length > 0
-                      ? `, 위험요소 ${floor.hazards.join("/")}`
+                      ? text("dashboard.popup.hazards", {
+                          hazards: floor.hazards.join("/"),
+                        })
                       : ""
                   }`,
               )
               .join(" · "),
           )}</dd></div>
-          <div class="${styles.popupRow}"><dt>출처</dt><dd>${sourceLabel}</dd></div>
+          <div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.sheet.source"))}</dt><dd>${sourceLabel}</dd></div>
           ${
             sourceNotesText
-              ? `<div class="${styles.popupRow}"><dt>검증 메모</dt><dd>${escapeHtml(
+              ? `<div class="${styles.popupRow}"><dt>${escapeHtml(text("dashboard.popup.verificationNotes"))}</dt><dd>${escapeHtml(
                   sourceNotesText,
                 )}</dd></div>`
               : ""
@@ -1336,8 +1353,8 @@ function buildBuildingPopupHtml(
         </dl>
       </section>`
     : `<section class="${styles.popupSafety}">
-        <strong>건물 안전 프로필 없음</strong>
-        <p>이 건물의 단면도/비상구 데이터는 아직 연결되지 않았습니다.</p>
+        <strong>${escapeHtml(text("dashboard.popup.noSafetyProfileTitle"))}</strong>
+        <p>${escapeHtml(text("dashboard.popup.noSafetyProfileDescription"))}</p>
       </section>`;
 
   return `<article class="${styles.popup}">
@@ -1348,28 +1365,32 @@ function buildBuildingPopupHtml(
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     ${profileHtml}
     <div class="${styles.popupActions}">
-      <button ${BUILDING_REPORT_ACTION_ATTRIBUTE}="true" type="button">이 위치 신고</button>
+      <button ${BUILDING_REPORT_ACTION_ATTRIBUTE}="true" type="button">${escapeHtml(text("dashboard.popup.reportHere"))}</button>
       <a href="${buildExternalMapSearchUrl(
         "naver",
         searchQuery,
-      )}" target="_blank" rel="noreferrer">네이버 지도</a>
+      )}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.naverMap"))}</a>
       <a href="${buildExternalMapSearchUrl(
         "kakao",
         searchQuery,
-      )}" target="_blank" rel="noreferrer">카카오맵</a>
+      )}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.kakaoMap"))}</a>
     </div>
   </article>`;
 }
 
-function dispatchRouteProviderLabel(route: DispatchRoute) {
+function dispatchRouteProviderLabel(route: DispatchRoute, text: DashboardText) {
   if (route.provider === "kakao") {
-    return route.traffic?.status === "live" ? "카카오 교통 반영" : "카카오";
+    return route.traffic?.status === "live"
+      ? text("dashboard.route.kakaoLive")
+      : text("dashboard.route.kakao");
   }
 
-  return route.traffic?.status === "live" ? "자체 A* + ITS 교통" : "자체 A*";
+  return route.traffic?.status === "live"
+    ? text("dashboard.route.astarLive")
+    : text("dashboard.route.astar");
 }
 
-function dispatchRouteTrafficStatus(route: DispatchRoute) {
+function dispatchRouteTrafficStatus(route: DispatchRoute, text: DashboardText) {
   if (!route.traffic) {
     return "";
   }
@@ -1379,20 +1400,30 @@ function dispatchRouteTrafficStatus(route: DispatchRoute) {
   }
 
   if (route.traffic.status === "unconfigured") {
-    return " · ITS 교통 API 키 미설정";
+    return text("dashboard.route.trafficUnconfigured");
   }
 
   return ` · ${route.traffic.message}`;
 }
 
-function buildUserLocationPopupHtml(location: UserLocation) {
+function buildUserLocationPopupHtml(
+  location: UserLocation,
+  text: DashboardText,
+  formatLocale: string,
+) {
   const rows = [
     [
-      "좌표",
+      text("dashboard.sheet.coordinates"),
       `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`,
     ],
-    ["정확도", distanceText(location.accuracy)],
-    ["확인 시각", formatDateTime(location.locatedAt)],
+    [
+      text("dashboard.sheet.accuracy"),
+      distanceText(location.accuracy, formatLocale),
+    ],
+    [
+      text("dashboard.sheet.checkedAt"),
+      formatDateTime(location.locatedAt, formatLocale),
+    ],
   ];
   const rowsHtml = rows
     .map(
@@ -1405,21 +1436,24 @@ function buildUserLocationPopupHtml(location: UserLocation) {
 
   return `<article class="${styles.popup}">
     <div class="${styles.popupHeader}">
-      <strong>내 위치</strong>
-      <span>브라우저 위치 정보</span>
+      <strong>${escapeHtml(text("dashboard.sheet.userLocationTitle"))}</strong>
+      <span>${escapeHtml(text("dashboard.sheet.userLocationSubtitle"))}</span>
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
   </article>`;
 }
 
-function buildReportLocationPopupHtml(location: ReportLocation) {
+function buildReportLocationPopupHtml(
+  location: ReportLocation,
+  text: DashboardText,
+) {
   const coordinateLabel = `${location.latitude.toFixed(
     5,
   )}, ${location.longitude.toFixed(5)}`;
   const rows = [
-    ["주소", location.address],
-    ["좌표", coordinateLabel],
-    ["상태", "등록 전 신고 후보 위치"],
+    [text("dashboard.sheet.address"), location.address],
+    [text("dashboard.sheet.coordinates"), coordinateLabel],
+    [text("dashboard.sheet.status"), text("dashboard.sheet.reportStatus")],
   ];
   const rowsHtml = rows
     .map(
@@ -1432,28 +1466,37 @@ function buildReportLocationPopupHtml(location: ReportLocation) {
 
   return `<article class="${styles.popup}">
     <div class="${styles.popupHeader}">
-      <strong>신고 예정 위치</strong>
-      <span>사고 등록 폼에 반영된 지도 선택 지점</span>
+      <strong>${escapeHtml(text("dashboard.sheet.reportLocationTitle"))}</strong>
+      <span>${escapeHtml(text("dashboard.sheet.reportLocationSubtitle"))}</span>
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
   </article>`;
 }
 
-function buildBigData119PopupHtml(point: BigData119MapPoint) {
+function buildBigData119PopupHtml(
+  point: BigData119MapPoint,
+  text: DashboardText,
+) {
   const coordinateLabel = `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
   const rows = [
-    ["유형", BIGDATA119_KIND_LABEL[point.kind]],
-    ["분류", point.category],
-    ["주소", point.address],
-    ["지역", [point.city, point.district].filter(Boolean).join(" ")],
-    ["관할", [point.stationName, point.centerName].filter(Boolean).join(" / ")],
-    ["상태", point.status],
-    ["좌표", coordinateLabel],
+    [text("dashboard.sheet.type"), text(BIGDATA119_KIND_LABEL[point.kind])],
+    [text("dashboard.sheet.category"), point.category],
+    [text("dashboard.sheet.address"), point.address],
     [
-      "데이터",
+      text("dashboard.sheet.region"),
+      [point.city, point.district].filter(Boolean).join(" "),
+    ],
+    [
+      text("dashboard.sheet.governingOffice"),
+      [point.stationName, point.centerName].filter(Boolean).join(" / "),
+    ],
+    [text("dashboard.sheet.status"), point.status],
+    [text("dashboard.sheet.coordinates"), coordinateLabel],
+    [
+      text("dashboard.sheet.dataStatus"),
       point.isSample
-        ? "소방안전 빅데이터 플랫폼 샘플"
-        : "소방안전 빅데이터 플랫폼 CSV",
+        ? text("dashboard.popup.bigDataSample")
+        : text("dashboard.popup.bigDataCsv"),
     ],
   ].filter((row): row is [string, string] => Boolean(row[1]));
   const rowsHtml = rows
@@ -1472,23 +1515,23 @@ function buildBigData119PopupHtml(point: BigData119MapPoint) {
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
-      <a href="${point.sourceUrl}" target="_blank" rel="noreferrer">데이터 출처</a>
+      <a href="${point.sourceUrl}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.source"))}</a>
       <a href="${buildExternalMapSearchUrl(
         "naver",
         point.address || point.name || coordinateLabel,
-      )}" target="_blank" rel="noreferrer">네이버 지도</a>
+      )}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.naverMap"))}</a>
     </div>
   </article>`;
 }
 
-function formatDateTime(value: string) {
+function formatDateTime(value: string, formatLocale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("ko-KR", {
+  return new Intl.DateTimeFormat(formatLocale, {
     dateStyle: "medium",
     timeZone: "Asia/Seoul",
     timeStyle: "short",
@@ -1511,7 +1554,10 @@ function localDateTimeToIso(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-type DashboardText = (key: string) => string;
+type DashboardText = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
 
 function buildingDataStatus(
   safetyProfile: BuildingSafetyProfile | null,
@@ -1553,6 +1599,7 @@ function compactRows(
 function userLocationSheet(
   location: UserLocation,
   text: DashboardText,
+  formatLocale: string,
 ): MobileSheet {
   return {
     id: `user-${location.locatedAt}`,
@@ -1561,8 +1608,14 @@ function userLocationSheet(
         text("dashboard.sheet.coordinates"),
         coordinateText(location.latitude, location.longitude),
       ],
-      [text("dashboard.sheet.accuracy"), distanceText(location.accuracy)],
-      [text("dashboard.sheet.checkedAt"), formatDateTime(location.locatedAt)],
+      [
+        text("dashboard.sheet.accuracy"),
+        distanceText(location.accuracy, formatLocale),
+      ],
+      [
+        text("dashboard.sheet.checkedAt"),
+        formatDateTime(location.locatedAt, formatLocale),
+      ],
     ]),
     subtitle: text("dashboard.sheet.userLocationSubtitle"),
     title: text("dashboard.sheet.userLocationTitle"),
@@ -1607,7 +1660,7 @@ function bigData119Sheet(
       },
     ],
     rows: compactRows([
-      [text("dashboard.sheet.type"), BIGDATA119_KIND_LABEL[point.kind]],
+      [text("dashboard.sheet.type"), text(BIGDATA119_KIND_LABEL[point.kind])],
       [text("dashboard.sheet.category"), point.category],
       [text("dashboard.sheet.address"), point.address],
       [
@@ -1686,14 +1739,14 @@ function incidentFormValue(incident: Incident): IncidentForm {
   };
 }
 
-function distanceText(value: number) {
+function distanceText(value: number, formatLocale: string) {
   if (value >= 1000) {
-    return `${(value / 1000).toLocaleString("ko-KR", {
+    return `${(value / 1000).toLocaleString(formatLocale, {
       maximumFractionDigits: 1,
     })}km`;
   }
 
-  return `${value.toLocaleString("ko-KR")}m`;
+  return `${value.toLocaleString(formatLocale)}m`;
 }
 
 function addDashboardLayers(map: MapLibreMap) {
@@ -2123,13 +2176,13 @@ export function DisasterDashboard({
     null,
   );
   const [form, setForm] = useState<IncidentForm>({
-    address: "서울특별시 중구 세종대로 110",
+    address: dictionary.dashboard["dashboard.form.defaultAddress"] ?? "",
     description: "",
     latitude: "37.5665",
     longitude: "126.9780",
     occurredAt: localDateTimeInputValue(new Date()),
     riskLevel: "high",
-    title: "신규 재난 신고",
+    title: dictionary.dashboard["dashboard.form.defaultTitle"] ?? "",
     type: "fire",
   });
 
@@ -2141,7 +2194,13 @@ export function DisasterDashboard({
   const didFitInitialSnapshotRef = useRef(false);
   const mobileSheetDragStartRef = useRef<number | null>(null);
   const dashboardText = useCallback(
-    (key: string) => uiText(dictionary, key),
+    (key: string, values: Record<string, string | number> = {}) => {
+      const template = dictionary.dashboard[key];
+      if (!template) return uiText(dictionary, key, values);
+      return template.replace(/\{(\w+)\}/g, (match, name) =>
+        Object.hasOwn(values, name) ? String(values[name]) : match,
+      );
+    },
     [dictionary],
   );
 
@@ -2157,7 +2216,7 @@ export function DisasterDashboard({
 
       if (!response.ok) {
         throw new Error(
-          payload.error ?? "대시보드 데이터를 불러오지 못했습니다.",
+          payload.error ?? dashboardText("dashboard.notice.loadFailed"),
         );
       }
 
@@ -2181,52 +2240,58 @@ export function DisasterDashboard({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dashboardText]);
 
-  const loadRecommendations = useCallback(async (incident: Incident) => {
-    popupRef.current?.remove();
-    setMobileSheet(null);
-    setMobileSheetDragOffset(0);
-    reportLocationRef.current = null;
-    setReportLocation(null);
-    setActiveIncident(incident);
-    setView("incidents");
+  const loadRecommendations = useCallback(
+    async (incident: Incident) => {
+      popupRef.current?.remove();
+      setMobileSheet(null);
+      setMobileSheetDragOffset(0);
+      reportLocationRef.current = null;
+      setReportLocation(null);
+      setActiveIncident(incident);
+      setView("incidents");
 
-    const response = await fetch(
-      `/api/disaster/recommendations?incidentId=${encodeURIComponent(
-        incident.id,
-      )}`,
-      { cache: "no-store" },
-    );
-    const payload = (await response.json()) as RecommendationResponse & {
-      error?: string;
-    };
+      const response = await fetch(
+        `/api/disaster/recommendations?incidentId=${encodeURIComponent(
+          incident.id,
+        )}`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json()) as RecommendationResponse & {
+        error?: string;
+      };
 
-    if (!response.ok) {
-      setNotice(payload.error ?? "추천 정보를 불러오지 못했습니다.");
-      return;
-    }
+      if (!response.ok) {
+        setNotice(
+          payload.error ??
+            dashboardText("dashboard.notice.recommendationFailed"),
+        );
+        return;
+      }
 
-    setDispatchRecommendation(payload.dispatchRecommendation);
-    setDispatchRoute(null);
-    setDispatchRouteStatus(null);
-    setHospitalRecommendations(payload.hospitalRecommendations);
-    const detailResponse = await fetch(
-      `/api/disaster/incidents/${encodeURIComponent(incident.id)}`,
-      { cache: "no-store" },
-    );
-    const detailPayload = (await detailResponse
-      .json()
-      .catch(() => null)) as IncidentDetailResponse | null;
-    setActiveIncidentEvents(
-      detailResponse.ok && detailPayload?.events ? detailPayload.events : [],
-    );
-    mapRef.current?.flyTo({
-      center: [incident.longitude, incident.latitude],
-      essential: true,
-      zoom: 13,
-    });
-  }, []);
+      setDispatchRecommendation(payload.dispatchRecommendation);
+      setDispatchRoute(null);
+      setDispatchRouteStatus(null);
+      setHospitalRecommendations(payload.hospitalRecommendations);
+      const detailResponse = await fetch(
+        `/api/disaster/incidents/${encodeURIComponent(incident.id)}`,
+        { cache: "no-store" },
+      );
+      const detailPayload = (await detailResponse
+        .json()
+        .catch(() => null)) as IncidentDetailResponse | null;
+      setActiveIncidentEvents(
+        detailResponse.ok && detailPayload?.events ? detailPayload.events : [],
+      );
+      mapRef.current?.flyTo({
+        center: [incident.longitude, incident.latitude],
+        essential: true,
+        zoom: 13,
+      });
+    },
+    [dashboardText],
+  );
 
   useEffect(() => {
     if (!(activeIncident && dispatchRecommendation)) {
@@ -2241,7 +2306,7 @@ export function DisasterDashboard({
 
     setIsDispatchRouteLoading(true);
     setDispatchRoute(null);
-    setDispatchRouteStatus("추천 소방서에서 사고지점까지 도로 경로 계산 중");
+    setDispatchRouteStatus(dashboardText("dashboard.route.calculating"));
 
     fetch("/api/routing/route", {
       body: JSON.stringify({
@@ -2263,31 +2328,37 @@ export function DisasterDashboard({
         const payload = (await response.json()) as DispatchRouteResponse;
 
         if (!(response.ok && payload.route)) {
-          throw new Error(payload.error ?? "도로 경로 계산 실패");
+          throw new Error(
+            payload.error ?? dashboardText("dashboard.route.failed"),
+          );
         }
 
         setDispatchRoute(payload.route);
         setDispatchRouteStatus(
-          `${dispatchRouteProviderLabel(payload.route)} 도로 경로 ${distanceText(
-            payload.route.distanceMeters,
-          )} · ${Math.max(
-            1,
-            Math.round(payload.route.durationSeconds / 60),
-          )}분${dispatchRouteTrafficStatus(payload.route)}`,
+          dashboardText("dashboard.route.summary", {
+            distance: distanceText(
+              payload.route.distanceMeters,
+              dictionary.formatLocale,
+            ),
+            minutes: Math.max(
+              1,
+              Math.round(payload.route.durationSeconds / 60),
+            ),
+            provider: dispatchRouteProviderLabel(payload.route, dashboardText),
+            traffic: dispatchRouteTrafficStatus(payload.route, dashboardText),
+          }),
         );
       })
       .catch((error) => {
         if (controller.signal.aborted) {
-          setDispatchRouteStatus(
-            "도로 경로 계산 시간 초과, 직선 예비 경로 표시",
-          );
+          setDispatchRouteStatus(dashboardText("dashboard.route.timeout"));
           return;
         }
 
         setDispatchRouteStatus(
-          `도로 경로 계산 실패, 직선 예비 경로 표시: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          dashboardText("dashboard.route.fallback", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
         );
       })
       .finally(() => {
@@ -2299,11 +2370,16 @@ export function DisasterDashboard({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [activeIncident, dispatchRecommendation]);
+  }, [
+    activeIncident,
+    dashboardText,
+    dictionary.formatLocale,
+    dispatchRecommendation,
+  ]);
 
   const locateUser = useCallback(() => {
     if (!("geolocation" in navigator)) {
-      setNotice("이 브라우저에서는 위치 확인을 사용할 수 없습니다.");
+      setNotice(dashboardText("dashboard.notice.geolocationUnsupported"));
       return;
     }
 
@@ -2317,7 +2393,10 @@ export function DisasterDashboard({
           longitude: position.coords.longitude,
         };
         const report: ReportLocation = {
-          address: `현재 위치 (${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`,
+          address: dashboardText("dashboard.location.current", {
+            latitude: location.latitude.toFixed(5),
+            longitude: location.longitude.toFixed(5),
+          }),
           latitude: location.latitude,
           longitude: location.longitude,
         };
@@ -2332,7 +2411,7 @@ export function DisasterDashboard({
           latitude: location.latitude.toFixed(6),
           longitude: location.longitude.toFixed(6),
         }));
-        setNotice("현재 위치를 지도와 사고 등록 폼에 반영했습니다.");
+        setNotice(dashboardText("dashboard.notice.locationApplied"));
         setMobileSheet(reportLocationSheet(report, dashboardText));
         setMobileSheetDragOffset(0);
 
@@ -2357,7 +2436,7 @@ export function DisasterDashboard({
               offset: 14,
             })
               .setLngLat([location.longitude, location.latitude])
-              .setHTML(buildReportLocationPopupHtml(report))
+              .setHTML(buildReportLocationPopupHtml(report, dashboardText))
               .addTo(map);
             suppressPopupContextMenu(popupRef.current);
           });
@@ -2368,8 +2447,10 @@ export function DisasterDashboard({
       (error) => {
         setNotice(
           error.message
-            ? `현재 위치를 확인하지 못했습니다: ${error.message}`
-            : "현재 위치를 확인하지 못했습니다.",
+            ? dashboardText("dashboard.notice.locationFailedWithReason", {
+                error: error.message,
+              })
+            : dashboardText("dashboard.notice.locationFailed"),
         );
         setIsLocating(false);
       },
@@ -2446,8 +2527,12 @@ export function DisasterDashboard({
       return;
     }
 
-    setSourceData(map, USER_LOCATION_SOURCE_ID, userLocationData(userLocation));
-  }, [isMapReady, userLocation]);
+    setSourceData(
+      map,
+      USER_LOCATION_SOURCE_ID,
+      userLocationData(userLocation, dashboardText),
+    );
+  }, [dashboardText, isMapReady, userLocation]);
 
   useEffect(() => {
     reportLocationRef.current = reportLocation;
@@ -2461,9 +2546,9 @@ export function DisasterDashboard({
     setSourceData(
       map,
       REPORT_LOCATION_SOURCE_ID,
-      reportLocationData(reportLocation),
+      reportLocationData(reportLocation, dashboardText),
     );
-  }, [isMapReady, reportLocation]);
+  }, [dashboardText, isMapReady, reportLocation]);
 
   useEffect(() => {
     if (!reportLocation) {
@@ -2564,11 +2649,12 @@ export function DisasterDashboard({
             poiProperties,
             safetyProfile,
             coordinates,
+            dashboardText,
           ),
         );
         selectReportLocation(
           report,
-          "건물 위치가 신고 예정 위치로 표시되었습니다. 건물 정보를 확인한 뒤 등록하세요.",
+          dashboardText("dashboard.notice.buildingSelected"),
         );
         setMobileSheet(
           buildingSheet(
@@ -2597,6 +2683,8 @@ export function DisasterDashboard({
               poiProperties,
               coordinates,
               safetyProfile,
+              dashboardText,
+              dictionary.formatLocale,
             ),
           )
           .addTo(map);
@@ -2610,7 +2698,7 @@ export function DisasterDashboard({
             buttonEvent.stopPropagation();
             selectReportLocation(
               report,
-              "건물 위치를 신고 예정 위치로 지정했습니다. 내용을 확인한 뒤 등록하세요.",
+              dashboardText("dashboard.notice.buildingConfirmed"),
             );
             showReportLocationPopup(report);
           });
@@ -2618,7 +2706,9 @@ export function DisasterDashboard({
 
       function showUserLocationPopup(location: UserLocation) {
         popupRef.current?.remove();
-        setMobileSheet(userLocationSheet(location, dashboardText));
+        setMobileSheet(
+          userLocationSheet(location, dashboardText, dictionary.formatLocale),
+        );
         setMobileSheetDragOffset(0);
         popupRef.current = new maplibre.Popup({
           closeButton: true,
@@ -2626,7 +2716,13 @@ export function DisasterDashboard({
           offset: 14,
         })
           .setLngLat([location.longitude, location.latitude])
-          .setHTML(buildUserLocationPopupHtml(location))
+          .setHTML(
+            buildUserLocationPopupHtml(
+              location,
+              dashboardText,
+              dictionary.formatLocale,
+            ),
+          )
           .addTo(map);
         suppressPopupContextMenu(popupRef.current);
       }
@@ -2641,7 +2737,7 @@ export function DisasterDashboard({
           offset: 14,
         })
           .setLngLat([location.longitude, location.latitude])
-          .setHTML(buildReportLocationPopupHtml(location))
+          .setHTML(buildReportLocationPopupHtml(location, dashboardText))
           .addTo(map);
         suppressPopupContextMenu(popupRef.current);
       }
@@ -2656,7 +2752,7 @@ export function DisasterDashboard({
           offset: 12,
         })
           .setLngLat([point.longitude, point.latitude])
-          .setHTML(buildBigData119PopupHtml(point))
+          .setHTML(buildBigData119PopupHtml(point, dashboardText))
           .addTo(map);
         suppressPopupContextMenu(popupRef.current);
       }
@@ -2666,17 +2762,21 @@ export function DisasterDashboard({
         setSourceData(
           map,
           BIGDATA119_SOURCE_ID,
-          bigData119Data(bigData119PointsRef.current, visibleBigDataKinds),
+          bigData119Data(
+            bigData119PointsRef.current,
+            visibleBigDataKinds,
+            dashboardText,
+          ),
         );
         setSourceData(
           map,
           USER_LOCATION_SOURCE_ID,
-          userLocationData(userLocationRef.current),
+          userLocationData(userLocationRef.current, dashboardText),
         );
         setSourceData(
           map,
           REPORT_LOCATION_SOURCE_ID,
-          reportLocationData(reportLocationRef.current),
+          reportLocationData(reportLocationRef.current, dashboardText),
         );
         syncThreeDimensionalView(map, isThreeDimensionalRef.current, false);
         setIsMapReady(true);
@@ -2840,14 +2940,15 @@ export function DisasterDashboard({
           }
         }
 
-        const report = createReportLocation([
-          event.lngLat.lng,
-          event.lngLat.lat,
-        ]);
+        const report = createReportLocation(
+          [event.lngLat.lng, event.lngLat.lat],
+          null,
+          dashboardText("dashboard.popup.mapSelection"),
+        );
 
         selectReportLocation(
           report,
-          "지도에서 사고 위치가 선택되었습니다. 내용을 확인한 뒤 등록하세요.",
+          dashboardText("dashboard.notice.mapSelected"),
         );
         showReportLocationPopup(report);
       });
@@ -2885,6 +2986,7 @@ export function DisasterDashboard({
     };
   }, [
     dashboardText,
+    dictionary.formatLocale,
     effectiveMapSettings,
     loadRecommendations,
     visibleBigDataKinds,
@@ -2909,7 +3011,11 @@ export function DisasterDashboard({
     setSourceData(
       map,
       BIGDATA119_SOURCE_ID,
-      bigData119Data(snapshot.bigData119Points, visibleBigDataKinds),
+      bigData119Data(
+        snapshot.bigData119Points,
+        visibleBigDataKinds,
+        dashboardText,
+      ),
     );
     setSourceData(
       map,
@@ -2930,6 +3036,7 @@ export function DisasterDashboard({
     }
   }, [
     activeIncident,
+    dashboardText,
     dispatchRecommendation,
     dispatchRoute,
     isMapReady,
@@ -2967,7 +3074,7 @@ export function DisasterDashboard({
 
   async function createIncident(event: React.FormEvent) {
     event.preventDefault();
-    setNotice("사고 정보를 등록하고 추천을 계산하는 중입니다.");
+    setNotice(dashboardText("dashboard.notice.creatingIncident"));
 
     try {
       const response = await fetch("/api/disaster/incidents", {
@@ -2986,7 +3093,9 @@ export function DisasterDashboard({
       };
 
       if (!(response.ok && payload.incident)) {
-        throw new Error(payload.error ?? "사고 등록에 실패했습니다.");
+        throw new Error(
+          payload.error ?? dashboardText("dashboard.notice.createFailed"),
+        );
       }
 
       popupRef.current?.remove();
@@ -2994,7 +3103,7 @@ export function DisasterDashboard({
       setReportLocation(null);
       await loadSnapshot();
       await loadRecommendations(payload.incident);
-      setNotice("사고가 등록되었습니다.");
+      setNotice(dashboardText("dashboard.notice.created"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     }
@@ -3006,7 +3115,7 @@ export function DisasterDashboard({
     }
 
     setIsStatusUpdating(true);
-    setNotice("사고 상태를 업데이트하는 중입니다.");
+    setNotice(dashboardText("dashboard.notice.updatingStatus"));
 
     try {
       const response = await fetch(
@@ -3023,13 +3132,15 @@ export function DisasterDashboard({
       };
 
       if (!(response.ok && payload.incident)) {
-        throw new Error(payload.error ?? "사고 상태 변경에 실패했습니다.");
+        throw new Error(
+          payload.error ?? dashboardText("dashboard.notice.statusFailed"),
+        );
       }
 
       setActiveIncident(payload.incident);
       await loadSnapshot();
       await loadRecommendations(payload.incident);
-      setNotice("사고 상태가 업데이트되었습니다.");
+      setNotice(dashboardText("dashboard.notice.statusUpdated"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3056,7 +3167,7 @@ export function DisasterDashboard({
     }
 
     setIsIncidentSaving(true);
-    setNotice("사고 정보를 수정하는 중입니다.");
+    setNotice(dashboardText("dashboard.notice.savingIncident"));
 
     try {
       const response = await fetch(
@@ -3075,7 +3186,9 @@ export function DisasterDashboard({
       const payload = (await response.json()) as IncidentDetailResponse;
 
       if (!(response.ok && payload.incident)) {
-        throw new Error(payload.error ?? "사고 정보 수정에 실패했습니다.");
+        throw new Error(
+          payload.error ?? dashboardText("dashboard.notice.saveFailed"),
+        );
       }
 
       setEditIncidentId(null);
@@ -3084,7 +3197,7 @@ export function DisasterDashboard({
       setActiveIncidentEvents(payload.events ?? []);
       await loadSnapshot();
       await loadRecommendations(payload.incident);
-      setNotice("사고 정보가 수정되었습니다.");
+      setNotice(dashboardText("dashboard.notice.saved"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3099,7 +3212,7 @@ export function DisasterDashboard({
 
     setIsDeleteConfirmationOpen(false);
     setIsIncidentDeleting(true);
-    setNotice("사고를 삭제하는 중입니다.");
+    setNotice(dashboardText("dashboard.notice.deletingIncident"));
 
     try {
       const response = await fetch(
@@ -3112,7 +3225,9 @@ export function DisasterDashboard({
       } | null;
 
       if (!(response.ok && payload?.deleted)) {
-        throw new Error(payload?.error ?? "사고 삭제에 실패했습니다.");
+        throw new Error(
+          payload?.error ?? dashboardText("dashboard.notice.deleteFailed"),
+        );
       }
 
       popupRef.current?.remove();
@@ -3122,7 +3237,7 @@ export function DisasterDashboard({
       setHospitalRecommendations([]);
       cancelIncidentEdit();
       await loadSnapshot();
-      setNotice("사고가 삭제되었습니다.");
+      setNotice(dashboardText("dashboard.notice.deleted"));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3205,9 +3320,12 @@ export function DisasterDashboard({
           <span>
             <ShieldAlert aria-hidden="true" size={20} strokeWidth={2.6} />
           </span>
-          Platelets 통합 재난 지도
+          {dashboardText("Platelets 통합 재난 지도")}
         </a>
-        <nav className={styles.nav} aria-label="재난 대응 화면">
+        <nav
+          className={styles.nav}
+          aria-label={dashboardText("재난 대응 화면")}
+        >
           {[
             ["dashboard", "대시보드"],
             ["incidents", "사고"],
@@ -3221,7 +3339,7 @@ export function DisasterDashboard({
               onClick={() => setView(key as DashboardView)}
               type="button"
             >
-              {label}
+              {dashboardText(label)}
             </button>
           ))}
         </nav>
@@ -3232,7 +3350,7 @@ export function DisasterDashboard({
           type="button"
         >
           <RefreshCw aria-hidden="true" size={16} />
-          새로고침
+          {dashboardText("새로고침")}
         </button>
       </header>
 
@@ -3241,7 +3359,7 @@ export function DisasterDashboard({
           <div className={styles.map} ref={mapContainerRef} />
           <div
             className={styles.mapControls}
-            aria-label="지도 도구"
+            aria-label={dashboardText("지도 도구")}
             role="toolbar"
           >
             <button
@@ -3250,21 +3368,21 @@ export function DisasterDashboard({
                 isThreeDimensional ? styles.mapToggleActive : styles.mapToggle
               }
               onClick={() => setIsThreeDimensional((current) => !current)}
-              title="3D 건물 보기"
+              title={dashboardText("3D 건물 보기")}
               type="button"
             >
-              3D
+              {dashboardText("3D")}
             </button>
             <button
               className={styles.mapToggle}
               data-testid="locate-user-button"
               disabled={isLocating}
               onClick={locateUser}
-              title="내 위치로 이동"
+              title={dashboardText("내 위치로 이동")}
               type="button"
             >
               <LocateFixed aria-hidden="true" size={15} />
-              {isLocating ? "확인 중" : "내 위치"}
+              {dashboardText(isLocating ? "확인 중" : "내 위치")}
             </button>
             <button
               aria-pressed={visibleBigDataKinds["fire-safety-target"]}
@@ -3279,10 +3397,10 @@ export function DisasterDashboard({
                   "fire-safety-target": !current["fire-safety-target"],
                 }))
               }
-              title="소방안전 빅데이터 특정소방대상물 표시"
+              title={dashboardText("소방안전 빅데이터 특정소방대상물 표시")}
               type="button"
             >
-              대상물
+              {dashboardText("대상물")}
             </button>
             <button
               aria-pressed={visibleBigDataKinds["fire-water-source"]}
@@ -3297,42 +3415,42 @@ export function DisasterDashboard({
                   "fire-water-source": !current["fire-water-source"],
                 }))
               }
-              title="소방안전 빅데이터 소방용수 표시"
+              title={dashboardText("소방안전 빅데이터 소방용수 표시")}
               type="button"
             >
-              소방용수
+              {dashboardText("소방용수")}
             </button>
           </div>
           <MapLegend
             items={[
               {
                 id: "incident",
-                label: "사고",
+                label: dashboardText("사고"),
                 markerClassName: styles.legendIncident,
               },
               {
                 id: "station",
-                label: "소방서",
+                label: dashboardText("소방서"),
                 markerClassName: styles.legendStation,
               },
               {
                 id: "hospital",
-                label: "병원",
+                label: dashboardText("병원"),
                 markerClassName: styles.legendHospital,
               },
               {
                 id: "risk",
-                label: "위험도",
+                label: dashboardText("위험도"),
                 markerClassName: styles.legendRisk,
               },
               {
                 id: "fire-safety-target",
-                label: "특정소방대상물",
+                label: dashboardText("특정소방대상물"),
                 markerClassName: styles.legendBigDataTarget,
               },
               {
                 id: "fire-water-source",
-                label: "소방용수",
+                label: dashboardText("소방용수"),
                 markerClassName: styles.legendBigDataWater,
               },
             ]}
@@ -3398,42 +3516,42 @@ export function DisasterDashboard({
 
         <aside className={styles.panel}>
           <SummaryMetrics
-            ariaLabel="운영 지표"
+            ariaLabel={dashboardText("운영 지표")}
             items={[
               {
                 icon: <AlertTriangle aria-hidden="true" size={18} />,
                 id: "active-incidents",
-                label: "진행 사고",
+                label: dashboardText("진행 사고"),
                 value: summary.activeIncidents,
               },
               {
                 icon: <Flame aria-hidden="true" size={18} />,
                 id: "fire-stations",
-                label: "소방 거점",
+                label: dashboardText("소방 거점"),
                 value: summary.fireStations,
               },
               {
                 icon: <Hospital aria-hidden="true" size={18} />,
                 id: "hospitals",
-                label: "응급 병원",
+                label: dashboardText("응급 병원"),
                 value: summary.hospitals,
               },
               {
                 icon: <Layers aria-hidden="true" size={18} />,
                 id: "high-risk-areas",
-                label: "고위험 지역",
+                label: dashboardText("고위험 지역"),
                 value: summary.highRiskAreas,
               },
               {
                 icon: <Database aria-hidden="true" size={18} />,
                 id: "big-data-points",
-                label: "빅데이터 포인트",
+                label: dashboardText("빅데이터 포인트"),
                 value: summary.bigData119Points,
               },
               {
                 icon: <Route aria-hidden="true" size={18} />,
                 id: "operational-rows",
-                label: "신고·출동 행",
+                label: dashboardText("신고·출동 행"),
                 value: summary.bigData119OperationalRows,
               },
             ]}
@@ -3444,9 +3562,13 @@ export function DisasterDashboard({
           {bigData119Summaries.length > 0 ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>소방안전 빅데이터 활용</span>
+                <span className={styles.kicker}>
+                  {dashboardText("소방안전 빅데이터 활용")}
+                </span>
                 <strong>
-                  플랫폼 CSV {bigData119Summaries.length}종 지도 반영
+                  {dashboardText("dashboard.bigData.mapSummary", {
+                    count: bigData119Summaries.length,
+                  })}
                 </strong>
               </div>
               <div className={styles.dataSourceGrid}>
@@ -3466,11 +3588,21 @@ export function DisasterDashboard({
                     <div>
                       <strong>{source.sourceLabel}</strong>
                       <span>
-                        {source.mappedCount.toLocaleString("ko-KR")}개 좌표 ·{" "}
-                        {source.regions.slice(0, 2).join(", ") ||
-                          "지역 정보 없음"}
-                        {source.regions.length > 2 ? " 외" : ""} ·{" "}
-                        {source.isSample ? "샘플" : "승인 CSV"}
+                        {dashboardText("dashboard.bigData.mapSourceMeta", {
+                          count: source.mappedCount.toLocaleString(
+                            dictionary.formatLocale,
+                          ),
+                          extra:
+                            source.regions.length > 2
+                              ? dashboardText(" 외")
+                              : "",
+                          regions:
+                            source.regions.slice(0, 2).join(", ") ||
+                            dashboardText("지역 정보 없음"),
+                          status: dashboardText(
+                            source.isSample ? "샘플" : "승인 CSV",
+                          ),
+                        })}
                       </span>
                     </div>
                   </a>
@@ -3482,9 +3614,13 @@ export function DisasterDashboard({
           {bigData119OperationalSummaries.length > 0 ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>119 신고·출동 데이터</span>
+                <span className={styles.kicker}>
+                  {dashboardText("119 신고·출동 데이터")}
+                </span>
                 <strong>
-                  운영 CSV {bigData119OperationalSummaries.length}종 위험도 반영
+                  {dashboardText("dashboard.bigData.operationsSummary", {
+                    count: bigData119OperationalSummaries.length,
+                  })}
                 </strong>
               </div>
               <div className={styles.dataSourceGrid}>
@@ -3500,36 +3636,62 @@ export function DisasterDashboard({
                     <div>
                       <strong>{source.sourceLabel}</strong>
                       <span>
-                        {BIGDATA119_OPERATIONAL_KIND_LABEL[source.kind]} ·{" "}
-                        {source.rowCount.toLocaleString("ko-KR")}행 ·{" "}
-                        {source.regions.slice(0, 2).join(", ") ||
-                          "지역 정보 없음"}
-                        {source.regions.length > 2 ? " 외" : ""} ·{" "}
-                        {source.isSample ? "샘플" : "승인 CSV"}
+                        {dashboardText("dashboard.bigData.operationMeta", {
+                          count: source.rowCount.toLocaleString(
+                            dictionary.formatLocale,
+                          ),
+                          extra:
+                            source.regions.length > 2
+                              ? dashboardText(" 외")
+                              : "",
+                          kind: dashboardText(
+                            BIGDATA119_OPERATIONAL_KIND_LABEL[source.kind],
+                          ),
+                          regions:
+                            source.regions.slice(0, 2).join(", ") ||
+                            dashboardText("지역 정보 없음"),
+                          status: dashboardText(
+                            source.isSample ? "샘플" : "승인 CSV",
+                          ),
+                        })}
                       </span>
                       <span>
-                        {source.incidentTypeHints.slice(0, 2).join(", ") ||
-                          "유형 정보 없음"}{" "}
-                        · {source.timeHints[0] ?? "시간 정보 없음"}
-                        {source.averageDispatchDistanceMeters
-                          ? ` · 평균 거리 ${distanceText(
-                              source.averageDispatchDistanceMeters,
-                            )}`
-                          : ""}
+                        {dashboardText("dashboard.bigData.operationHints", {
+                          average: source.averageDispatchDistanceMeters
+                            ? dashboardText("dashboard.bigData.averageSuffix", {
+                                distance: distanceText(
+                                  source.averageDispatchDistanceMeters,
+                                  dictionary.formatLocale,
+                                ),
+                              })
+                            : "",
+                          time:
+                            source.timeHints[0] ??
+                            dashboardText("시간 정보 없음"),
+                          types:
+                            source.incidentTypeHints.slice(0, 2).join(", ") ||
+                            dashboardText("유형 정보 없음"),
+                        })}
                       </span>
                       {source.areaLoads.length > 0 ? (
                         <span>
-                          위험권역 매칭:{" "}
-                          {source.areaLoads
-                            .slice(0, 2)
-                            .map(
-                              (areaLoad) =>
-                                `${areaLoad.areaName} ${areaLoad.rowCount.toLocaleString(
-                                  "ko-KR",
-                                )}건`,
-                            )
-                            .join(", ")}
-                          {source.areaLoads.length > 2 ? " 외" : ""}
+                          {dashboardText("dashboard.bigData.areaLoads", {
+                            areas: source.areaLoads
+                              .slice(0, 2)
+                              .map((areaLoad) =>
+                                dashboardText("dashboard.bigData.areaLoad", {
+                                  area: areaLoad.areaName,
+                                  count: areaLoad.rowCount.toLocaleString(
+                                    dictionary.formatLocale,
+                                  ),
+                                }),
+                              )
+                              .join(", "),
+                            extra:
+                              source.areaLoads.length > 2
+                                ? dashboardText(" 외")
+                                : "",
+                          })}
                         </span>
                       ) : null}
                     </div>
@@ -3542,28 +3704,43 @@ export function DisasterDashboard({
           {(view === "dashboard" || view === "incidents") && activeIncident ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>선택 사고</span>
+                <span className={styles.kicker}>
+                  {dashboardText("선택 사고")}
+                </span>
                 <strong>{activeIncident.title}</strong>
               </div>
               <dl className={styles.detailGrid}>
                 <div>
-                  <dt>유형</dt>
-                  <dd>{INCIDENT_TYPE_LABEL[activeIncident.type]}</dd>
+                  <dt>{dashboardText("유형")}</dt>
+                  <dd>
+                    {dashboardText(INCIDENT_TYPE_LABEL[activeIncident.type])}
+                  </dd>
                 </div>
                 <div>
-                  <dt>위험도</dt>
-                  <dd>{RISK_LEVEL_LABEL[activeIncident.riskLevel]}</dd>
+                  <dt>{dashboardText("위험도")}</dt>
+                  <dd>
+                    {dashboardText(RISK_LEVEL_LABEL[activeIncident.riskLevel])}
+                  </dd>
                 </div>
                 <div>
-                  <dt>상태</dt>
-                  <dd>{INCIDENT_STATUS_LABEL[activeIncident.status]}</dd>
+                  <dt>{dashboardText("상태")}</dt>
+                  <dd>
+                    {dashboardText(
+                      INCIDENT_STATUS_LABEL[activeIncident.status],
+                    )}
+                  </dd>
                 </div>
                 <div>
-                  <dt>발생시각</dt>
-                  <dd>{formatDateTime(activeIncident.occurredAt)}</dd>
+                  <dt>{dashboardText("발생시각")}</dt>
+                  <dd>
+                    {formatDateTime(
+                      activeIncident.occurredAt,
+                      dictionary.formatLocale,
+                    )}
+                  </dd>
                 </div>
                 <div>
-                  <dt>위치</dt>
+                  <dt>{dashboardText("위치")}</dt>
                   <dd>{activeIncident.address}</dd>
                 </div>
               </dl>
@@ -3576,7 +3753,7 @@ export function DisasterDashboard({
                     onClick={() => updateIncidentStatus("dispatched")}
                     type="button"
                   >
-                    출동 처리
+                    {dashboardText("출동 처리")}
                   </button>
                 )}
                 {activeIncident.status === "closed" ? null : (
@@ -3586,7 +3763,7 @@ export function DisasterDashboard({
                     onClick={() => updateIncidentStatus("closed")}
                     type="button"
                   >
-                    종료
+                    {dashboardText("종료")}
                   </button>
                 )}
                 {activeIncident.status === "reported" ? null : (
@@ -3596,7 +3773,7 @@ export function DisasterDashboard({
                     onClick={() => updateIncidentStatus("reported")}
                     type="button"
                   >
-                    접수로 되돌리기
+                    {dashboardText("접수로 되돌리기")}
                   </button>
                 )}
                 <button
@@ -3605,7 +3782,7 @@ export function DisasterDashboard({
                   onClick={() => startIncidentEdit(activeIncident)}
                   type="button"
                 >
-                  수정
+                  {dashboardText("수정")}
                 </button>
                 {isDeleteConfirmationOpen ? (
                   <>
@@ -3640,7 +3817,7 @@ export function DisasterDashboard({
               {editIncidentId === activeIncident.id && editIncidentForm ? (
                 <form className={styles.form} onSubmit={saveIncidentEdit}>
                   <label>
-                    사고명
+                    {dashboardText("사고명")}
                     <input
                       onChange={(event) =>
                         setEditIncidentForm((current) =>
@@ -3654,7 +3831,7 @@ export function DisasterDashboard({
                   </label>
                   <div className={styles.formGrid}>
                     <label>
-                      유형
+                      {dashboardText("유형")}
                       <select
                         onChange={(event) =>
                           setEditIncidentForm((current) =>
@@ -3668,14 +3845,16 @@ export function DisasterDashboard({
                         }
                         value={editIncidentForm.type}
                       >
-                        <option value="fire">화재</option>
-                        <option value="medical">구급</option>
-                        <option value="rescue">구조</option>
-                        <option value="traffic">교통사고</option>
+                        <option value="fire">{dashboardText("화재")}</option>
+                        <option value="medical">{dashboardText("구급")}</option>
+                        <option value="rescue">{dashboardText("구조")}</option>
+                        <option value="traffic">
+                          {dashboardText("교통사고")}
+                        </option>
                       </select>
                     </label>
                     <label>
-                      위험도
+                      {dashboardText("위험도")}
                       <select
                         onChange={(event) =>
                           setEditIncidentForm((current) =>
@@ -3689,15 +3868,15 @@ export function DisasterDashboard({
                         }
                         value={editIncidentForm.riskLevel}
                       >
-                        <option value="low">낮음</option>
-                        <option value="medium">보통</option>
-                        <option value="high">높음</option>
+                        <option value="low">{dashboardText("낮음")}</option>
+                        <option value="medium">{dashboardText("보통")}</option>
+                        <option value="high">{dashboardText("높음")}</option>
                       </select>
                     </label>
                   </div>
                   <div className={styles.formGrid}>
                     <label>
-                      위도
+                      {dashboardText("위도")}
                       <input
                         inputMode="decimal"
                         onChange={(event) =>
@@ -3711,7 +3890,7 @@ export function DisasterDashboard({
                       />
                     </label>
                     <label>
-                      경도
+                      {dashboardText("경도")}
                       <input
                         inputMode="decimal"
                         onChange={(event) =>
@@ -3726,7 +3905,7 @@ export function DisasterDashboard({
                     </label>
                   </div>
                   <label>
-                    발생시각
+                    {dashboardText("발생시각")}
                     <input
                       onChange={(event) =>
                         setEditIncidentForm((current) =>
@@ -3740,7 +3919,7 @@ export function DisasterDashboard({
                     />
                   </label>
                   <label>
-                    주소
+                    {dashboardText("주소")}
                     <input
                       onChange={(event) =>
                         setEditIncidentForm((current) =>
@@ -3753,7 +3932,7 @@ export function DisasterDashboard({
                     />
                   </label>
                   <label>
-                    설명
+                    {dashboardText("설명")}
                     <textarea
                       onChange={(event) =>
                         setEditIncidentForm((current) =>
@@ -3772,7 +3951,7 @@ export function DisasterDashboard({
                       disabled={isIncidentSaving}
                       type="submit"
                     >
-                      저장
+                      {dashboardText("저장")}
                     </button>
                     <button
                       className={styles.secondaryButton}
@@ -3780,7 +3959,7 @@ export function DisasterDashboard({
                       onClick={cancelIncidentEdit}
                       type="button"
                     >
-                      취소
+                      {dashboardText("취소")}
                     </button>
                   </div>
                 </form>
@@ -3789,14 +3968,28 @@ export function DisasterDashboard({
                 <div className={styles.timeline}>
                   {activeIncidentEvents.slice(0, 5).map((event) => (
                     <article className={styles.timelineItem} key={event.id}>
-                      <strong>{INCIDENT_EVENT_LABEL[event.type]}</strong>
+                      <strong>
+                        {dashboardText(INCIDENT_EVENT_LABEL[event.type])}
+                      </strong>
                       <span>
                         {event.message}
                         {event.fromStatus && event.toStatus
-                          ? ` · ${INCIDENT_STATUS_LABEL[event.fromStatus]} -> ${INCIDENT_STATUS_LABEL[event.toStatus]}`
+                          ? dashboardText("dashboard.statusTransition", {
+                              from: dashboardText(
+                                INCIDENT_STATUS_LABEL[event.fromStatus],
+                              ),
+                              to: dashboardText(
+                                INCIDENT_STATUS_LABEL[event.toStatus],
+                              ),
+                            })
                           : ""}
                       </span>
-                      <small>{formatDateTime(event.createdAt)}</small>
+                      <small>
+                        {formatDateTime(
+                          event.createdAt,
+                          dictionary.formatLocale,
+                        )}
+                      </small>
                     </article>
                   ))}
                 </div>
@@ -3808,30 +4001,44 @@ export function DisasterDashboard({
           dispatchRecommendation ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>소방서 추천</span>
+                <span className={styles.kicker}>
+                  {dashboardText("소방서 추천")}
+                </span>
                 <strong>{dispatchRecommendation.station.name}</strong>
               </div>
               <div className={styles.recommendationMeta}>
                 <span>
                   <Route size={15} />{" "}
-                  {distanceText(dispatchRecommendation.distanceMeters)}
+                  {distanceText(
+                    dispatchRecommendation.distanceMeters,
+                    dictionary.formatLocale,
+                  )}
                 </span>
                 <span>
-                  <Truck size={15} /> {dispatchRecommendation.etaMinutes}분
+                  <Truck size={15} />
+                  {dashboardText("dashboard.minutes", {
+                    value: dispatchRecommendation.etaMinutes,
+                  })}
                 </span>
-                <span>{dispatchRecommendation.score}점</span>
+                <span>
+                  {dashboardText("dashboard.points", {
+                    value: dispatchRecommendation.score,
+                  })}
+                </span>
               </div>
               {dispatchRouteStatus ? (
                 <p className={styles.itemReasons}>
-                  {isDispatchRouteLoading ? "계산 중 · " : ""}
+                  {isDispatchRouteLoading
+                    ? dashboardText("dashboard.calculatingPrefix")
+                    : ""}
                   {dispatchRouteStatus}
                 </p>
               ) : null}
               <div className={styles.criteriaGrid}>
-                <span>거리 기반 우선</span>
-                <span>예상 출동 시간</span>
-                <span>관할/인접 권역</span>
-                <span>보유 장비 가점</span>
+                <span>{dashboardText("거리 기반 우선")}</span>
+                <span>{dashboardText("예상 출동 시간")}</span>
+                <span>{dashboardText("관할/인접 권역")}</span>
+                <span>{dashboardText("보유 장비 가점")}</span>
               </div>
               <ul className={styles.reasonList}>
                 {dispatchRecommendation.reasons.map((reason) => (
@@ -3845,13 +4052,15 @@ export function DisasterDashboard({
           hospitalRecommendations.length > 0 ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>병원 추천</span>
-                <strong>사고 유형 기반 후보</strong>
+                <span className={styles.kicker}>
+                  {dashboardText("병원 추천")}
+                </span>
+                <strong>{dashboardText("사고 유형 기반 후보")}</strong>
               </div>
               <div className={styles.criteriaGrid}>
-                <span>응급실 운영</span>
-                <span>전문 진료 분야</span>
-                <span>거리/접근성</span>
+                <span>{dashboardText("응급실 운영")}</span>
+                <span>{dashboardText("전문 진료 분야")}</span>
+                <span>{dashboardText("거리/접근성")}</span>
               </div>
               <div className={styles.list}>
                 {hospitalRecommendations.map((recommendation) => (
@@ -3862,10 +4071,17 @@ export function DisasterDashboard({
                     <div>
                       <strong>{recommendation.hospital.name}</strong>
                       <small>
-                        {distanceText(recommendation.distanceMeters)} ·{" "}
-                        {recommendation.hospital.emergencyRoom
-                          ? "응급실 운영"
-                          : "응급실 정보 없음"}
+                        {dashboardText("dashboard.hospitalMeta", {
+                          distance: distanceText(
+                            recommendation.distanceMeters,
+                            dictionary.formatLocale,
+                          ),
+                          emergencyRoom: dashboardText(
+                            recommendation.hospital.emergencyRoom
+                              ? "응급실 운영"
+                              : "응급실 정보 없음",
+                          ),
+                        })}
                       </small>
                     </div>
                     <span>{recommendation.score}</span>
@@ -3881,25 +4097,31 @@ export function DisasterDashboard({
           {view === "create" ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>사고 등록</span>
-                <strong>지도 클릭 또는 좌표 입력</strong>
+                <span className={styles.kicker}>
+                  {dashboardText("사고 등록")}
+                </span>
+                <strong>{dashboardText("지도 클릭 또는 좌표 입력")}</strong>
               </div>
               {reportLocation ? (
                 <div className={styles.locationPreview}>
                   <MapPin aria-hidden="true" size={16} />
                   <div>
-                    <strong>신고 예정 위치가 지도에 표시 중입니다</strong>
+                    <strong>
+                      {dashboardText("신고 예정 위치가 지도에 표시 중입니다")}
+                    </strong>
                     <span>
-                      {reportLocation.address} ·{" "}
-                      {reportLocation.latitude.toFixed(5)},{" "}
-                      {reportLocation.longitude.toFixed(5)}
+                      {dashboardText("dashboard.reportLocation", {
+                        address: reportLocation.address,
+                        latitude: reportLocation.latitude.toFixed(5),
+                        longitude: reportLocation.longitude.toFixed(5),
+                      })}
                     </span>
                   </div>
                 </div>
               ) : null}
               <form className={styles.form} onSubmit={createIncident}>
                 <label>
-                  사고명
+                  {dashboardText("사고명")}
                   <input
                     onChange={(event) =>
                       setForm((current) => ({
@@ -3912,7 +4134,7 @@ export function DisasterDashboard({
                 </label>
                 <div className={styles.formGrid}>
                   <label>
-                    유형
+                    {dashboardText("유형")}
                     <select
                       onChange={(event) =>
                         setForm((current) => ({
@@ -3922,14 +4144,16 @@ export function DisasterDashboard({
                       }
                       value={form.type}
                     >
-                      <option value="fire">화재</option>
-                      <option value="medical">구급</option>
-                      <option value="rescue">구조</option>
-                      <option value="traffic">교통사고</option>
+                      <option value="fire">{dashboardText("화재")}</option>
+                      <option value="medical">{dashboardText("구급")}</option>
+                      <option value="rescue">{dashboardText("구조")}</option>
+                      <option value="traffic">
+                        {dashboardText("교통사고")}
+                      </option>
                     </select>
                   </label>
                   <label>
-                    위험도
+                    {dashboardText("위험도")}
                     <select
                       onChange={(event) =>
                         setForm((current) => ({
@@ -3939,15 +4163,15 @@ export function DisasterDashboard({
                       }
                       value={form.riskLevel}
                     >
-                      <option value="low">낮음</option>
-                      <option value="medium">보통</option>
-                      <option value="high">높음</option>
+                      <option value="low">{dashboardText("낮음")}</option>
+                      <option value="medium">{dashboardText("보통")}</option>
+                      <option value="high">{dashboardText("높음")}</option>
                     </select>
                   </label>
                 </div>
                 <div className={styles.formGrid}>
                   <label>
-                    위도
+                    {dashboardText("위도")}
                     <input
                       inputMode="decimal"
                       onChange={(event) =>
@@ -3960,7 +4184,7 @@ export function DisasterDashboard({
                     />
                   </label>
                   <label>
-                    경도
+                    {dashboardText("경도")}
                     <input
                       inputMode="decimal"
                       onChange={(event) =>
@@ -3974,7 +4198,7 @@ export function DisasterDashboard({
                   </label>
                 </div>
                 <label>
-                  발생시각
+                  {dashboardText("발생시각")}
                   <input
                     onChange={(event) =>
                       setForm((current) => ({
@@ -3987,7 +4211,7 @@ export function DisasterDashboard({
                   />
                 </label>
                 <label>
-                  주소
+                  {dashboardText("주소")}
                   <input
                     onChange={(event) =>
                       setForm((current) => ({
@@ -3999,7 +4223,7 @@ export function DisasterDashboard({
                   />
                 </label>
                 <label>
-                  설명
+                  {dashboardText("설명")}
                   <textarea
                     onChange={(event) =>
                       setForm((current) => ({
@@ -4012,7 +4236,8 @@ export function DisasterDashboard({
                   />
                 </label>
                 <button className={styles.primaryButton} type="submit">
-                  <Plus aria-hidden="true" size={16} /> 사고 등록
+                  <Plus aria-hidden="true" size={16} />
+                  {dashboardText("사고 등록")}
                 </button>
               </form>
             </section>
@@ -4021,21 +4246,29 @@ export function DisasterDashboard({
           {(view === "incidents" || view === "dashboard") && (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>사고 목록</span>
+                <span className={styles.kicker}>
+                  {dashboardText("사고 목록")}
+                </span>
                 <strong>
-                  {filteredIncidents.length.toLocaleString("ko-KR")} /{" "}
-                  {incidents.length.toLocaleString("ko-KR")}건
+                  {dashboardText("dashboard.incidentCount", {
+                    filtered: filteredIncidents.length.toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                    total: incidents.length.toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                  })}
                 </strong>
               </div>
               <div className={styles.filterBar}>
                 <input
-                  aria-label="사고 검색"
+                  aria-label={dashboardText("사고 검색")}
                   onChange={(event) => setIncidentSearch(event.target.value)}
-                  placeholder="사고명, 주소, 설명 검색"
+                  placeholder={dashboardText("사고명, 주소, 설명 검색")}
                   value={incidentSearch}
                 />
                 <select
-                  aria-label="사고 유형 필터"
+                  aria-label={dashboardText("사고 유형 필터")}
                   onChange={(event) =>
                     setIncidentTypeFilter(
                       event.target.value as IncidentTypeFilter,
@@ -4043,14 +4276,14 @@ export function DisasterDashboard({
                   }
                   value={incidentTypeFilter}
                 >
-                  <option value="all">전체 유형</option>
-                  <option value="fire">화재</option>
-                  <option value="medical">구급</option>
-                  <option value="rescue">구조</option>
-                  <option value="traffic">교통사고</option>
+                  <option value="all">{dashboardText("전체 유형")}</option>
+                  <option value="fire">{dashboardText("화재")}</option>
+                  <option value="medical">{dashboardText("구급")}</option>
+                  <option value="rescue">{dashboardText("구조")}</option>
+                  <option value="traffic">{dashboardText("교통사고")}</option>
                 </select>
                 <select
-                  aria-label="사고 상태 필터"
+                  aria-label={dashboardText("사고 상태 필터")}
                   onChange={(event) =>
                     setIncidentStatusFilter(
                       event.target.value as IncidentStatusFilter,
@@ -4058,10 +4291,10 @@ export function DisasterDashboard({
                   }
                   value={incidentStatusFilter}
                 >
-                  <option value="all">전체 상태</option>
-                  <option value="reported">접수</option>
-                  <option value="dispatched">출동</option>
-                  <option value="closed">종료</option>
+                  <option value="all">{dashboardText("전체 상태")}</option>
+                  <option value="reported">{dashboardText("접수")}</option>
+                  <option value="dispatched">{dashboardText("출동")}</option>
+                  <option value="closed">{dashboardText("종료")}</option>
                 </select>
               </div>
               <div className={styles.list}>
@@ -4081,16 +4314,25 @@ export function DisasterDashboard({
                       {incident.title}
                     </span>
                     <small>
-                      {INCIDENT_TYPE_LABEL[incident.type]} ·{" "}
-                      {RISK_LEVEL_LABEL[incident.riskLevel]} ·{" "}
-                      {INCIDENT_STATUS_LABEL[incident.status]} ·{" "}
-                      {formatDateTime(incident.occurredAt)}
+                      {dashboardText("dashboard.incidentMeta", {
+                        occurredAt: formatDateTime(
+                          incident.occurredAt,
+                          dictionary.formatLocale,
+                        ),
+                        risk: dashboardText(
+                          RISK_LEVEL_LABEL[incident.riskLevel],
+                        ),
+                        status: dashboardText(
+                          INCIDENT_STATUS_LABEL[incident.status],
+                        ),
+                        type: dashboardText(INCIDENT_TYPE_LABEL[incident.type]),
+                      })}
                     </small>
                   </button>
                 ))}
                 {filteredIncidents.length === 0 ? (
                   <p className={styles.emptyState}>
-                    조건에 맞는 사고가 없습니다.
+                    {dashboardText("조건에 맞는 사고가 없습니다.")}
                   </p>
                 ) : null}
               </div>
@@ -4100,26 +4342,40 @@ export function DisasterDashboard({
           {view === "risk" ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>위험도 예측</span>
-                <strong>규칙 기반 점수</strong>
+                <span className={styles.kicker}>
+                  {dashboardText("위험도 예측")}
+                </span>
+                <strong>{dashboardText("규칙 기반 점수")}</strong>
               </div>
               {activeRiskArea ? (
                 <article className={styles.analysisCard}>
                   <div>
                     <strong>{activeRiskArea.name}</strong>
                     <span>
-                      {RISK_LEVEL_LABEL[activeRiskArea.riskLevel]} ·{" "}
-                      {activeRiskArea.riskScore}점
+                      {dashboardText("dashboard.riskScore", {
+                        level: dashboardText(
+                          RISK_LEVEL_LABEL[activeRiskArea.riskLevel],
+                        ),
+                        score: activeRiskArea.riskScore,
+                      })}
                     </span>
                   </div>
                   <dl>
                     <div>
-                      <dt>기준 점수</dt>
-                      <dd>{activeRiskArea.baseScore}점</dd>
+                      <dt>{dashboardText("기준 점수")}</dt>
+                      <dd>
+                        {dashboardText("dashboard.points", {
+                          value: activeRiskArea.baseScore,
+                        })}
+                      </dd>
                     </div>
                     <div>
-                      <dt>최근 사고</dt>
-                      <dd>{activeRiskArea.recentIncidentCount}건</dd>
+                      <dt>{dashboardText("최근 사고")}</dt>
+                      <dd>
+                        {dashboardText("dashboard.count", {
+                          value: activeRiskArea.recentIncidentCount,
+                        })}
+                      </dd>
                     </div>
                   </dl>
                   <ul className={styles.compactReasonList}>
@@ -4153,8 +4409,11 @@ export function DisasterDashboard({
                       {area.name}
                     </span>
                     <small>
-                      {RISK_LEVEL_LABEL[area.riskLevel]} · {area.riskScore}점 ·{" "}
-                      {area.factors.join(", ")}
+                      {dashboardText("dashboard.riskAreaMeta", {
+                        factors: area.factors.join(", "),
+                        level: dashboardText(RISK_LEVEL_LABEL[area.riskLevel]),
+                        score: area.riskScore,
+                      })}
                     </small>
                   </button>
                 ))}
@@ -4165,8 +4424,10 @@ export function DisasterDashboard({
           {view === "resources" ? (
             <section className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.kicker}>자원 배치 지원</span>
-                <strong>의사결정 권고</strong>
+                <span className={styles.kicker}>
+                  {dashboardText("자원 배치 지원")}
+                </span>
+                <strong>{dashboardText("의사결정 권고")}</strong>
               </div>
               <div className={styles.list}>
                 {recommendations.map((recommendation) => (
@@ -4177,23 +4438,36 @@ export function DisasterDashboard({
                     <div>
                       <strong>{recommendation.areaName}</strong>
                       <small>
-                        {recommendation.timeWindow} ·{" "}
-                        {RISK_LEVEL_LABEL[recommendation.priority]} 우선순위 ·{" "}
-                        위험도 {recommendation.riskScore}점
+                        {dashboardText("dashboard.resourceMeta", {
+                          priority: dashboardText(
+                            RISK_LEVEL_LABEL[recommendation.priority],
+                          ),
+                          score: recommendation.riskScore,
+                          timeWindow: recommendation.timeWindow,
+                        })}
                       </small>
                     </div>
                     <div className={styles.resourceCounts}>
                       <span>
-                        <Truck size={15} /> 소방차{" "}
-                        {recommendation.recommendedFireEngines}대
+                        <Truck size={15} />
+                        {dashboardText("dashboard.vehicleCount", {
+                          count: recommendation.recommendedFireEngines,
+                          vehicle: dashboardText("소방차"),
+                        })}
                       </span>
                       <span>
-                        <Ambulance size={15} /> 구급차{" "}
-                        {recommendation.recommendedAmbulances}대
+                        <Ambulance size={15} />
+                        {dashboardText("dashboard.vehicleCount", {
+                          count: recommendation.recommendedAmbulances,
+                          vehicle: dashboardText("구급차"),
+                        })}
                       </span>
                       <span>
-                        <ShieldAlert size={15} /> 구조차{" "}
-                        {recommendation.recommendedRescueTrucks}대
+                        <ShieldAlert size={15} />
+                        {dashboardText("dashboard.vehicleCount", {
+                          count: recommendation.recommendedRescueTrucks,
+                          vehicle: dashboardText("구조차"),
+                        })}
                       </span>
                     </div>
                     <p>{recommendation.message}</p>

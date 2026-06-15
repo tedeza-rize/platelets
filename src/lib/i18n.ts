@@ -1,3 +1,5 @@
+import { enDashboard, koDashboard } from "@/lib/i18n-dashboard";
+
 export type Locale = "ko" | "en";
 
 export type MapDictionary = {
@@ -46,6 +48,7 @@ export type MapDictionary = {
 };
 
 export type AppDictionary = {
+  dashboard: Record<string, string>;
   formatLocale: string;
   map: MapDictionary;
   metadata: {
@@ -521,6 +524,38 @@ const koUi = {
   "preferences.theme.light": "라이트",
   "preferences.theme.system": "시스템",
   "preferences.title": "환경 설정",
+  AI: "AI",
+  ID: "ID",
+  NTP: "NTP",
+  OpenFreeMap: "OpenFreeMap",
+  "Responses API": "Responses API",
+  "ai.effort.high": "높음",
+  "ai.effort.low": "낮음",
+  "ai.effort.medium": "보통",
+  "ai.effort.minimal": "최소",
+  "ai.effort.none": "사용 안 함",
+  "ai.effort.xhigh": "매우 높음",
+  "ai.verbosity.high": "길게",
+  "ai.verbosity.low": "짧게",
+  "ai.verbosity.medium": "보통",
+  "format.datasetCount": "{selected}/{total}",
+  "format.dispatchCandidate": "출동 후보: {name} · {distance}km",
+  "format.editAccount": "계정 수정: {name}",
+  "format.hospitalSummary": "{category} · {minutes}분 · {distance}km",
+  "format.milliseconds": "{value}ms",
+  "format.origin": "{label} {latitude}, {longitude}",
+  "format.percent": "{value}%",
+  "format.quota": "{used} / {limit}",
+  "format.routeSummary":
+    "{provider} 경로 · {minutes}분 · {distance}km{traffic}",
+  "format.statusRisk": "{status} · {risk}",
+  "format.trafficSuffix": " · {traffic}",
+  "license.registry": "Platelets 데이터 출처 목록",
+  "log.category.dataset": "데이터셋",
+  "log.category.geocoding": "좌표 검색",
+  "log.category.hazard": "재난 정보",
+  "log.category.system": "시스템",
+  "log.category.ui": "화면",
   레스터: "레스터",
   벡터: "벡터",
   브이월드: "브이월드",
@@ -992,6 +1027,38 @@ const enUi = {
   "preferences.theme.light": "Light",
   "preferences.theme.system": "System",
   "preferences.title": "Preferences",
+  AI: "AI",
+  ID: "ID",
+  NTP: "NTP",
+  OpenFreeMap: "OpenFreeMap",
+  "Responses API": "Responses API",
+  "ai.effort.high": "High",
+  "ai.effort.low": "Low",
+  "ai.effort.medium": "Medium",
+  "ai.effort.minimal": "Minimal",
+  "ai.effort.none": "None",
+  "ai.effort.xhigh": "Extra high",
+  "ai.verbosity.high": "Detailed",
+  "ai.verbosity.low": "Concise",
+  "ai.verbosity.medium": "Balanced",
+  "format.datasetCount": "{selected}/{total}",
+  "format.dispatchCandidate": "Dispatch candidate: {name} · {distance} km",
+  "format.editAccount": "Edit account: {name}",
+  "format.hospitalSummary": "{category} · {minutes} min · {distance} km",
+  "format.milliseconds": "{value} ms",
+  "format.origin": "{label} {latitude}, {longitude}",
+  "format.percent": "{value}%",
+  "format.quota": "{used} / {limit}",
+  "format.routeSummary":
+    "{provider} route · {minutes} min · {distance} km{traffic}",
+  "format.statusRisk": "{status} · {risk}",
+  "format.trafficSuffix": " · {traffic}",
+  "license.registry": "Platelets data registry",
+  "log.category.dataset": "Dataset",
+  "log.category.geocoding": "Geocoding",
+  "log.category.hazard": "Hazard",
+  "log.category.system": "System",
+  "log.category.ui": "Interface",
   레스터: "Raster",
   벡터: "Vector",
   브이월드: "VWorld",
@@ -1009,6 +1076,7 @@ export function uiText(
 
 const dictionaries: Record<Locale, AppDictionary> = {
   ko: {
+    dashboard: koDashboard,
     formatLocale: "ko-KR",
     map: {
       activeProvider: "선택한 지도: {provider}",
@@ -1069,6 +1137,7 @@ const dictionaries: Record<Locale, AppDictionary> = {
     ui: koUi,
   },
   en: {
+    dashboard: enDashboard,
     formatLocale: "en-US",
     map: {
       activeProvider: "Selected map: {provider}",
