@@ -1,0 +1,157 @@
+.page {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  background:
+    linear-gradient(135deg, rgb(31 143 87 / 8%), transparent 38%),
+    linear-gradient(315deg, rgb(225 29 72 / 7%), transparent 34%),
+    var(--background);
+  padding: 32px 20px;
+}
+
+.panel {
+  display: grid;
+  width: min(960px, 100%);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.82fr);
+  align-items: center;
+  gap: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--dropdown-surface);
+  box-shadow: var(--premium-glass-shadow);
+  padding: clamp(28px, 5vw, 64px);
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.eyebrow {
+  color: var(--brand-mark);
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.4;
+}
+
+.copy h1 {
+  max-width: 18ch;
+  color: var(--text-strong);
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.description {
+  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.72;
+  word-break: keep-all;
+}
+
+.reference {
+  color: var(--text-muted);
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.actions a,
+.actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--control-border);
+  border-radius: 7px;
+  background: var(--control-surface);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-weight: 800;
+  padding: 10px 16px;
+}
+
+.actions button {
+  border-color: var(--brand-mark);
+  background: var(--brand-mark);
+  color: #ffffff;
+}
+
+.actions a:hover,
+.actions a:focus-visible,
+.actions button:hover,
+.actions button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus-ring) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.actions svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.illustration {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+}
+
+.illustration img {
+  width: min(100%, 380px);
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  .page {
+    align-items: start;
+    padding: 18px 12px;
+  }
+
+  .panel {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 28px 22px 32px;
+  }
+
+  .illustration {
+    grid-row: 1;
+  }
+
+  .illustration img {
+    width: min(78vw, 300px);
+  }
+
+  .copy {
+    text-align: center;
+  }
+
+  .copy h1,
+  .description {
+    margin-inline: auto;
+  }
+
+  .actions {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .actions,
+  .actions a,
+  .actions button {
+    width: 100%;
+  }
+}

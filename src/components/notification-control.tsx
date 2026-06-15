@@ -101,7 +101,7 @@ export function NotificationControl({
         return;
       }
 
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      const registration = await navigator.serviceWorker.register("/sw.js?v=3");
       if (!("Notification" in window && "PushManager" in window)) {
         setState("unsupported");
         return;

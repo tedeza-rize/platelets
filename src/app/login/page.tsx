@@ -1,7 +1,7 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LoginConsole } from "@/components/login-console";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-preferences";
 import { homePathForRole } from "@/lib/role-routing";
 import { getCurrentAccessSession } from "@/lib/server-session";
 import { requireSetupComplete } from "@/lib/setup-redirect";
@@ -13,10 +13,7 @@ export default async function LoginPage() {
   const session = await getCurrentAccessSession();
   if (session) redirect(homePathForRole(session.role));
 
-  const headerList = await headers();
-  const dictionary = getDictionary(
-    resolveLocale(headerList.get("accept-language")),
-  );
+  const dictionary = getDictionary(await getRequestLocale());
 
   return <LoginConsole dictionary={dictionary} />;
 }

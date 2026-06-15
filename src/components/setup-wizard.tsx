@@ -132,7 +132,9 @@ const setupCopy = {
     "api.lead":
       "Save provider keys for maps, public data, geocoding, routing, Seoul citydata, and AI.",
     "api.title": "API keys",
+    "brand.name": "Platelets",
     "brand.subtitle": "Setup Assistant",
+    "brand.wizardAria": "Platelets setup wizard",
     "controls.language": "Language",
     "controls.theme": "Theme",
     "environment.checking.detail": "Reading runtime and filesystem status.",
@@ -258,7 +260,9 @@ const setupCopy = {
     "api.lead":
       "지도, 공공데이터, 지오코딩, 경로, 서울 도시데이터, AI에 사용할 제공자 키를 저장합니다.",
     "api.title": "API 키",
+    "brand.name": "Platelets",
     "brand.subtitle": "설치 도우미",
+    "brand.wizardAria": "Platelets 설치 마법사",
     "controls.language": "언어",
     "controls.theme": "테마",
     "environment.checking.detail": "런타임과 파일 시스템 상태를 읽는 중입니다.",
@@ -988,7 +992,7 @@ export function SetupWizard({
 
   return (
     <main className={styles.page} data-theme={theme}>
-      <section className={styles.shell} aria-label="Platelets setup wizard">
+      <section className={styles.shell} aria-label={copy["brand.wizardAria"]}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarTop}>
             <div className={styles.brand}>
@@ -996,7 +1000,7 @@ export function SetupWizard({
                 <ShieldAlert aria-hidden="true" size={22} strokeWidth={2.6} />
               </span>
               <div>
-                <strong>Platelets</strong>
+                <strong>{copy["brand.name"]}</strong>
                 <span>{copy["brand.subtitle"]}</span>
               </div>
             </div>

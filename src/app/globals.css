@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --navbar-height: 72px;
   --background: #ffffff;
   --foreground: #18201c;
@@ -39,8 +40,49 @@
   --text-strong: #18201c;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #111512;
+  --foreground: #edf4ef;
+  --border: #2b352f;
+  --brand-mark: #61d394;
+  --brand-mark-halo: #183624;
+  --control-border: #344139;
+  --control-selected: #223027;
+  --control-shadow: 0 2px 8px rgb(0 0 0 / 32%);
+  --control-surface: #171e1a;
+  --dropdown-border: #38453d;
+  --dropdown-hover: #223027;
+  --dropdown-shadow: 0 12px 28px rgb(0 0 0 / 42%);
+  --dropdown-surface: #161d18;
+  --focus-ring: #7db7ff;
+  --map-fallback: #202820;
+  --nav-action-active: rgb(255 255 255 / 16%);
+  --nav-border: rgb(255 255 255 / 18%);
+  --nav-focus-ring: rgb(255 255 255 / 76%);
+  --nav-gradient: linear-gradient(90deg, #285899 0%, #365d9b 48%, #4a2d92 100%);
+  --nav-surface: rgb(17 21 18 / 84%);
+  --nav-text: rgb(255 255 255 / 86%);
+  --nav-text-strong: #ffffff;
+  --notice-border: #3a463f;
+  --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
+  --notice-surface: rgb(22 29 24 / 94%);
+  --page-glow: #16251c;
+  --premium-glass-border: rgb(255 255 255 / 14%);
+  --premium-glass-shadow: 0 26px 80px rgb(0 0 0 / 42%);
+  --premium-glass-surface: rgb(22 29 24 / 78%);
+  --premium-panel-glow: radial-gradient(
+    circle at top left,
+    rgb(225 29 72 / 20%),
+    transparent 38%
+  );
+  --text-muted: #a7b5ac;
+  --text-strong: #f3f8f4;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
+    color-scheme: dark;
     --background: #111512;
     --foreground: #edf4ef;
     --border: #2b352f;
@@ -258,10 +300,4 @@ a {
 .licenseCard dd a {
   color: #225ea8;
   font-weight: 700;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
 }

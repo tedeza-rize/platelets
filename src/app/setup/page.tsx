@@ -1,7 +1,6 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SetupWizard } from "@/components/setup-wizard";
-import { resolveLocale } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-preferences";
 import {
   getSetupEnvironmentStatus,
   isSetupCompleteFromDatabaseFile,
@@ -14,8 +13,7 @@ export default async function SetupPage() {
     redirect("/");
   }
 
-  const headerList = await headers();
-  const locale = resolveLocale(headerList.get("accept-language"));
+  const locale = await getRequestLocale();
 
   return (
     <SetupWizard
