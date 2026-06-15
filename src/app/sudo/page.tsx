@@ -1,4 +1,5 @@
 import { ManagementConsole } from "@/components/management-console";
+import { getDatabaseConfig } from "@/lib/database/config";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { requireSetupComplete } from "@/lib/setup-redirect";
@@ -10,5 +11,11 @@ export default async function SudoPage() {
 
   const dictionary = getDictionary(await getRequestLocale());
 
-  return <ManagementConsole dictionary={dictionary} mode="sudo" />;
+  return (
+    <ManagementConsole
+      currentDatabaseEngine={getDatabaseConfig().engine}
+      dictionary={dictionary}
+      mode="sudo"
+    />
+  );
 }

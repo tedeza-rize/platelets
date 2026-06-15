@@ -1,6 +1,9 @@
 import type { PushSubscription } from "web-push";
+import {
+  allDatabase as allSqlite,
+  runDatabase as runSqlite,
+} from "@/lib/database/query";
 import { getDatabase, withDatabaseWriteTransaction } from "@/lib/points-db";
-import { allSqlite, runSqlite } from "@/lib/sqlite";
 
 export type PushSubscriptionLocale = "en" | "ko";
 
