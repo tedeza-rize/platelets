@@ -1,6 +1,6 @@
-import { headers } from "next/headers";
 import { ManagementConsole } from "@/components/management-console";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-preferences";
 import { requireSetupComplete } from "@/lib/setup-redirect";
 
 export const dynamic = "force-dynamic";
@@ -8,10 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage() {
   await requireSetupComplete();
 
-  const headerList = await headers();
-  const dictionary = getDictionary(
-    resolveLocale(headerList.get("accept-language")),
-  );
+  const dictionary = getDictionary(await getRequestLocale());
 
   return <ManagementConsole dictionary={dictionary} mode="admin" />;
 }
