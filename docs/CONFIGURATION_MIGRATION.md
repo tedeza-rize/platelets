@@ -1,26 +1,18 @@
 # Configuration Migration
 
-Platelets stores runtime API keys and operational settings in SQLite
-`app_settings`.
+Platelets stores runtime API keys, alert integrations, and operational settings
+in `app_settings`. Environment files are no longer an application configuration
+source; only `PORT` is supported for selecting the listening port.
 
-- API keys are entered during setup and read from the database at runtime.
-- Stored API key values are encrypted before they are written to
-  `app_settings`. Set `PLATELETS_SECRET_KEY` to a long random value to make the
-  encryption key stable across deployments. If it is not set, Platelets creates
-  a local `.platelets-secret-key` file in `PLATELETS_DATA_DIR`.
-- AI settings are managed from the sudo AI settings page.
-- Operational settings such as private AI base URL allowance, dataset automatic
-  updates, KMA polling interval, and Overpass API URL are managed from the sudo
-  console.
-- Environment variables should be limited to bootstrap values that must exist
-  before the database can be opened, such as `PORT`, `PLATELETS_DATA_DIR`, and
-  `PLATELETS_SECRET_KEY`.
+- API keys are entered during setup or from the sudo external-service panel.
+- Webhook, web-push, and traffic credentials are managed from the same sudo
+  panel.
+- Stored secrets are encrypted before they are written to the database.
+- The encryption key is generated at `data/.platelets-secret-key`.
+- AI behavior and map/import settings are managed from the sudo console.
 
-If an older deployment used API-key or behavior environment variables, sign in
-with the sudo account and copy those values into the setup or sudo console
-before removing them from the environment.
-
-Existing setup records that still contain plaintext API keys are migrated
-automatically the next time runtime API keys are read. If
-`PLATELETS_SECRET_KEY` changes after encryption, previously stored API keys can
-no longer be decrypted and must be re-entered.
+Before upgrading an older deployment, record any integration values that still
+exist only in its environment file. After upgrading, enter them in the sudo
+external-service panel and remove the old variables. Back up the complete
+`data/` directory because the encrypted settings and their local encryption key
+must be restored together.

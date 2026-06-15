@@ -22,12 +22,6 @@ export type SecretBox = {
 export type ProtectedSecret = SecretBox | string;
 
 function getSecretMaterial() {
-  const configuredSecret = process.env.PLATELETS_SECRET_KEY?.trim();
-
-  if (configuredSecret) {
-    return configuredSecret;
-  }
-
   const dataDirectory = getDataDirectoryPath();
   const secretFilePath = path.join(dataDirectory, SECRET_FILE_NAME);
 

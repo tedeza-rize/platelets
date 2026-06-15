@@ -5,11 +5,13 @@ import {
   type Page,
   test,
 } from "@playwright/test";
+import webPush from "web-push";
 
 const SEOUL_COORDINATES = {
   latitude: 37.5665,
   longitude: 126.978,
 } as const;
+const E2E_VAPID_KEYS = webPush.generateVAPIDKeys();
 
 test.describe.configure({ mode: "serial" });
 
@@ -29,6 +31,11 @@ async function ensureSetupComplete(request: APIRequestContext) {
         password: "StrongAdminPass1!",
       },
       apiKeys: {},
+      integrations: {
+        webPushContact: "mailto:e2e@example.com",
+        webPushPrivateKey: E2E_VAPID_KEYS.privateKey,
+        webPushPublicKey: E2E_VAPID_KEYS.publicKey,
+      },
       licenseAccepted: true,
       sudo: {
         email: "sudo@example.com",
@@ -263,6 +270,23 @@ test("routes staff login and updates an account lifecycle", async ({
   await page.getByLabel("Password", { exact: true }).fill("StrongSudoPass1!");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin\/users$/);
+
+  const integrationsSaved = await page.evaluate(async (keys) => {
+    const response = await fetch("/api/admin/integrations", {
+      body: JSON.stringify({
+        integrations: {
+          webPushContact: "mailto:e2e@example.com",
+          webPushPrivateKey: keys.privateKey,
+          webPushPublicKey: keys.publicKey,
+        },
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
+    });
+
+    return response.ok;
+  }, E2E_VAPID_KEYS);
+  expect(integrationsSaved).toBeTruthy();
 
   await page.getByRole("button", { name: "Refresh" }).click();
   const accountRow = page.getByRole("row").filter({ hasText: fieldUsername });

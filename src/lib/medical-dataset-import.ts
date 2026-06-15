@@ -261,9 +261,7 @@ async function fetchPublicDataPage(params: {
   const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
-    throw new Error(
-      "PUBLIC_DATA_API_KEY, DATA_GO_KR_API_KEY, or DATA_GO_KR_SERVICE_KEY is required.",
-    );
+    throw new Error("The public data API key is not configured.");
   }
 
   const url = new URL(params.url);
@@ -335,9 +333,7 @@ async function fetchMoisPharmacyPage(pageNo: number) {
   const serviceKey = await getPublicDataApiKey();
 
   if (!serviceKey) {
-    throw new Error(
-      "PUBLIC_DATA_API_KEY, DATA_GO_KR_API_KEY, or DATA_GO_KR_SERVICE_KEY is required.",
-    );
+    throw new Error("The public data API key is not configured.");
   }
 
   const url = new URL(MOIS_PHARMACY_URL);

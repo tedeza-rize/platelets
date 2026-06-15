@@ -200,8 +200,8 @@ const koUi = {
   medium: "보통",
   reported: "접수",
   sudo: "최고 관리자",
-  "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.":
-    "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.",
+  "API 키와 외부 서비스 연결값은 sudo 설정에서 관리합니다.":
+    "API 키와 외부 서비스 연결값은 sudo 설정에서 관리합니다.",
   "Chat Completions 호환": "Chat Completions 호환",
   "NTP 서버 목록 저장 실패": "NTP 서버 목록 저장 실패",
   "NTP 서버 목록 저장 완료": "NTP 서버 목록 저장 완료",
@@ -232,8 +232,8 @@ const koUi = {
   "개발자 토큰이 필요합니다.": "관리자 토큰이 필요합니다.",
   "검색 결과가 없습니다.": "검색 결과가 없습니다.",
   "검색 시설": "검색 시설",
-  "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.":
-    "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.",
+  "기본값은 https://api.openai.com/v1이며 사설망 주소 허용 여부는 sudo 운영 설정에서 관리합니다.":
+    "기본값은 https://api.openai.com/v1이며 사설망 주소 허용 여부는 sudo 운영 설정에서 관리합니다.",
   "기본 지도 제공자": "기본 지도 제공자",
   "기상청 지진 API": "기상청 지진 API",
   "기상청 지진/지진해일 정보 요청 중": "기상청 지진/지진해일 정보 요청 중",
@@ -432,6 +432,30 @@ const koUi = {
   "databaseMigration.testFailed": "대상 데이터베이스에 연결하지 못했습니다.",
   "databaseMigration.testReady": "대상 데이터베이스 연결을 확인했습니다.",
   "databaseMigration.title": "데이터베이스 이전",
+  "integrationSettings.clear": "저장된 값 삭제",
+  "integrationSettings.configured": "등록됨 - 새 값 입력 시 교체",
+  "integrationSettings.description":
+    "외부 서비스 연결값은 암호화해 DB에 저장합니다. 빈 입력은 기존 값을 유지합니다.",
+  "integrationSettings.field.incidentWebhookUrls":
+    "사고 알림 웹훅 주소 (줄마다 하나)",
+  "integrationSettings.field.itsOpenApiKey": "국가교통정보 API 키",
+  "integrationSettings.field.kakaoMobilityRestApiKey": "카카오모빌리티 API 키",
+  "integrationSettings.field.kakaoRestApiKey": "카카오 로컬 API 키",
+  "integrationSettings.field.openaiApiKey": "AI 제공자 API 키",
+  "integrationSettings.field.publicDataApiKey": "공공데이터포털 API 키",
+  "integrationSettings.field.seoulOpenApiKey": "서울 열린데이터 API 키",
+  "integrationSettings.field.vworldApiKey": "브이월드 API 키",
+  "integrationSettings.field.webPushContact": "웹 푸시 운영 연락처",
+  "integrationSettings.field.webPushPrivateKey": "웹 푸시 비공개 키",
+  "integrationSettings.field.webPushPublicKey": "웹 푸시 공개 키",
+  "integrationSettings.load": "설정 불러오기",
+  "integrationSettings.loadFailed": "외부 서비스 설정을 불러오지 못했습니다.",
+  "integrationSettings.loaded": "외부 서비스 설정 상태를 불러왔습니다.",
+  "integrationSettings.notConfigured": "등록되지 않음",
+  "integrationSettings.save": "외부 서비스 설정 저장",
+  "integrationSettings.saveFailed": "외부 서비스 설정을 저장하지 못했습니다.",
+  "integrationSettings.saved": "외부 서비스 설정을 저장했습니다.",
+  "integrationSettings.title": "외부 서비스 연결",
   "지진 API 폴링 간격(ms)": "지진 API 폴링 간격(ms)",
   "notification.control.blocked": "브라우저에서 재난 알림이 차단되었습니다.",
   "notification.control.disable": "재난 알림 끄기",
@@ -720,8 +744,8 @@ const enUi = {
   medium: "Medium",
   reported: "Reported",
   sudo: "Sudo administrator",
-  "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.":
-    "Keep API keys in environment variables; only request mode and prompts are saved here.",
+  "API 키와 외부 서비스 연결값은 sudo 설정에서 관리합니다.":
+    "Manage API keys and external service connections in sudo settings.",
   "Chat Completions 호환": "Chat Completions compatible",
   "NTP 서버 목록 저장 실패": "Could not save NTP server list",
   "NTP 서버 목록 저장 완료": "NTP server list saved",
@@ -752,8 +776,8 @@ const enUi = {
   "개발자 토큰이 필요합니다.": "Administrator token is required.",
   "검색 결과가 없습니다.": "No search results.",
   "검색 시설": "Matching facilities",
-  "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.":
-    "The default is https://api.openai.com/v1. Private network addresses must be allowed through a separate environment variable.",
+  "기본값은 https://api.openai.com/v1이며 사설망 주소 허용 여부는 sudo 운영 설정에서 관리합니다.":
+    "The default is https://api.openai.com/v1. Manage private-network access in sudo operational settings.",
   "기본 지도 제공자": "Default map provider",
   "기상청 지진 API": "KMA earthquake API",
   "기상청 지진/지진해일 정보 요청 중":
@@ -953,6 +977,31 @@ const enUi = {
   "databaseMigration.testFailed": "Could not connect to the target database.",
   "databaseMigration.testReady": "Target database connection is ready.",
   "databaseMigration.title": "Database migration",
+  "integrationSettings.clear": "Delete stored value",
+  "integrationSettings.configured":
+    "Configured - enter a new value to replace it",
+  "integrationSettings.description":
+    "External service credentials are encrypted in the database. Blank inputs keep their current values.",
+  "integrationSettings.field.incidentWebhookUrls":
+    "Incident webhook URLs (one per line)",
+  "integrationSettings.field.itsOpenApiKey": "National traffic API key",
+  "integrationSettings.field.kakaoMobilityRestApiKey": "Kakao Mobility API key",
+  "integrationSettings.field.kakaoRestApiKey": "Kakao Local API key",
+  "integrationSettings.field.openaiApiKey": "AI provider API key",
+  "integrationSettings.field.publicDataApiKey": "Public Data Portal API key",
+  "integrationSettings.field.seoulOpenApiKey": "Seoul Open Data API key",
+  "integrationSettings.field.vworldApiKey": "VWorld API key",
+  "integrationSettings.field.webPushContact": "Web push operator contact",
+  "integrationSettings.field.webPushPrivateKey": "Web push private key",
+  "integrationSettings.field.webPushPublicKey": "Web push public key",
+  "integrationSettings.load": "Load settings",
+  "integrationSettings.loadFailed": "Could not load external service settings.",
+  "integrationSettings.loaded": "External service settings loaded.",
+  "integrationSettings.notConfigured": "Not configured",
+  "integrationSettings.save": "Save external service settings",
+  "integrationSettings.saveFailed": "Could not save external service settings.",
+  "integrationSettings.saved": "External service settings saved.",
+  "integrationSettings.title": "External service connections",
   "지진 API 폴링 간격(ms)": "Earthquake API polling interval (ms)",
   "notification.control.blocked":
     "Disaster notifications are blocked in this browser.",

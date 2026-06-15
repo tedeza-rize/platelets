@@ -111,7 +111,7 @@ Enable `mod_proxy`, `mod_proxy_http`, `mod_headers`, `mod_ssl`, and
 
 - Keep `/api/disaster/events` and write routes on the same single writable
   instance unless an external event broker is introduced.
-- Keep `PLATELETS_SQLITE_WRITE_MODE=single-process` only for verified
-  single-process deployments with persistent disk ownership.
+- Use SQLite only for one persistent application process. Select PostgreSQL,
+  MySQL, or MariaDB before adding writable application instances.
 - Put rate limiting at the proxy or edge when multiple app processes serve
   public traffic; the application limiter is process-local.

@@ -3,12 +3,13 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setDataDirectoryPathForTests } from "@/lib/data-paths";
 import type { AssemblyProtestInput } from "@/lib/points-db";
 
 const dataDirectory = mkdtempSync(
   path.join(tmpdir(), "platelets-assembly-db-"),
 );
-process.env.PLATELETS_DATA_DIR = dataDirectory;
+setDataDirectoryPathForTests(dataDirectory);
 
 const pointsDb = await import("@/lib/points-db");
 const assemblyProtests = await import("@/lib/assembly-protests");

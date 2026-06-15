@@ -451,7 +451,7 @@ async function routeWithKakao(
   const apiKey = kakaoMobilityRestApiKey || kakaoRestApiKey;
 
   if (!apiKey) {
-    throw new Error("KAKAO_MOBILITY_REST_API_KEY is required.");
+    throw new Error("The Kakao Mobility API key is not configured.");
   }
 
   const url = new URL("https://apis-navi.kakaomobility.com/v1/directions");
