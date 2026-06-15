@@ -1,8 +1,8 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { LazyDisasterDashboard } from "@/components/lazy-disaster-dashboard";
 import { getDisasterDashboardConfig } from "@/lib/disaster-dashboard-config";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-preferences";
 import { getCurrentAccessSession } from "@/lib/server-session";
 import { requireSetupComplete } from "@/lib/setup-redirect";
 
@@ -13,11 +13,8 @@ export default async function DashboardPage() {
   const session = await getCurrentAccessSession();
   if (session?.role === "field_worker") redirect("/field");
 
-  const headerList = await headers();
   const dashboardConfig = await getDisasterDashboardConfig();
-  const dictionary = getDictionary(
-    resolveLocale(headerList.get("accept-language")),
-  );
+  const dictionary = getDictionary(await getRequestLocale());
 
   return (
     <LazyDisasterDashboard
