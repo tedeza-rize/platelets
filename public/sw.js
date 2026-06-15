@@ -1,6 +1,7 @@
-const SHELL_CACHE = "platelets-shell-v3";
-const RUNTIME_CACHE = "platelets-runtime-v3";
+const SHELL_CACHE = "platelets-shell-v4";
+const RUNTIME_CACHE = "platelets-runtime-v4";
 const NETWORK_STATUS_KEY = "/__platelets-network-status";
+const PRECACHE_URLS = ["/offline", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("message", (event) => {
   if (event.data?.type === "network-status") {
@@ -22,16 +23,7 @@ self.addEventListener("install", (event) => {
     caches
       .open(SHELL_CACHE)
       .then((cache) =>
-        cache.addAll([
-          "/",
-          "/dashboard",
-          "/incidents",
-          "/offline",
-          "/resources",
-          "/risk",
-          "/icon.svg",
-          "/manifest.webmanifest",
-        ]),
+        Promise.all(PRECACHE_URLS.map((url) => safeCache(cache, url))),
       )
       .then(() => self.skipWaiting()),
   );
@@ -119,6 +111,18 @@ async function networkFirstNavigation(request) {
 async function clientReportedOffline(cache) {
   const response = await cache.match(NETWORK_STATUS_KEY);
   return response ? (await response.text()) === "offline" : false;
+}
+
+async function safeCache(cache, url) {
+  try {
+    const response = await fetch(url, { cache: "reload" });
+
+    if (response.ok) {
+      await cache.put(url, response);
+    }
+  } catch {
+    // Optional shell caching should never block service worker activation.
+  }
 }
 
 function shouldRuntimeCache(request, url) {

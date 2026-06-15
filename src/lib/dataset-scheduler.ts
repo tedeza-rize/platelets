@@ -11,7 +11,7 @@ import {
   recordApiLog,
   setAppSetting,
 } from "@/lib/points-db";
-import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-state";
+import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-environment";
 
 export type DatasetSchedule = {
   enabled: boolean;

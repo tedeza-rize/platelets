@@ -2,7 +2,7 @@ import { updateHazardEvents } from "@/lib/hazard-events";
 import { getOperationalSettings } from "@/lib/operational-settings";
 import { databaseFileExists, recordApiLog } from "@/lib/points-db";
 import { getPublicDataApiKey } from "@/lib/public-data";
-import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-state";
+import { isSetupCompleteFromDatabaseFile } from "@/lib/setup-environment";
 
 const SCHEDULER_TICK_MS = 60_000;
 
