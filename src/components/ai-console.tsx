@@ -370,7 +370,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
                   )
                 }
               >
-                <option value="responses">Responses API</option>
+                <option value="responses">{t("Responses API")}</option>
                 <option value="chat-completions">
                   {t("Chat Completions 호환")}
                 </option>
@@ -436,7 +436,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
                 {["none", "minimal", "low", "medium", "high", "xhigh"].map(
                   (value) => (
                     <option key={value} value={value}>
-                      {value}
+                      {t(`ai.effort.${value}`)}
                     </option>
                   ),
                 )}
@@ -453,9 +453,9 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
                   )
                 }
               >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
+                <option value="low">{t("ai.verbosity.low")}</option>
+                <option value="medium">{t("ai.verbosity.medium")}</option>
+                <option value="high">{t("ai.verbosity.high")}</option>
               </select>
             </label>
           </div>

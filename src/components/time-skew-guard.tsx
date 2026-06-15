@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./time-skew-guard.module.css";
@@ -205,7 +206,7 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
             onClick={closeWarning}
             type="button"
           >
-            x
+            <X aria-hidden="true" size={18} />
           </button>
         </div>
         <p>
@@ -251,11 +252,12 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
               <div>
                 <dt>{t("요청 왕복")}</dt>
                 <dd>
-                  {formatMilliseconds(
-                    warning.clientServerRoundTripMs,
-                    dictionary.formatLocale,
-                  )}
-                  ms
+                  {uiText(dictionary, "format.milliseconds", {
+                    value: formatMilliseconds(
+                      warning.clientServerRoundTripMs,
+                      dictionary.formatLocale,
+                    ),
+                  })}
                   {warning.serverProcessingMs >= 1
                     ? `, ${t("서버 처리")} ${formatMilliseconds(
                         warning.serverProcessingMs,
@@ -276,7 +278,7 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
                 </dd>
               </div>
               <div>
-                <dt>NTP</dt>
+                <dt>{t("NTP")}</dt>
                 <dd>
                   {warning.ntpServer ?? warning.ntpError ?? t("응답 없음")}
                   {warning.ntpRoundTripDelayMs === null

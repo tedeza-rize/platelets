@@ -1,6 +1,7 @@
 import { buildDisasterReportWorkbook } from "@/lib/disaster-response/report-export";
 import { noStoreJson } from "@/lib/http";
-import { getDictionary, resolveLocale } from "@/lib/i18n";
+import { getDictionary } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/request-preferences";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,9 +19,7 @@ export async function GET(request: Request) {
     return noStoreJson({ error: "unsupported-report-format" }, { status: 400 });
   }
 
-  const dictionary = getDictionary(
-    resolveLocale(request.headers.get("accept-language")),
-  );
+  const dictionary = getDictionary(await getRequestLocale());
   const workbook = await buildDisasterReportWorkbook({ dictionary });
 
   return new Response(workbook.body, {
