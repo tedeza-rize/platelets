@@ -129,7 +129,7 @@ Endpoint:
 
 ```txt
 GET https://apis-navi.kakaomobility.com/v1/directions
-Authorization: KakaoAK ${KAKAO_REST_API_KEY}
+Authorization: KakaoAK {stored Kakao Local API key}
 Content-Type: application/json
 ```
 
@@ -153,7 +153,7 @@ Response fields needed for ranking:
 
 Current implementation:
 
-- `scripts/points-mcp.ts` can rank existing response points using Kakao route duration when `KAKAO_REST_API_KEY` is set.
+- `scripts/points-mcp.ts` can rank existing response points using Kakao route duration when the Kakao Local key is stored during setup or in the sudo console.
 - If the key is missing or Kakao directions fail, the tool falls back to straight-line distance.
 
 ## MCP Contract For LLMs
@@ -230,12 +230,11 @@ Detail levels:
 - General agency admins use `/admin` for read-only dataset status. API quota,
   detailed logs, refresh actions, raw point records, and NTP configuration are
   intentionally hidden from this page.
-- Developer/operator access uses `/sudo` with `PLATELETS_SUDO_TOKEN`. Server
-  route handlers enforce the token for expensive API-consuming actions and
-  sensitive operational details.
-- Never commit real `KAKAO_REST_API_KEY`, `PUBLIC_DATA_API_KEY`, or
-  `PLATELETS_SUDO_TOKEN` values. Keep them in local deployment environment
-  variables such as `.env.local`.
+- Developer/operator access uses role-aware sessions created from `/sudo`.
+  Server route handlers enforce the session role for expensive API-consuming
+  actions and sensitive operational details.
+- Never commit real API keys or access tokens. Store provider credentials in
+  the encrypted setup or sudo settings database.
 
 Point detail:
 

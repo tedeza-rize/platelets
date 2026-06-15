@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { DatabaseMigrationPanel } from "@/components/database-migration-panel";
+import { IntegrationSettingsPanel } from "@/components/integration-settings-panel";
 import type { DatabaseEngine } from "@/lib/database/types";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
@@ -901,6 +902,13 @@ export function ManagementConsole({
         {mode === "sudo" && currentDatabaseEngine ? (
           <DatabaseMigrationPanel
             currentEngine={currentDatabaseEngine}
+            dictionary={dictionary}
+            ensureSudoSession={loginIfNeeded}
+          />
+        ) : null}
+
+        {mode === "sudo" ? (
+          <IntegrationSettingsPanel
             dictionary={dictionary}
             ensureSudoSession={loginIfNeeded}
           />

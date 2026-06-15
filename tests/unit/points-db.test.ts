@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setDataDirectoryPathForTests } from "@/lib/data-paths";
 import type {
   EmergencyPointInput,
   findNearestPoints as FindNearestPoints,
@@ -10,7 +11,7 @@ import type {
 } from "@/lib/points-db";
 
 const dataDirectory = mkdtempSync(path.join(tmpdir(), "platelets-unit-db-"));
-process.env.PLATELETS_DATA_DIR = dataDirectory;
+setDataDirectoryPathForTests(dataDirectory);
 
 const pointsDb = await import("@/lib/points-db");
 const replaceDataset: typeof ReplaceDataset = pointsDb.replaceDataset;

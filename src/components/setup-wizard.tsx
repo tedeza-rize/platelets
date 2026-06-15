@@ -230,7 +230,7 @@ const setupCopy = {
     "field.seoulOpenApiKey": "Seoul Open API key",
     "field.vworldApiKey": "VWorld API key",
     "finish.info":
-      "The installer stores credential hashes, never plain passwords. Existing environment variables remain valid as deployment fallbacks.",
+      "The installer stores credential hashes, never plain passwords. Runtime credentials are stored in the encrypted application database.",
     "finish.lead":
       "Platelets will create the selected database schema, store the setup configuration, and open the home map.",
     "finish.title": "Create database",
@@ -351,7 +351,7 @@ const setupCopy = {
     "field.seoulOpenApiKey": "서울 열린데이터 API 키",
     "field.vworldApiKey": "VWorld API 키",
     "finish.info":
-      "설치 도구는 비밀번호 원문을 저장하지 않고 해시만 저장합니다. 기존 환경 변수는 배포용 fallback으로 계속 사용할 수 있습니다.",
+      "설치 도구는 비밀번호 원문을 저장하지 않고 해시만 저장합니다. 외부 서비스 연결값은 암호화된 애플리케이션 DB에 저장합니다.",
     "finish.lead":
       "Platelets가 SQLite 데이터베이스를 만들고 설치 설정을 저장한 뒤 홈 지도를 엽니다.",
     "finish.title": "데이터베이스 생성",

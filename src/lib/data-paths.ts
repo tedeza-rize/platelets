@@ -1,17 +1,20 @@
 import path from "node:path";
 
+declare global {
+  var __plateletsDataDirectoryOverride: string | undefined;
+}
+
 export function getDataDirectoryPath() {
-  const configuredDirectory = process.env.PLATELETS_DATA_DIR;
-
-  if (!configuredDirectory) {
-    return path.join(process.cwd(), "data");
-  }
-
-  return path.isAbsolute(configuredDirectory)
-    ? configuredDirectory
-    : path.join(/*turbopackIgnore: true*/ process.cwd(), configuredDirectory);
+  return (
+    globalThis.__plateletsDataDirectoryOverride ??
+    path.join(process.cwd(), "data")
+  );
 }
 
 export function getSqliteDatabasePath() {
   return path.join(getDataDirectoryPath(), "points.sqlite");
+}
+
+export function setDataDirectoryPathForTests(directory: string) {
+  globalThis.__plateletsDataDirectoryOverride = path.resolve(directory);
 }

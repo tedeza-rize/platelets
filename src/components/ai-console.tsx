@@ -331,11 +331,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
           <Settings aria-hidden="true" size={22} />
         </span>
         <h1>{t("AI 연결 설정")}</h1>
-        <p>
-          {t(
-            "API 키는 환경변수에만 두고, 여기에는 호출 방식과 프롬프트만 저장합니다.",
-          )}
-        </p>
+        <p>{t("API 키와 외부 서비스 연결값은 sudo 설정에서 관리합니다.")}</p>
       </header>
 
       <section className={styles.card}>
@@ -417,7 +413,7 @@ export function AiSettingsConsole({ dictionary }: AiConsoleProps) {
             />
             <small>
               {t(
-                "기본값은 https://api.openai.com/v1이며 사설망 주소는 별도 환경변수로 허용해야 합니다.",
+                "기본값은 https://api.openai.com/v1이며 사설망 주소 허용 여부는 sudo 운영 설정에서 관리합니다.",
               )}
             </small>
           </label>

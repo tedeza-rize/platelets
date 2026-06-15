@@ -26,56 +26,33 @@ and exposes summarized data to OpenAI-compatible models and a local MCP server.
 
 ## Environment
 
-Copy `env.example` to `.env.local` and fill only the integrations you use.
-Never commit real keys.
-
-Important variables:
+Runtime credentials and operational settings are stored in the encrypted
+application database. `.env.local` is optional and supports only the listening
+port:
 
 ```bash
-NEXT_PUBLIC_VWORLD_API_KEY=
-KAKAO_REST_API_KEY=
-KAKAO_MOBILITY_REST_API_KEY=
-PUBLIC_DATA_API_KEY=
-ITS_OPEN_API_KEY=
-SEOUL_OPEN_API_KEY=
-PLATELETS_ADMIN_TOKEN=
-PLATELETS_SUDO_TOKEN=
-OPENAI_API_KEY=
-OPENAI_BASE_URL=https://api.openai.com/v1
-PLATELETS_DATA_DIR=data
-PLATELETS_SQLITE_WRITE_MODE=single-process
-PLATELETS_SECRET_KEY=
-PLATELETS_INCIDENT_WEBHOOK_URLS=
-WEB_PUSH_VAPID_PUBLIC_KEY=
-WEB_PUSH_VAPID_PRIVATE_KEY=
-WEB_PUSH_CONTACT=mailto:operations@example.com
+PORT=3000
 ```
 
-`PLATELETS_ADMIN_TOKEN` grants AI-query access. A sudo token also satisfies
-admin access. `PLATELETS_SUDO_TOKEN` protects dataset refreshes, logs, quota
-details, schedules, NTP settings, and AI configuration.
-
 API keys are optional during setup. Empty keys are recorded as skipped so the
-operator can finish installation and add integrations later. When VWorld is
-not configured, the root map falls back to the OpenStreetMap/OpenFreeMap
-renderer instead of blocking the dashboard.
+operator can finish installation and add integrations later from the sudo
+console. When VWorld is not configured, the root map falls back to the
+OpenStreetMap/OpenFreeMap renderer instead of blocking the dashboard.
 
 When `data/points.sqlite` or a completed setup state is missing, Platelets
 redirects `/` to `/setup`. The setup assistant stores hashed sudo/admin
 credentials and encrypted API key configuration in SQLite, then sends the
-operator to the integrated disaster dashboard. `PLATELETS_DATA_DIR` can point
-deployments or tests at a different data directory. `PLATELETS_SECRET_KEY`
-overrides the local encryption key file used to protect stored setup secrets.
+operator to the integrated disaster dashboard. Local state and the generated
+encryption key are stored under `data/`; back up that directory together.
 SQLite remains the default database engine. PostgreSQL, MySQL, and MariaDB are
 selected and validated in the first-run installer. SQLite writes are supported
 only when one persistent Node.js process owns the database file. Serverless or
-multi-instance signals disable SQLite writes unless
-`PLATELETS_SQLITE_WRITE_MODE=single-process` is set explicitly for a verified
-single-process deployment. Prefer PostgreSQL, MySQL, or MariaDB before running
-multiple writable app instances. A sudo operator can move an installed system
-to another supported engine from `/sudo`. Platelets verifies the target first,
-copies every managed table in one source snapshot and one target transaction,
-and changes the active database only after the copy succeeds.
+multi-instance signals disable SQLite writes. Select PostgreSQL, MySQL, or
+MariaDB before running multiple writable app instances. A sudo operator can
+move an installed system to another supported engine from `/sudo`. Platelets
+verifies the target first, copies every managed table in one source snapshot
+and one target transaction, and changes the active database only after the copy
+succeeds.
 
 For Nginx, Apache, and load balancer requirements, including forwarded headers
 and Server-Sent Events buffering, see
@@ -83,11 +60,10 @@ and Server-Sent Events buffering, see
 
 High-risk incident creation can notify browser subscribers and up to five
 HTTPS webhook destinations. Generate one VAPID key pair for the deployment and
-store it in `WEB_PUSH_VAPID_PUBLIC_KEY` and `WEB_PUSH_VAPID_PRIVATE_KEY`; set
-`WEB_PUSH_CONTACT` to a monitored `mailto:` or HTTPS contact. Configure Slack,
-Discord, or compatible endpoints in the comma-separated
-`PLATELETS_INCIDENT_WEBHOOK_URLS`. Webhooks that resolve to loopback, link-local,
-or private-network addresses are rejected.
+store it from the sudo external-service panel together with a monitored
+`mailto:` or HTTPS contact. Configure Slack, Discord, or compatible endpoints
+in the same panel. Webhooks that resolve to loopback, link-local, or
+private-network addresses are rejected.
 
 ```bash
 npx web-push generate-vapid-keys
@@ -305,8 +281,8 @@ source metadata. The platform products checked for future replacement are
 181). These are 비정형 download products, so approved files must be normalized
 into floors, exits, evacuation routes, and source notes before operational use.
 
-Dispatch routes use OSM A* by default. If `ITS_OPEN_API_KEY` or
-`MOLIT_ITS_API_KEY` is present, `/api/routing/route` also queries the Ministry
+Dispatch routes use OSM A* by default. If a national traffic API key is stored
+in the sudo console, `/api/routing/route` also queries the Ministry
 of Land, Infrastructure and Transport ITS traffic API and adjusts the A* ETA
 with nearby road speed samples. Kakao Mobility routes keep their own provider
 ETA and are marked as traffic-aware external routes.
