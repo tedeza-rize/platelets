@@ -135,7 +135,7 @@ export async function searchKakaoLocalCoordinates(params: {
         metadata: {
           kakaoHint:
             response.status === 401 || response.status === 403
-              ? "Check KAKAO_REST_API_KEY and Kakao Map/Local API activation for the app."
+              ? "Check the stored Kakao Local API key and Map/Local API activation for the app."
               : null,
           query,
           searchKind: kind,

@@ -3,9 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setDataDirectoryPathForTests } from "@/lib/data-paths";
 
-process.env.PLATELETS_DATA_DIR = mkdtempSync(
-  path.join(tmpdir(), "platelets-setup-database-"),
+setDataDirectoryPathForTests(
+  mkdtempSync(path.join(tmpdir(), "platelets-setup-database-")),
 );
 
 const { POST } = await import("@/app/api/setup/test-database/route");

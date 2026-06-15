@@ -7,6 +7,7 @@ import {
 } from "@/lib/disaster-response/push-subscriptions";
 import type { Incident } from "@/lib/disaster-response/types";
 import { getDictionary, uiText } from "@/lib/i18n";
+import { getIntegrationSettings } from "@/lib/integration-settings";
 
 const MAX_WEBHOOKS = 5;
 const WEBHOOK_TIMEOUT_MS = 5_000;
@@ -58,12 +59,11 @@ function isPrivateAddress(address: string) {
   );
 }
 
-export function configuredIncidentWebhookUrls() {
-  return (process.env.PLATELETS_INCIDENT_WEBHOOK_URLS ?? "")
-    .split(/[\n,]/)
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .slice(0, MAX_WEBHOOKS);
+export async function configuredIncidentWebhookUrls() {
+  return (await getIntegrationSettings()).incidentWebhookUrls.slice(
+    0,
+    MAX_WEBHOOKS,
+  );
 }
 
 export async function assertWebhookUrlSafe(
@@ -118,15 +118,16 @@ function isHostnameOrSubdomain(hostname: string, domain: string) {
 
 export async function sendIncidentWebhooks(
   incident: Incident,
-  urls = configuredIncidentWebhookUrls(),
+  urls?: string[],
   dependencies: {
     fetcher?: WebhookFetch;
     resolveAddresses?: AddressResolver;
   } = {},
 ) {
   const fetcher = dependencies.fetcher ?? fetch;
+  const configuredUrls = urls ?? (await configuredIncidentWebhookUrls());
   const results = await Promise.allSettled(
-    urls.slice(0, MAX_WEBHOOKS).map(async (value) => {
+    configuredUrls.slice(0, MAX_WEBHOOKS).map(async (value) => {
       const safeUrl = await assertWebhookUrlSafe(
         value,
         dependencies.resolveAddresses,
@@ -160,10 +161,11 @@ function pushPayload(incident: Incident, subscription: StoredPushSubscription) {
   });
 }
 
-export function getWebPushConfig() {
-  const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() ?? "";
-  const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() ?? "";
-  const subject = process.env.WEB_PUSH_CONTACT?.trim() ?? "";
+export async function getWebPushConfig() {
+  const settings = await getIntegrationSettings();
+  const publicKey = settings.webPushPublicKey;
+  const privateKey = settings.webPushPrivateKey;
+  const subject = settings.webPushContact;
 
   return {
     enabled: Boolean(publicKey && privateKey && subject),
@@ -174,7 +176,7 @@ export function getWebPushConfig() {
 }
 
 export async function sendIncidentPushNotifications(incident: Incident) {
-  const config = getWebPushConfig();
+  const config = await getWebPushConfig();
   if (!config.enabled) return 0;
 
   const subscriptions = await listPushSubscriptions();

@@ -1,4 +1,5 @@
 import type { Coordinate } from "@/lib/disaster-response/types";
+import { getIntegrationSettings } from "@/lib/integration-settings";
 
 export type TrafficCongestionLevel =
   | "congested"
@@ -26,14 +27,6 @@ type TrafficItem = {
 };
 
 const ITS_TRAFFIC_URL = "https://openapi.its.go.kr:9443/trafficInfo";
-
-function trafficApiKey() {
-  return (
-    process.env.ITS_OPEN_API_KEY?.trim() ||
-    process.env.MOLIT_ITS_API_KEY?.trim() ||
-    ""
-  );
-}
 
 function numberValue(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -151,7 +144,7 @@ export function unconfiguredTrafficSummary(
     congestionLevel: "unknown",
     durationMultiplier: 1,
     message:
-      "ITS_OPEN_API_KEY가 없어 실시간 교통 보정 없이 기준 경로 시간을 사용",
+      "국가교통정보 API 키가 없어 실시간 교통 보정 없이 기준 경로 시간을 사용",
     provider: "none",
     sampleCount: 0,
     status: "unconfigured",
@@ -165,7 +158,7 @@ export async function fetchItsTrafficSummary(params: {
   distanceMeters: number;
   origin: Coordinate;
 }): Promise<TrafficSummary> {
-  const apiKey = trafficApiKey();
+  const { itsOpenApiKey: apiKey } = await getIntegrationSettings();
 
   if (!apiKey) {
     return unconfiguredTrafficSummary(params.baseDurationSeconds);

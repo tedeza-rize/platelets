@@ -3,14 +3,33 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setDataDirectoryPathForTests } from "@/lib/data-paths";
 
 const dataDirectory = mkdtempSync(path.join(tmpdir(), "platelets-geocoding-"));
-process.env.PLATELETS_DATA_DIR = dataDirectory;
-process.env.KAKAO_REST_API_KEY = "kakao-test-key";
-process.env.VWORLD_API_KEY = "vworld-test-key";
+setDataDirectoryPathForTests(dataDirectory);
 
 const pointsDb = await import("@/lib/points-db");
 const databaseQuery = await import("@/lib/database/query");
+const setupState = await import("@/lib/setup-state");
+
+await setupState.completeSetup({
+  admin: {
+    email: "admin@example.com",
+    fullName: "Test Admin",
+    password: "StrongAdminPass1!",
+  },
+  apiKeys: {
+    kakaoRestApiKey: "kakao-test-key",
+    vworldApiKey: "vworld-test-key",
+  },
+  licenseAccepted: true,
+  sudo: {
+    email: "sudo@example.com",
+    fullName: "Test Sudo",
+    password: "StrongSudoPass1!",
+  },
+});
+
 const geocoding = await import("@/lib/geocoding");
 
 test("searchMapCoordinates falls back to VWorld when Kakao quota is exhausted", async () => {

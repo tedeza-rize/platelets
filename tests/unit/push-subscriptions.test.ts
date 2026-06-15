@@ -3,9 +3,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { setDataDirectoryPathForTests } from "@/lib/data-paths";
 
 const dataDirectory = mkdtempSync(path.join(tmpdir(), "platelets-push-db-"));
-process.env.PLATELETS_DATA_DIR = dataDirectory;
+setDataDirectoryPathForTests(dataDirectory);
 
 const subscriptions = await import(
   "@/lib/disaster-response/push-subscriptions"

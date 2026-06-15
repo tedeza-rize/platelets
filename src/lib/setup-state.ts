@@ -6,6 +6,10 @@ import {
   saveDatabaseConfig,
   testDatabaseConfig,
 } from "@/lib/database/config";
+import {
+  type IntegrationSettingsUpdate,
+  saveIntegrationSettings,
+} from "@/lib/integration-settings";
 import { isPasswordValid } from "@/lib/password-policy";
 import {
   closeDatabase,
@@ -41,6 +45,10 @@ export type SetupApiKeys = {
   publicDataApiKey: string;
   seoulOpenApiKey: string;
   vworldApiKey: string;
+};
+
+export type ApiKeyConfigurationSummary = {
+  configured: Record<Exclude<keyof SetupApiKeys, "openaiBaseUrl">, boolean>;
 };
 
 export type SetupDatabaseSelection = {
@@ -80,6 +88,7 @@ export type SetupPayload = {
   };
   apiKeys: Partial<SetupApiKeys>;
   database?: SetupDatabaseSelection;
+  integrations?: IntegrationSettingsUpdate;
   licenseAccepted: boolean;
   sudo: {
     email: string;
@@ -110,6 +119,17 @@ function cleanText(value: unknown, maxLength: number) {
   return String(value ?? "")
     .trim()
     .slice(0, maxLength);
+}
+
+function cleanOpenAiBaseUrl(value: unknown) {
+  const candidate = cleanText(value, 500) || EMPTY_API_KEYS.openaiBaseUrl;
+  const url = new URL(candidate);
+
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("AI provider URL must use HTTPS without credentials.");
+  }
+
+  return url.toString().replace(/\/$/, "");
 }
 
 function assertEmail(value: string, label: string) {
@@ -161,8 +181,7 @@ function normalizeApiKeys(input: Partial<SetupApiKeys> = {}): SetupApiKeys {
     kakaoMobilityRestApiKey: cleanText(input.kakaoMobilityRestApiKey, 500),
     kakaoRestApiKey: cleanText(input.kakaoRestApiKey, 500),
     openaiApiKey: cleanText(input.openaiApiKey, 500),
-    openaiBaseUrl:
-      cleanText(input.openaiBaseUrl, 500) || EMPTY_API_KEYS.openaiBaseUrl,
+    openaiBaseUrl: cleanOpenAiBaseUrl(input.openaiBaseUrl),
     publicDataApiKey: cleanText(input.publicDataApiKey, 1000),
     seoulOpenApiKey: cleanText(input.seoulOpenApiKey, 500),
     vworldApiKey: cleanText(input.vworldApiKey, 500),
@@ -260,6 +279,69 @@ export async function getConfiguredApiKeys() {
   return apiKeys;
 }
 
+export async function getApiKeyConfigurationSummary(): Promise<ApiKeyConfigurationSummary> {
+  const keys = await getConfiguredApiKeys();
+
+  return {
+    configured: {
+      kakaoMobilityRestApiKey: Boolean(keys.kakaoMobilityRestApiKey),
+      kakaoRestApiKey: Boolean(keys.kakaoRestApiKey),
+      openaiApiKey: Boolean(keys.openaiApiKey),
+      publicDataApiKey: Boolean(keys.publicDataApiKey),
+      seoulOpenApiKey: Boolean(keys.seoulOpenApiKey),
+      vworldApiKey: Boolean(keys.vworldApiKey),
+    },
+  };
+}
+
+export async function saveConfiguredApiKeys(
+  input: Partial<SetupApiKeys>,
+  clearKeys: Exclude<keyof SetupApiKeys, "openaiBaseUrl">[] = [],
+) {
+  const state = await getSetupState();
+
+  if (!state) {
+    throw new Error("Setup is not complete.");
+  }
+
+  const current = revealApiKeys(state.apiKeys);
+  const next = { ...current };
+  const secretFields = [
+    "kakaoMobilityRestApiKey",
+    "kakaoRestApiKey",
+    "openaiApiKey",
+    "publicDataApiKey",
+    "seoulOpenApiKey",
+    "vworldApiKey",
+  ] as const;
+
+  for (const field of secretFields) {
+    if (clearKeys.includes(field)) {
+      next[field] = "";
+      continue;
+    }
+
+    const value = cleanText(
+      input[field],
+      field === "publicDataApiKey" ? 1000 : 500,
+    );
+    if (value) {
+      next[field] = value;
+    }
+  }
+
+  if (input.openaiBaseUrl !== undefined) {
+    next.openaiBaseUrl = cleanOpenAiBaseUrl(input.openaiBaseUrl);
+  }
+
+  await setAppSetting(SETUP_STATE_KEY, {
+    ...state,
+    apiKeys: protectApiKeys(normalizeApiKeys(next)),
+  });
+
+  return getApiKeyConfigurationSummary();
+}
+
 export async function getStoredAccessRole(password: string) {
   if (!password) {
     return null;
@@ -294,13 +376,14 @@ export async function completeSetup(payload: SetupPayload) {
   const databaseConfig = normalizeDatabaseConfig(
     payload.database ?? { connectionString: "", engine: "sqlite" },
   );
+  const apiKeys = normalizeApiKeys(payload.apiKeys);
   const completedAt = new Date().toISOString();
   const state: SetupState = {
     accounts: {
       admin: accountFromPayload("admin", payload.admin),
       sudo: accountFromPayload("sudo", payload.sudo),
     },
-    apiKeys: protectApiKeys(normalizeApiKeys(payload.apiKeys)),
+    apiKeys: protectApiKeys(apiKeys),
     completedAt,
     licenseAcceptedAt: completedAt,
   };
@@ -337,5 +420,9 @@ export async function completeSetup(payload: SetupPayload) {
     },
   });
   await setAppSetting(SETUP_STATE_KEY, state);
+  await setAppSetting("ai-settings", { baseUrl: apiKeys.openaiBaseUrl });
+  if (payload.integrations) {
+    await saveIntegrationSettings(payload.integrations);
+  }
   return state;
 }
