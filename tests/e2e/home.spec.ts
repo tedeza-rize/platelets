@@ -360,9 +360,22 @@ test("exposes a PWA manifest and offline navigation fallback", async ({
 
   await page.context().setOffline(true);
   try {
+    await expect.poll(() => page.evaluate(() => !navigator.onLine)).toBe(true);
+    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const cache = await caches.open("platelets-shell-v3");
+          const response = await cache.match("/__platelets-network-status");
+          return response?.text();
+        }),
+      )
+      .toBe("offline");
     await page.goto("/offline-probe", { waitUntil: "domcontentloaded" });
     await expect(
-      page.getByRole("heading", { name: "You are offline" }),
+      page.getByRole("heading", {
+        name: "The internet left its post for a moment.",
+      }),
     ).toBeVisible({ timeout: 10_000 });
   } finally {
     await page.context().setOffline(false);

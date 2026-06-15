@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
+  isThemeMode,
   LOCALE_COOKIE,
   resolveLocalePreference,
-  resolveThemePreference,
   THEME_COOKIE,
 } from "@/lib/preferences";
 
@@ -20,19 +20,20 @@ export async function POST(request: NextRequest) {
   if (!body) return NextResponse.json(null, { status: 400 });
 
   const locale = resolveLocalePreference(body.locale);
-  const theme = body.theme ? resolveThemePreference(body.theme) : null;
+  const theme = isThemeMode(body.theme) ? body.theme : null;
   if (!(locale || theme)) return NextResponse.json(null, { status: 400 });
 
   const response = new NextResponse(null, { status: 204 });
   const options = {
-    httpOnly: true,
     maxAge: COOKIE_MAX_AGE,
     path: "/",
     sameSite: "lax" as const,
     secure: request.nextUrl.protocol === "https:",
   };
 
-  if (locale) response.cookies.set(LOCALE_COOKIE, locale, options);
+  if (locale) {
+    response.cookies.set(LOCALE_COOKIE, locale, { ...options, httpOnly: true });
+  }
   if (theme) response.cookies.set(THEME_COOKIE, theme, options);
   return response;
 }
