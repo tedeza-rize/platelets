@@ -31,6 +31,11 @@
   height: 19px;
 }
 
+.trigger:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .panel {
   position: absolute;
   top: 48px;

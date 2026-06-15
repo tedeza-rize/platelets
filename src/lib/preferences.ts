@@ -5,6 +5,10 @@ export const THEME_COOKIE = "platelets-theme";
 
 export type ThemeMode = "dark" | "light" | "system";
 
+export function isThemeMode(value: unknown): value is ThemeMode {
+  return value === "dark" || value === "light" || value === "system";
+}
+
 export function resolveLocalePreference(
   value: string | undefined,
 ): Locale | null {
@@ -12,7 +16,5 @@ export function resolveLocalePreference(
 }
 
 export function resolveThemePreference(value: string | undefined): ThemeMode {
-  return value === "dark" || value === "light" || value === "system"
-    ? value
-    : "system";
+  return isThemeMode(value) ? value : "system";
 }

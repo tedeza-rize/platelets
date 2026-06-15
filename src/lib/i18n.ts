@@ -489,6 +489,29 @@ const koUi = {
     "네트워크가 불안정합니다. 최근에 열었던 화면과 기본 앱 구조는 계속 사용할 수 있지만, 실시간 사고·지도·경로 정보는 연결이 복구되면 다시 갱신됩니다.",
   "pwa.offline.retry": "다시 연결 시도",
   "pwa.offline.title": "오프라인 상태입니다",
+  "error.action.home": "안전 지도 홈으로",
+  "error.action.retry": "다시 시도",
+  "error.maintenance.description":
+    "더 튼튼한 지도를 만들려고 잠깐 나사를 조이는 중입니다. 잠시 뒤 다시 들러 주세요.",
+  "error.maintenance.eyebrow": "서비스 점검",
+  "error.maintenance.imageAlt": "안전모를 쓰고 제어판을 점검하는 혈소판 캐릭터",
+  "error.maintenance.title": "지도가 잠깐 건강검진을 받고 있어요.",
+  "error.notFound.description":
+    "주소가 바뀌었거나 페이지가 임무를 마치고 철수한 것 같습니다. 홈에서 다시 경로를 잡아 볼게요.",
+  "error.notFound.eyebrow": "404 · 길 잃은 지도",
+  "error.notFound.imageAlt": "지도를 거꾸로 들여다보는 혈소판 캐릭터",
+  "error.notFound.title": "이 지점은 지도 밖으로 산책을 나갔어요.",
+  "error.offline.description":
+    "통신선이 잠깐 숨을 고르는 중입니다. 연결이 돌아오면 실시간 사고와 경로 정보도 바로 따라옵니다.",
+  "error.offline.eyebrow": "연결 신호 없음",
+  "error.offline.imageAlt": "안테나 신호를 찾는 혈소판 캐릭터",
+  "error.offline.title": "인터넷이 현장 이탈했습니다.",
+  "error.reference": "참고 번호: {digest}",
+  "error.server.description":
+    "예상 밖의 일이 생겨 담당 혈소판이 무전기를 붙잡았습니다. 잠깐 뒤 다시 시도해 주세요.",
+  "error.server.eyebrow": "500 · 예상 밖의 상황",
+  "error.server.imageAlt": "무전기로 긴급 연락하는 혈소판 캐릭터",
+  "error.server.title": "서버가 작전 회의를 갑자기 소집했어요.",
   "preferences.language": "언어",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",
@@ -935,6 +958,31 @@ const enUi = {
     "The network is unstable. Recently opened screens and the basic app shell remain available, but live incidents, maps, and routing will refresh when the connection returns.",
   "pwa.offline.retry": "Try reconnecting",
   "pwa.offline.title": "You are offline",
+  "error.action.home": "Return to the safety map",
+  "error.action.retry": "Try again",
+  "error.maintenance.description":
+    "We are tightening a few bolts to make the map sturdier. Please check back shortly.",
+  "error.maintenance.eyebrow": "Scheduled maintenance",
+  "error.maintenance.imageAlt":
+    "Platelet character in a hard hat checking a control panel",
+  "error.maintenance.title": "The map is having a quick checkup.",
+  "error.notFound.description":
+    "The address may have changed, or the page finished its mission and headed home. Let us plot a new route from the map.",
+  "error.notFound.eyebrow": "404 · Map wandered off",
+  "error.notFound.imageAlt": "Platelet character inspecting a map upside down",
+  "error.notFound.title": "This location stepped beyond the edge of the map.",
+  "error.offline.description":
+    "The connection is catching its breath. Live incidents and routes will report back as soon as it returns.",
+  "error.offline.eyebrow": "No connection signal",
+  "error.offline.imageAlt":
+    "Platelet character searching for an antenna signal",
+  "error.offline.title": "The internet left its post for a moment.",
+  "error.reference": "Reference: {digest}",
+  "error.server.description":
+    "Something unexpected happened, and the duty platelet is already on the radio. Please try again in a moment.",
+  "error.server.eyebrow": "500 · Unexpected situation",
+  "error.server.imageAlt": "Platelet character making an urgent radio call",
+  "error.server.title": "The server called an emergency briefing.",
   "preferences.language": "Language",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",

@@ -16,6 +16,7 @@ import type { ThemeMode } from "@/lib/preferences";
 import styles from "./preference-control.module.css";
 
 const THEME_ICONS = { dark: Moon, light: Sun, system: SunMoon } as const;
+const COOKIE_MAX_AGE = 31_536_000;
 
 async function persistPreference(preference: {
   locale?: Locale;
@@ -38,6 +39,12 @@ function applyTheme(theme: ThemeMode) {
   document.documentElement.dataset.theme = theme;
 }
 
+function persistTheme(theme: ThemeMode) {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  // biome-ignore lint/suspicious/noDocumentCookie: a non-sensitive theme cookie must be synchronous so an immediate reload keeps the selected mode.
+  document.cookie = `platelets-theme=${theme}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
+}
+
 type PreferenceControlProps = {
   dictionary: AppDictionary;
   initialLocale: Locale;
@@ -52,9 +59,16 @@ export function PreferenceControl({
   const router = useRouter();
   const controlRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [locale, setLocale] = useState(initialLocale);
   const [theme, setTheme] = useState(initialTheme);
   const t = (key: string) => uiText(dictionary, key);
+
+  useEffect(() => {
+    setIsReady(true);
+    localStorage.setItem("platelets-locale", initialLocale);
+    localStorage.setItem("platelets-theme", initialTheme);
+  }, [initialLocale, initialTheme]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,14 +94,18 @@ export function PreferenceControl({
   async function selectLocale(nextLocale: Locale) {
     if (nextLocale === locale) return;
     setLocale(nextLocale);
+    setIsOpen(false);
     await persistPreference({ locale: nextLocale });
+    localStorage.setItem("platelets-locale", nextLocale);
     router.refresh();
   }
 
-  async function selectTheme(nextTheme: ThemeMode) {
+  function selectTheme(nextTheme: ThemeMode) {
     setTheme(nextTheme);
+    setIsOpen(false);
     applyTheme(nextTheme);
-    await persistPreference({ theme: nextTheme });
+    persistTheme(nextTheme);
+    localStorage.setItem("platelets-theme", nextTheme);
   }
 
   return (
@@ -96,6 +114,7 @@ export function PreferenceControl({
         aria-expanded={isOpen}
         aria-label={t("preferences.open")}
         className={styles.trigger}
+        disabled={!isReady}
         onClick={() => setIsOpen((open) => !open)}
         title={t("preferences.open")}
         type="button"
@@ -135,7 +154,7 @@ export function PreferenceControl({
                     aria-label={label}
                     aria-pressed={theme === option}
                     key={option}
-                    onClick={async () => selectTheme(option)}
+                    onClick={() => selectTheme(option)}
                     title={label}
                     type="button"
                   >
