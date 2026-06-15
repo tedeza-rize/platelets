@@ -98,7 +98,6 @@ type StatusPayload = {
     checks: EnvironmentCheck[];
     database: {
       engine: DatabaseEngine;
-      managedByEnvironment: boolean;
     };
     databaseCanDelete: boolean;
     databaseExists: boolean;
@@ -874,11 +873,6 @@ export function SetupWizard({
 
         if (!isDisposed) {
           setStatus(payload);
-          if (payload.environment.database.managedByEnvironment) {
-            const serverDatabase = databaseFromStatus(payload);
-            setDatabase(serverDatabase);
-            setDatabaseTested(true);
-          }
           setClientClockCheck(
             buildClientServerClockCheck(payload, startedAt, receivedAt),
           );
@@ -929,11 +923,7 @@ export function SetupWizard({
     environmentChecks.length > 0 &&
     Boolean(clientClockCheck) &&
     environmentChecks.every((check) => check.ok);
-  const databaseManagedByEnvironment = Boolean(
-    status?.environment.database.managedByEnvironment,
-  );
-  const databaseNeedsTest =
-    database.engine !== "sqlite" && !databaseManagedByEnvironment;
+  const databaseNeedsTest = database.engine !== "sqlite";
   const databaseReady = !databaseNeedsTest || databaseTested;
 
   const stepError = useMemo(() => {
@@ -943,7 +933,7 @@ export function SetupWizard({
     if (activeStep.id === "environment" && !environmentReady) {
       return copy["validation.environment"];
     }
-    if (activeStep.id === "environment" && !databaseManagedByEnvironment) {
+    if (activeStep.id === "environment") {
       const databaseValidationError = validateDatabase(database, copy);
 
       if (databaseValidationError) {
@@ -977,7 +967,6 @@ export function SetupWizard({
     apiKeys,
     apiTested,
     database,
-    databaseManagedByEnvironment,
     databaseReady,
     environmentReady,
     sudo,
@@ -1402,7 +1391,7 @@ export function SetupWizard({
                     {databaseEngineOptions.map((engine) => (
                       <button
                         aria-pressed={database.engine === engine}
-                        disabled={databaseManagedByEnvironment || isBusy}
+                        disabled={isBusy}
                         key={engine}
                         onClick={() => updateDatabase({ engine })}
                         type="button"
@@ -1411,35 +1400,33 @@ export function SetupWizard({
                       </button>
                     ))}
                   </fieldset>
-                  {database.engine !== "sqlite" &&
-                    !databaseManagedByEnvironment && (
-                      <Field
-                        error={
-                          showCurrentStepValidation || database.connectionString
-                            ? getDatabaseFieldErrors(database, copy)
-                                .connectionString
-                            : undefined
+                  {database.engine !== "sqlite" && (
+                    <Field
+                      error={
+                        showCurrentStepValidation || database.connectionString
+                          ? getDatabaseFieldErrors(database, copy)
+                              .connectionString
+                          : undefined
+                      }
+                      label={copy["database.connectionString"]}
+                    >
+                      <input
+                        autoComplete="off"
+                        onChange={(event) =>
+                          updateDatabase({
+                            connectionString: event.target.value,
+                          })
                         }
-                        label={copy["database.connectionString"]}
-                      >
-                        <input
-                          autoComplete="off"
-                          onChange={(event) =>
-                            updateDatabase({
-                              connectionString: event.target.value,
-                            })
-                          }
-                          type="password"
-                          value={database.connectionString}
-                        />
-                      </Field>
-                    )}
-                  {database.engine !== "sqlite" &&
-                    !databaseManagedByEnvironment && (
-                      <p className={styles.helpText}>
-                        {copy["database.connectionStringHelp"]}
-                      </p>
-                    )}
+                        type="password"
+                        value={database.connectionString}
+                      />
+                    </Field>
+                  )}
+                  {database.engine !== "sqlite" && (
+                    <p className={styles.helpText}>
+                      {copy["database.connectionStringHelp"]}
+                    </p>
+                  )}
                   {databaseNeedsTest ? (
                     <button
                       className={styles.secondaryButton}

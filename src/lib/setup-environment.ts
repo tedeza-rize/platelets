@@ -1,9 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import {
-  getDatabaseConfig,
-  isDatabaseConfigEnvironmentManaged,
-} from "@/lib/database/config";
+import { getDatabaseConfig } from "@/lib/database/config";
 import {
   closeDatabase,
   databaseFileExists,
@@ -258,7 +255,6 @@ export async function getSetupEnvironmentStatus(
     checks,
     database: {
       engine: databaseConfig.engine,
-      managedByEnvironment: isDatabaseConfigEnvironmentManaged(),
     },
     databaseCanDelete,
     databaseExists: hasDatabase,
