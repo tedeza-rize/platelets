@@ -292,8 +292,11 @@ export function EmergencyRoutingPanel({
       </div>
 
       <p className={styles.emergencyOrigin}>
-        {t("사고 지점")} {origin.latitude.toFixed(5)},{" "}
-        {origin.longitude.toFixed(5)}
+        {uiText(dictionary, "format.origin", {
+          label: t("사고 지점"),
+          latitude: origin.latitude.toFixed(5),
+          longitude: origin.longitude.toFixed(5),
+        })}
       </p>
       <button
         className={styles.emergencyRecommendButton}
@@ -315,19 +318,25 @@ export function EmergencyRoutingPanel({
 
       {dispatchStation ? (
         <p className={styles.dispatchStation}>
-          {t("출동 후보:")} {dispatchStation.name} ·{" "}
-          {(dispatchStation.distanceMeters / 1000).toFixed(1)}km
+          {uiText(dictionary, "format.dispatchCandidate", {
+            distance: (dispatchStation.distanceMeters / 1000).toFixed(1),
+            name: dispatchStation.name,
+          })}
         </p>
       ) : null}
       {error ? <p className={styles.emergencyError}>{error}</p> : null}
       {activeRoute ? (
         <p className={styles.emergencyRouteSummary}>
-          {routeProviderLabel(activeRoute, t)} {t("경로 ·")}{" "}
-          {minutes(activeRoute.durationSeconds)}
-          {t("분 ·")} {(activeRoute.distanceMeters / 1000).toFixed(1)}km
-          {routeTrafficText(activeRoute, t) ? (
-            <> · {routeTrafficText(activeRoute, t)}</>
-          ) : null}
+          {uiText(dictionary, "format.routeSummary", {
+            distance: (activeRoute.distanceMeters / 1000).toFixed(1),
+            minutes: minutes(activeRoute.durationSeconds),
+            provider: routeProviderLabel(activeRoute, t),
+            traffic: routeTrafficText(activeRoute, t)
+              ? uiText(dictionary, "format.trafficSuffix", {
+                  traffic: routeTrafficText(activeRoute, t) ?? "",
+                })
+              : "",
+          })}
         </p>
       ) : null}
 
@@ -343,8 +352,11 @@ export function EmergencyRoutingPanel({
                 </b>
               </div>
               <p>
-                {hospital.category} · {minutes(hospital.durationSeconds)}
-                {t("분 ·")} {(hospital.distanceMeters / 1000).toFixed(1)}km
+                {uiText(dictionary, "format.hospitalSummary", {
+                  category: hospital.category,
+                  distance: (hospital.distanceMeters / 1000).toFixed(1),
+                  minutes: minutes(hospital.durationSeconds),
+                })}
               </p>
               <small>{hospital.reasons.join(" · ")}</small>
               <button

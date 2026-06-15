@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sparkles,
   UserCog,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -98,7 +99,7 @@ export function MapNavbar({
         <span className={styles.brandMark}>
           <HeartPulse aria-hidden="true" size={20} strokeWidth={2.7} />
         </span>
-        <span>Platelets</span>
+        <span>{dictionary.navigation.brand}</span>
       </a>
       <div className={styles.desktopLinks}>
         <a className={styles.desktopLinkActive} href="/">
@@ -198,8 +199,12 @@ export function SourceMenu({
       >
         <ListFilter aria-hidden="true" size={18} strokeWidth={2.5} />
         <span>
-          {selectedDatasetCount.toLocaleString("ko-KR")}/
-          {datasetsLength.toLocaleString("ko-KR")}
+          {uiText(dictionary, "format.datasetCount", {
+            selected: selectedDatasetCount.toLocaleString(
+              dictionary.formatLocale,
+            ),
+            total: datasetsLength.toLocaleString(dictionary.formatLocale),
+          })}
         </span>
       </button>
       {isOpen ? (
@@ -336,7 +341,7 @@ export function HazardModal({
             onClick={onClose}
             type="button"
           >
-            ×
+            <X aria-hidden="true" size={18} />
           </button>
         </div>
         <dl className={styles.hazardDetails}>
@@ -409,7 +414,7 @@ export function MobileNav({
       </button>
       <a href="/ai">
         <Sparkles aria-hidden="true" size={20} strokeWidth={2.5} />
-        <span>AI</span>
+        <span>{uiText(dictionary, "AI")}</span>
       </a>
       <a href="/admin">
         <UserCog aria-hidden="true" size={20} strokeWidth={2.5} />

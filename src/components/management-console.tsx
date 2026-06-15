@@ -803,13 +803,14 @@ export function ManagementConsole({
                   </span>
                 </div>
                 <strong className={styles.metric}>
-                  {(quota?.usedCount ?? 0).toLocaleString(
-                    dictionary.formatLocale,
-                  )}{" "}
-                  /{" "}
-                  {(quota?.monthlyLimit ?? 100000).toLocaleString(
-                    dictionary.formatLocale,
-                  )}
+                  {uiText(dictionary, "format.quota", {
+                    limit: (quota?.monthlyLimit ?? 100000).toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                    used: (quota?.usedCount ?? 0).toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                  })}
                 </strong>
                 <span className={styles.muted}>
                   {quotaPercent}
@@ -833,13 +834,14 @@ export function ManagementConsole({
                   </span>
                 </div>
                 <strong className={styles.metric}>
-                  {(kmaQuota?.usedCount ?? 0).toLocaleString(
-                    dictionary.formatLocale,
-                  )}{" "}
-                  /{" "}
-                  {(kmaQuota?.monthlyLimit ?? 5000).toLocaleString(
-                    dictionary.formatLocale,
-                  )}
+                  {uiText(dictionary, "format.quota", {
+                    limit: (kmaQuota?.monthlyLimit ?? 5000).toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                    used: (kmaQuota?.usedCount ?? 0).toLocaleString(
+                      dictionary.formatLocale,
+                    ),
+                  })}
                 </strong>
                 <span className={styles.muted}>
                   {kmaQuotaPercent}
@@ -1001,7 +1003,7 @@ export function ManagementConsole({
                   }
                   value={operationalSettings.osmTileSource}
                 >
-                  <option value="openfreemap">OpenFreeMap</option>
+                  <option value="openfreemap">{t("OpenFreeMap")}</option>
                   <option value="official">{t("OSM 공식")}</option>
                 </select>
               </label>
@@ -1421,7 +1423,11 @@ export function ManagementConsole({
           >
             <div className={styles.progressHeader}>
               <h2 id={progressTitleId}>{visibleProgress.title}</h2>
-              <span>{visibleProgress.percent}%</span>
+              <span>
+                {uiText(dictionary, "format.percent", {
+                  value: visibleProgress.percent,
+                })}
+              </span>
             </div>
             <div
               aria-label={t("갱신 진행률")}

@@ -146,11 +146,11 @@ export function LogConsole({ dictionary }: { dictionary: AppDictionary }) {
               value={category}
             >
               <option value="">{t("전체 분류")}</option>
-              <option value="dataset">dataset</option>
-              <option value="geocoding">geocoding</option>
-              <option value="hazard">hazard</option>
-              <option value="system">system</option>
-              <option value="ui">ui</option>
+              <option value="dataset">{t("log.category.dataset")}</option>
+              <option value="geocoding">{t("log.category.geocoding")}</option>
+              <option value="hazard">{t("log.category.hazard")}</option>
+              <option value="system">{t("log.category.system")}</option>
+              <option value="ui">{t("log.category.ui")}</option>
             </select>
             <select
               className={styles.actionButton}
@@ -194,7 +194,7 @@ export function LogConsole({ dictionary }: { dictionary: AppDictionary }) {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>{t("ID")}</th>
                   <th>{t("시각")}</th>
                   <th>{t("레벨")}</th>
                   <th>{t("상태")}</th>

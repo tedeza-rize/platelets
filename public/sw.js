@@ -1,7 +1,26 @@
+const SHELL_CACHE = "platelets-shell-v3";
+const RUNTIME_CACHE = "platelets-runtime-v3";
+const NETWORK_STATUS_KEY = "/__platelets-network-status";
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "network-status") {
+    event.waitUntil(
+      caches
+        .open(SHELL_CACHE)
+        .then((cache) =>
+          cache.put(
+            NETWORK_STATUS_KEY,
+            new Response(event.data.online === false ? "offline" : "online"),
+          ),
+        ),
+    );
+  }
+});
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open("platelets-shell-v1")
+      .open(SHELL_CACHE)
       .then((cache) =>
         cache.addAll([
           "/",
@@ -25,10 +44,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter(
-              (key) =>
-                !["platelets-shell-v1", "platelets-runtime-v1"].includes(key),
-            )
+            .filter((key) => ![SHELL_CACHE, RUNTIME_CACHE].includes(key))
             .map((key) => caches.delete(key)),
         ),
       )
@@ -77,20 +93,20 @@ self.addEventListener("push", (event) => {
 });
 
 async function networkFirstNavigation(request) {
-  const cache = await caches.open("platelets-shell-v1");
+  const cache = await caches.open(SHELL_CACHE);
 
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      await cache.put(request, response.clone());
+    if (!response.ok) {
+      if ((await clientReportedOffline(cache)) || !self.navigator.onLine) {
+        return (await cache.match("/offline")) || response;
+      }
+
       return response;
     }
 
-    return (
-      (await cache.match(request)) ||
-      (await cache.match("/offline")) ||
-      response
-    );
+    await cache.put(request, response.clone());
+    return response;
   } catch {
     return (
       (await cache.match(request)) ||
@@ -98,6 +114,11 @@ async function networkFirstNavigation(request) {
       Response.error()
     );
   }
+}
+
+async function clientReportedOffline(cache) {
+  const response = await cache.match(NETWORK_STATUS_KEY);
+  return response ? (await response.text()) === "offline" : false;
 }
 
 function shouldRuntimeCache(request, url) {
@@ -116,7 +137,7 @@ function shouldRuntimeCache(request, url) {
 }
 
 async function staleWhileRevalidate(request) {
-  const cache = await caches.open("platelets-runtime-v1");
+  const cache = await caches.open(RUNTIME_CACHE);
   const cached = await cache.match(request);
   const fresh = fetch(request)
     .then(async (response) => {

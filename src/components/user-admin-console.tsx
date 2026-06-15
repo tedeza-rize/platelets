@@ -238,7 +238,9 @@ export function UserAdminConsole({
         <form aria-busy={isSaving} className={styles.card} onSubmit={save}>
           {editingUser ? (
             <h2 className={styles.formTitle}>
-              {t("Edit account")}: {editingUser.name}
+              {uiText(dictionary, "format.editAccount", {
+                name: editingUser.name,
+              })}
             </h2>
           ) : null}
           <div className={styles.grid}>

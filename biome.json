@@ -176,29 +176,6 @@
           }
         }
       }
-    },
-    {
-      "includes": [
-        "src/app/offline/page.tsx",
-        "src/components/ai-console.tsx",
-        "src/components/disaster-dashboard.tsx",
-        "src/components/emergency-routing-panel.tsx",
-        "src/components/field-console.tsx",
-        "src/components/license-browser.tsx",
-        "src/components/log-console.tsx",
-        "src/components/management-console.tsx",
-        "src/components/map-shell-controls.tsx",
-        "src/components/setup-wizard.tsx",
-        "src/components/time-skew-guard.tsx",
-        "src/components/user-admin-console.tsx"
-      ],
-      "linter": {
-        "rules": {
-          "style": {
-            "noJsxLiterals": "off"
-          }
-        }
-      }
     }
   ]
 }

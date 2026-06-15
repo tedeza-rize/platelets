@@ -46,7 +46,7 @@ export function LicenseBrowser({ dictionary, entries }: LicenseBrowserProps) {
           <span>{t("지도")}</span>
         </Link>
         <div className={styles.titleBlock}>
-          <span className={styles.eyebrow}>Platelets data registry</span>
+          <span className={styles.eyebrow}>{t("license.registry")}</span>
           <h1>{t("데이터 출처 및 라이선스")}</h1>
           <p>
             {t(
@@ -65,12 +65,12 @@ export function LicenseBrowser({ dictionary, entries }: LicenseBrowserProps) {
             <strong>
               {entries
                 .filter((entry) => entry.usage.includes("지도"))
-                .length.toLocaleString("ko-KR")}
+                .length.toLocaleString(dictionary.formatLocale)}
             </strong>
             <span>{t("지도 관련")}</span>
           </div>
           <div>
-            <strong>0</strong>
+            <strong>{0}</strong>
             <span>{t("키 노출")}</span>
           </div>
         </section>
