@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { DatabaseMigrationPanel } from "@/components/database-migration-panel";
+import type { DatabaseEngine } from "@/lib/database/types";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import type { OperationalSettings } from "@/lib/operational-settings";
@@ -116,6 +118,7 @@ type TimeStatus = {
 };
 
 type ManagementConsoleProps = {
+  currentDatabaseEngine?: DatabaseEngine;
   dictionary: AppDictionary;
   mode: "admin" | "sudo";
 };
@@ -237,6 +240,7 @@ function formatImportProgress(
 }
 
 export function ManagementConsole({
+  currentDatabaseEngine,
   dictionary,
   mode,
 }: ManagementConsoleProps) {
@@ -892,6 +896,14 @@ export function ManagementConsole({
               />
             </label>
           </section>
+        ) : null}
+
+        {mode === "sudo" && currentDatabaseEngine ? (
+          <DatabaseMigrationPanel
+            currentEngine={currentDatabaseEngine}
+            dictionary={dictionary}
+            ensureSudoSession={loginIfNeeded}
+          />
         ) : null}
 
         {mode === "sudo" && operationalSettings ? (

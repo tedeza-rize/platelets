@@ -15,7 +15,7 @@ export function ServiceWorkerRegistration() {
 
     async function registerServiceWorker() {
       const registration = await navigator.serviceWorker.register(
-        "/sw.js?v=3",
+        "/sw.js?v=4",
         {
           scope: "/",
           updateViaCache: "none",

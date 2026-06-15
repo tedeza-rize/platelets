@@ -1,11 +1,11 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  allDatabase as all,
+  getDatabaseRow as get,
+  runDatabase as run,
+} from "@/lib/database/query";
 import { isPasswordValid } from "@/lib/password-policy";
 import { getDatabase, withDatabaseWriteTransaction } from "@/lib/points-db";
-import {
-  allSqlite as all,
-  getSqlite as get,
-  runSqlite as run,
-} from "@/lib/sqlite";
 
 export type UserRole = "admin" | "dispatcher" | "field_worker" | "sudo";
 

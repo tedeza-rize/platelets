@@ -1,3 +1,9 @@
+import {
+  allDatabase as all,
+  getDatabaseRow as get,
+  runDatabase as run,
+} from "@/lib/database/query";
+import type { DatabaseClient } from "@/lib/database/types";
 import type { DatasetUpdateProgress } from "@/lib/dataset-progress";
 import { DATASET_SOURCES, type DatasetSourceId } from "@/lib/dataset-sources";
 import {
@@ -19,12 +25,6 @@ import {
   listPoints,
   searchPointSummaries,
 } from "@/lib/points-db-modules/point-repository";
-import {
-  allSqlite as all,
-  getSqlite as get,
-  runSqlite as run,
-  type SqliteDatabase,
-} from "@/lib/sqlite";
 
 export {
   closeDatabase,
@@ -644,7 +644,7 @@ function buildWhitelistedWhereClause(
   return selected.length > 0 ? `WHERE ${selected.join(" AND ")}` : "";
 }
 
-async function getKakaoLocalUsageWindowRow(db: SqliteDatabase) {
+async function getKakaoLocalUsageWindowRow(db: DatabaseClient) {
   return get<ApiUsageWindowRow>(
     db,
     "SELECT * FROM api_usage_windows WHERE provider = ?",
@@ -652,7 +652,7 @@ async function getKakaoLocalUsageWindowRow(db: SqliteDatabase) {
   );
 }
 
-async function getKmaEarthquakeUsageWindowRow(db: SqliteDatabase) {
+async function getKmaEarthquakeUsageWindowRow(db: DatabaseClient) {
   return get<ApiUsageWindowRow>(
     db,
     "SELECT * FROM api_usage_windows WHERE provider = ?",

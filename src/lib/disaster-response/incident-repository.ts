@@ -1,4 +1,10 @@
 import { randomUUID } from "node:crypto";
+import {
+  allDatabase as all,
+  getDatabaseRow as get,
+  runDatabase as run,
+} from "@/lib/database/query";
+import type { DatabaseClient } from "@/lib/database/types";
 import { INITIAL_INCIDENTS } from "@/lib/disaster-response/mock-data";
 import type {
   Incident,
@@ -10,12 +16,6 @@ import type {
   RiskLevel,
 } from "@/lib/disaster-response/types";
 import { withDatabaseWriteTransaction } from "@/lib/points-db";
-import {
-  allSqlite as all,
-  getSqlite as get,
-  runSqlite as run,
-  type SqliteDatabase,
-} from "@/lib/sqlite";
 
 type IncidentRow = {
   address: string;
@@ -73,7 +73,7 @@ export type IncidentRepository = {
   ) => Promise<Incident | null>;
 };
 
-let databasePromise: Promise<SqliteDatabase> | null = null;
+let databasePromise: Promise<DatabaseClient> | null = null;
 
 function asIncidentType(value: string): IncidentType {
   return value === "rescue" ||
@@ -136,7 +136,7 @@ function mapIncidentEventRow(row: IncidentEventRow): IncidentEvent {
   };
 }
 
-async function insertIncident(db: SqliteDatabase, incident: Incident) {
+async function insertIncident(db: DatabaseClient, incident: Incident) {
   await run(
     db,
     `INSERT INTO disaster_incidents (
@@ -171,7 +171,7 @@ async function insertIncident(db: SqliteDatabase, incident: Incident) {
 }
 
 async function insertIncidentEvent(
-  db: SqliteDatabase,
+  db: DatabaseClient,
   event: Omit<IncidentEvent, "actorId" | "actorName" | "actorRole" | "id"> & {
     actor?: IncidentActor | null;
   },
@@ -205,25 +205,7 @@ async function insertIncidentEvent(
   );
 }
 
-async function addIncidentEventColumnIfMissing(
-  db: SqliteDatabase,
-  name: string,
-  definition: string,
-) {
-  const columns = await all<{ name: string }>(
-    db,
-    "PRAGMA table_info(disaster_incident_events)",
-  );
-
-  if (!columns.some((column) => column.name === name)) {
-    await run(
-      db,
-      `ALTER TABLE disaster_incident_events ADD COLUMN ${definition}`,
-    );
-  }
-}
-
-async function seedInitialIncidents(db: SqliteDatabase) {
+async function seedInitialIncidents(db: DatabaseClient) {
   const row = await get<{ count: number }>(
     db,
     "SELECT COUNT(*) AS count FROM disaster_incidents",
@@ -238,7 +220,7 @@ async function seedInitialIncidents(db: SqliteDatabase) {
   }
 }
 
-async function backfillInitialIncidentEvents(db: SqliteDatabase) {
+async function backfillInitialIncidentEvents(db: DatabaseClient) {
   const row = await get<{ count: number }>(
     db,
     "SELECT COUNT(*) AS count FROM disaster_incident_events",
@@ -265,59 +247,7 @@ async function backfillInitialIncidentEvents(db: SqliteDatabase) {
   }
 }
 
-async function initializeDatabase(db: SqliteDatabase) {
-  await run(db, "PRAGMA journal_mode = WAL");
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS disaster_incidents (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      title TEXT NOT NULL,
-      description TEXT NOT NULL,
-      address TEXT NOT NULL,
-      latitude REAL NOT NULL,
-      longitude REAL NOT NULL,
-      risk_level TEXT NOT NULL,
-      status TEXT NOT NULL,
-      occurred_at TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )`,
-  );
-  await run(
-    db,
-    `CREATE TABLE IF NOT EXISTS disaster_incident_events (
-      id TEXT PRIMARY KEY,
-      incident_id TEXT NOT NULL,
-      type TEXT NOT NULL,
-      message TEXT NOT NULL,
-      from_status TEXT,
-      to_status TEXT,
-      actor_id TEXT,
-      actor_name TEXT,
-      actor_role TEXT,
-      created_at TEXT NOT NULL
-    )`,
-  );
-  await addIncidentEventColumnIfMissing(db, "actor_id", "actor_id TEXT");
-  await addIncidentEventColumnIfMissing(db, "actor_name", "actor_name TEXT");
-  await addIncidentEventColumnIfMissing(db, "actor_role", "actor_role TEXT");
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS disaster_incidents_occurred_idx ON disaster_incidents(occurred_at DESC)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS disaster_incidents_coordinates_idx ON disaster_incidents(latitude, longitude)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS disaster_incidents_type_risk_idx ON disaster_incidents(type, risk_level)",
-  );
-  await run(
-    db,
-    "CREATE INDEX IF NOT EXISTS disaster_incident_events_incident_idx ON disaster_incident_events(incident_id, created_at DESC)",
-  );
+async function initializeDatabase(db: DatabaseClient) {
   await seedInitialIncidents(db);
   await backfillInitialIncidentEvents(db);
 }
@@ -334,7 +264,7 @@ async function getIncidentDatabase() {
 }
 
 async function withIncidentWriteTransaction<T>(
-  operation: (db: SqliteDatabase) => Promise<T>,
+  operation: (db: DatabaseClient) => Promise<T>,
 ) {
   await getIncidentDatabase();
   return withDatabaseWriteTransaction(operation);

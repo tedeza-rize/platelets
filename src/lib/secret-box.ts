@@ -6,7 +6,7 @@ import {
 } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { getDataDirectoryPath } from "@/lib/points-db";
+import { getDataDirectoryPath } from "@/lib/data-paths";
 
 const SECRET_FILE_NAME = ".platelets-secret-key";
 const SECRET_BOX_VERSION = 1;
