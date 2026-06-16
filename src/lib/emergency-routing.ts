@@ -1,3 +1,14 @@
+import {
+  buildRoadGraphFromOverpass,
+  type OverpassElement,
+  type RoadGraph,
+} from "@/lib/emergency-road-graph";
+import {
+  getOrLoadRoadGraph,
+  getOrLoadRoute,
+  roundedCoordinateKey,
+} from "@/lib/emergency-routing-cache";
+import { nearestRoadNode } from "@/lib/emergency-routing-spatial-index";
 import { getOperationalSettings } from "@/lib/operational-settings";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
 import {
@@ -22,27 +33,12 @@ export type EmergencyRoute = {
   traffic: TrafficSummary;
 };
 
-type OverpassElement = {
-  id: number;
-  lat?: number;
-  lon?: number;
-  nodes?: number[];
-  tags?: Record<string, string>;
-  type: "node" | "way";
-};
-
-type RoadGraph = {
-  adjacency: Map<number, Array<{ nodeId: number; seconds: number }>>;
-  nodes: Map<number, Coordinate>;
-};
-
 type QueueItem = {
   nodeId: number;
   score: number;
 };
 
 const MAX_ASTAR_DISTANCE_METERS = 70_000;
-const graphCache = new Map<string, { expiresAt: number; graph: RoadGraph }>();
 
 class MinPriorityQueue {
   private readonly items: QueueItem[] = [];
@@ -162,35 +158,6 @@ function assertCoordinate(value: Coordinate) {
   }
 }
 
-function highwaySpeedKph(highway: string | undefined) {
-  const speeds: Record<string, number> = {
-    motorway: 90,
-    motorway_link: 55,
-    primary: 60,
-    primary_link: 45,
-    residential: 30,
-    secondary: 50,
-    secondary_link: 40,
-    service: 20,
-    tertiary: 40,
-    tertiary_link: 35,
-    trunk: 75,
-    trunk_link: 50,
-    unclassified: 30,
-  };
-
-  return speeds[highway ?? ""] ?? 25;
-}
-
-function parseMaxSpeed(value: string | undefined, fallback: number) {
-  const match = value?.match(/\d+(?:\.\d+)?/);
-  const parsed = match ? Number(match[0]) : Number.NaN;
-
-  return Number.isFinite(parsed)
-    ? Math.min(130, Math.max(10, parsed))
-    : fallback;
-}
-
 function graphBounds(origin: Coordinate, destination: Coordinate) {
   const padding = Math.max(
     0.012,
@@ -217,117 +184,27 @@ async function fetchRoadGraph(
 ): Promise<RoadGraph> {
   const bounds = graphBounds(origin, destination);
   const key = graphCacheKey(bounds);
-  const cached = graphCache.get(key);
 
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.graph;
-  }
+  return getOrLoadRoadGraph(key, async () => {
+    const query = `[out:json][timeout:25];way["highway"]["highway"!~"footway|path|cycleway|steps|pedestrian|bridleway"]["access"!="private"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});(._;>;);out body;`;
+    const response = await fetch(await overpassEndpoint(), {
+      body: new URLSearchParams({ data: query }),
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "platelets/0.1 emergency-routing",
+      },
+      method: "POST",
+      signal: AbortSignal.timeout(30_000),
+    });
 
-  const query = `[out:json][timeout:25];way["highway"]["highway"!~"footway|path|cycleway|steps|pedestrian|bridleway"]["access"!="private"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});(._;>;);out body;`;
-  const response = await fetch(await overpassEndpoint(), {
-    body: new URLSearchParams({ data: query }),
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "platelets/0.1 emergency-routing",
-    },
-    method: "POST",
-    signal: AbortSignal.timeout(30_000),
+    if (!response.ok) {
+      throw new Error(`Overpass road request failed (${response.status}).`);
+    }
+
+    const payload = (await response.json()) as { elements?: OverpassElement[] };
+    return buildRoadGraphFromOverpass(payload.elements ?? []);
   });
-
-  if (!response.ok) {
-    throw new Error(`Overpass road request failed (${response.status}).`);
-  }
-
-  const payload = (await response.json()) as { elements?: OverpassElement[] };
-  const elements = payload.elements ?? [];
-  const nodes = new Map<number, Coordinate>();
-  const adjacency = new Map<
-    number,
-    Array<{ nodeId: number; seconds: number }>
-  >();
-
-  for (const element of elements) {
-    if (
-      element.type === "node" &&
-      typeof element.lat === "number" &&
-      typeof element.lon === "number"
-    ) {
-      nodes.set(element.id, {
-        latitude: element.lat,
-        longitude: element.lon,
-      });
-    }
-  }
-
-  function connect(fromId: number, toId: number, seconds: number) {
-    const edges = adjacency.get(fromId) ?? [];
-    edges.push({ nodeId: toId, seconds });
-    adjacency.set(fromId, edges);
-  }
-
-  for (const way of elements) {
-    if (way.type !== "way" || !way.nodes || way.nodes.length < 2) {
-      continue;
-    }
-
-    const tags = way.tags ?? {};
-    const fallbackSpeed = highwaySpeedKph(tags.highway);
-    const speedMetersPerSecond =
-      parseMaxSpeed(tags.maxspeed, fallbackSpeed) / 3.6;
-    const reverseOnly = tags.oneway === "-1";
-    const forwardOnly =
-      tags.oneway === "yes" ||
-      tags.oneway === "1" ||
-      tags.junction === "roundabout" ||
-      tags.highway === "motorway";
-
-    for (let index = 1; index < way.nodes.length; index += 1) {
-      const previousId = way.nodes[index - 1];
-      const currentId = way.nodes[index];
-      const previous = nodes.get(previousId);
-      const current = nodes.get(currentId);
-
-      if (!(previous && current)) {
-        continue;
-      }
-
-      const seconds = haversineMeters(previous, current) / speedMetersPerSecond;
-
-      if (!reverseOnly) {
-        connect(previousId, currentId, seconds);
-      }
-
-      if (!forwardOnly) {
-        connect(currentId, previousId, seconds);
-      }
-    }
-  }
-
-  const graph = { adjacency, nodes };
-  graphCache.set(key, { expiresAt: Date.now() + 10 * 60 * 1000, graph });
-
-  return graph;
-}
-
-function nearestNode(nodes: Map<number, Coordinate>, target: Coordinate) {
-  let bestId: number | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (const [nodeId, coordinate] of nodes) {
-    const distance = haversineMeters(target, coordinate);
-
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestId = nodeId;
-    }
-  }
-
-  if (bestId === null || bestDistance > 2_500) {
-    throw new Error("No routable road was found near the selected point.");
-  }
-
-  return bestId;
 }
 
 function reconstructPath(cameFrom: Map<number, number>, current: number) {
@@ -351,8 +228,8 @@ async function routeWithAstar(
   }
 
   const graph = await fetchRoadGraph(origin, destination);
-  const startId = nearestNode(graph.nodes, origin);
-  const goalId = nearestNode(graph.nodes, destination);
+  const startId = nearestRoadNode(graph.nodeIndex, origin);
+  const goalId = nearestRoadNode(graph.nodeIndex, destination);
   const open = new MinPriorityQueue();
   const cameFrom = new Map<number, number>();
   const gScore = new Map<number, number>([[startId, 0]]);
@@ -546,13 +423,24 @@ export async function calculateEmergencyRoute(params: {
 }) {
   assertCoordinate(params.origin);
   assertCoordinate(params.destination);
+  const cacheKey = [
+    params.provider,
+    roundedCoordinateKey(params.origin),
+    roundedCoordinateKey(params.destination),
+  ].join(":");
 
-  const route =
-    params.provider === "kakao"
-      ? routeWithKakao(params.origin, params.destination)
-      : routeWithAstar(params.origin, params.destination);
+  return getOrLoadRoute(cacheKey, async () => {
+    const route =
+      params.provider === "kakao"
+        ? routeWithKakao(params.origin, params.destination)
+        : routeWithAstar(params.origin, params.destination);
 
-  return applyTrafficAdjustment(await route, params.origin, params.destination);
+    return applyTrafficAdjustment(
+      await route,
+      params.origin,
+      params.destination,
+    );
+  });
 }
 
 export async function hasKakaoMobilityKey() {
