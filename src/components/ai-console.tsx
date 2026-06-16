@@ -29,8 +29,15 @@ type AiAnswer = {
   model: string;
 };
 
+type AiErrorCode = "ai_api_key_missing" | "ai_provider_unavailable";
+
 type AiConsoleProps = {
   dictionary: AppDictionary;
+};
+
+const aiErrorMessageKeys: Record<AiErrorCode, string> = {
+  ai_api_key_missing: "Register an AI API key in setup before asking.",
+  ai_provider_unavailable: "The AI provider is unavailable. Try again later.",
 };
 
 function AccessTokenField({
@@ -101,10 +108,17 @@ export function AiQueryConsole({ dictionary }: AiConsoleProps) {
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      const payload = (await response.json()) as AiAnswer & { error?: string };
+      const payload = (await response.json()) as AiAnswer & {
+        error?: string;
+        errorCode?: AiErrorCode;
+      };
 
       if (!response.ok) {
-        throw new Error(payload.error ?? t("AI 질의에 실패했습니다."));
+        throw new Error(
+          payload.errorCode
+            ? t(aiErrorMessageKeys[payload.errorCode])
+            : (payload.error ?? t("AI 질의에 실패했습니다.")),
+        );
       }
 
       setResult(payload);

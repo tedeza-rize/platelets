@@ -5,12 +5,13 @@ import {
 import { quoteIdentifier } from "@/lib/database/sql";
 import type { DatabaseClient } from "@/lib/database/types";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export const DATABASE_TABLES = [
   "app_schema_versions",
   "app_settings",
   "users",
+  "access_sessions",
   "points",
   "dataset_updates",
   "dataset_import_progress",
@@ -146,6 +147,15 @@ function tableStatements(db: DatabaseClient) {
       created_at ${type.timestamp} NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at ${type.timestamp} NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS access_sessions (
+      token_hash ${type.key} PRIMARY KEY,
+      user_id ${type.key},
+      username ${type.key},
+      role ${type.key} NOT NULL,
+      name ${type.text} NOT NULL,
+      created_at ${type.timestamp} NOT NULL,
+      expires_at ${type.timestamp} NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS incident_push_subscriptions (
       endpoint ${type.key} PRIMARY KEY,
       subscription_json ${type.text} NOT NULL,
@@ -231,6 +241,8 @@ const INDEXES = [
   ["api_logs_event_idx", "api_logs", "event_at DESC"],
   ["api_logs_category_idx", "api_logs", "category, event_at DESC"],
   ["users_role_idx", "users", "role, username"],
+  ["access_sessions_user_idx", "access_sessions", "user_id, expires_at"],
+  ["access_sessions_expires_idx", "access_sessions", "expires_at"],
   ["hazard_events_event_idx", "hazard_events", "event_type, issued_at DESC"],
   ["hazard_events_coordinates_idx", "hazard_events", "latitude, longitude"],
   ["assembly_protests_date_idx", "assembly_protests", "date, agency"],
