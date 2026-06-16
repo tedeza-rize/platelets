@@ -1189,21 +1189,23 @@ export function getViewportFromMap(map: MapLibreMap): PointViewport {
 }
 
 export function buildPointsUrl(
-  source: DatasetSourceId,
+  sources: DatasetSourceId | DatasetSourceId[],
   viewport: PointViewport,
 ) {
+  const selectedSources = Array.isArray(sources) ? sources : [sources];
   const searchParams = new URLSearchParams({
     centerLatitude: String((viewport.minLatitude + viewport.maxLatitude) / 2),
     centerLongitude: String(
       (viewport.minLongitude + viewport.maxLongitude) / 2,
     ),
-    limit: String(getPointLimitForZoom(viewport.zoom)),
+    limit: String(getPointLimitForZoom(viewport.zoom) * selectedSources.length),
     maxLatitude: String(viewport.maxLatitude),
     maxLongitude: String(viewport.maxLongitude),
     minLatitude: String(viewport.minLatitude),
     minLongitude: String(viewport.minLongitude),
-    source,
   });
+
+  searchParams.set("source", selectedSources.join(","));
 
   return `/api/points?${searchParams.toString()}`;
 }

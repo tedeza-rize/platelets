@@ -97,6 +97,7 @@ export type PointSearchOptions = {
   includeUnmapped?: boolean;
   limit?: number;
   source?: DatasetSourceId | null;
+  sources?: DatasetSourceId[];
 };
 
 export type NearestPoint = EmergencyPointSummary & {

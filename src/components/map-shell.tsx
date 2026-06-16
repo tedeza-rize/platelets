@@ -188,13 +188,12 @@ export function MapShell({
     pointRequestRef.current = { controller, id: requestId };
 
     const viewport = mapCore.getViewportFromMap(map);
-    const responses = await Promise.all(
-      selectedSources.map((source) =>
-        fetch(mapCore.buildPointsUrl(source, viewport), {
-          cache: "no-store",
-          signal: controller.signal,
-        }),
-      ),
+    const response = await fetch(
+      mapCore.buildPointsUrl(selectedSources, viewport),
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
     );
 
     if (
@@ -204,13 +203,11 @@ export function MapShell({
       return;
     }
 
-    if (responses.some((response) => !response.ok)) {
+    if (!response.ok) {
       throw new Error("Failed to load viewport points");
     }
 
-    const payloads = (await Promise.all(
-      responses.map((response) => response.json()),
-    )) as mapCore.PointsResponse[];
+    const payload = (await response.json()) as mapCore.PointsResponse;
 
     if (
       pointRequestRef.current?.id !== requestId ||
@@ -219,7 +216,7 @@ export function MapShell({
       return;
     }
 
-    setPoints(payloads.flatMap((payload) => payload.points));
+    setPoints(payload.points);
     setDataError(null);
   }, [datasets, visibleSources]);
 

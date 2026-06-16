@@ -212,6 +212,8 @@ LLM usage rules:
 Optional query parameters:
 
 - `source=fire-stations|police-stations|aeds`
+  - Repeat `source` or pass comma-separated IDs to aggregate multiple datasets
+    in one viewport request.
 - `includeUnmapped=true`
 - `includeRaw=true`
 - `detail=map|summary`

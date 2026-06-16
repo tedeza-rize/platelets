@@ -42,7 +42,10 @@ async function ensureSetup() {
   });
 }
 
-function point(name: string): EmergencyPointInput {
+function point(
+  name: string,
+  source: EmergencyPointInput["source"] = "hospitals",
+): EmergencyPointInput {
   return {
     address: `${name} address`,
     category: "test",
@@ -52,7 +55,7 @@ function point(name: string): EmergencyPointInput {
     parentName: null,
     phone: null,
     raw: {},
-    source: "hospitals",
+    source,
     sourceRecordId: name,
     sourceUpdatedAt: "2026-06-16T00:00:00.000Z",
   };
@@ -209,6 +212,54 @@ test("points API returns cursor pages for summary listings", async () => {
     ["charlie"],
   );
   assert.equal(secondPage.nextCursor, null);
+});
+
+test("points API aggregates multiple source filters", async () => {
+  await pointsDb.replaceDataset({
+    failedCount: 0,
+    fetchedAt: "2026-06-16T00:00:00.000Z",
+    geocodedCount: 1,
+    points: [point("hospital aggregate")],
+    skippedCount: 0,
+    source: "hospitals",
+  });
+  await pointsDb.replaceDataset({
+    failedCount: 0,
+    fetchedAt: "2026-06-16T00:00:00.000Z",
+    geocodedCount: 1,
+    points: [point("aed aggregate", "aeds")],
+    skippedCount: 0,
+    source: "aeds",
+  });
+
+  const response = await pointsRoute.GET(
+    new NextRequest(
+      "http://platelets.local/api/points?source=hospitals,aeds&detail=summary&limit=10",
+    ),
+  );
+  const payload = (await response.json()) as {
+    points: Array<{ name: string; source: string }>;
+  };
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    payload.points.map((current) => current.name),
+    ["hospital aggregate", "aed aggregate"],
+  );
+  assert.deepEqual(
+    payload.points.map((current) => current.source),
+    ["hospitals", "aeds"],
+  );
+});
+
+test("points API rejects invalid aggregate source filters", async () => {
+  const response = await pointsRoute.GET(
+    new NextRequest(
+      "http://platelets.local/api/points?source=hospitals,missing-source",
+    ),
+  );
+
+  assert.equal(response.status, 400);
 });
 
 test("logs API clamps oversized limits", async () => {
