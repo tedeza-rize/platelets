@@ -61,7 +61,11 @@ type MapDisposal = {
   isDisposed: boolean;
 };
 
-function createMap(maplibre: MapLibreModule, options: InitializeMapOptions) {
+function createMap(
+  maplibre: MapLibreModule,
+  options: InitializeMapOptions,
+  forceWebgl: boolean,
+) {
   const container = options.mapContainerRef.current;
 
   if (!container) {
@@ -75,10 +79,14 @@ function createMap(maplibre: MapLibreModule, options: InitializeMapOptions) {
     bearing: options.isThreeDimensionalRef.current
       ? mapCore.THREE_DIMENSIONAL_BEARING
       : 0,
-    canvasContextAttributes: {
-      antialias: true,
-      contextType: "webgl",
-    },
+    canvasContextAttributes: forceWebgl
+      ? {
+          antialias: true,
+          contextType: "webgl",
+        }
+      : {
+          antialias: true,
+        },
     center: mapCore.MAP_CENTER,
     container,
     pitch: options.isThreeDimensionalRef.current
@@ -87,6 +95,11 @@ function createMap(maplibre: MapLibreModule, options: InitializeMapOptions) {
     style: options.initialStyleRef.current,
     zoom: mapCore.DEFAULT_ZOOM,
   });
+}
+
+function resetMapContainer(container: HTMLDivElement) {
+  container.replaceChildren();
+  container.classList.remove("maplibregl-map");
 }
 
 async function showPointPopup(
@@ -306,7 +319,21 @@ async function initializeMap(
     return;
   }
 
-  const map = createMap(maplibre, options);
+  const container = options.mapContainerRef.current;
+  let map: MapLibreMap | null;
+
+  try {
+    map = createMap(maplibre, options, true);
+  } catch {
+    resetMapContainer(container);
+
+    try {
+      map = createMap(maplibre, options, false);
+    } catch {
+      resetMapContainer(container);
+      return;
+    }
+  }
 
   if (!map) {
     return;
