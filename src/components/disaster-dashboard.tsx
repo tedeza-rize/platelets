@@ -2745,9 +2745,7 @@ export function DisasterDashboard({
       try {
         maplibre = await import("maplibre-gl");
       } catch {
-        if (!disposed) {
-          setNotice(dashboardText("dashboard.notice.mapFailed"));
-        }
+        setNotice(dashboardText("dashboard.notice.mapFailed"));
         return;
       }
 
