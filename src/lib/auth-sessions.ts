@@ -1,6 +1,11 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { AccessRole } from "@/lib/access-control";
-import { getAppSetting, setAppSetting } from "@/lib/points-db";
+import {
+  getDatabaseRow as get,
+  runDatabase as run,
+} from "@/lib/database/query";
+import type { DatabaseClient } from "@/lib/database/types";
+import { getDatabase, withDatabaseWriteTransaction } from "@/lib/points-db";
 import { getStoredAccessRole } from "@/lib/setup-state";
 import { authenticateUser } from "@/lib/users";
 
@@ -18,44 +23,121 @@ type StoredAccessSession = {
 
 const SESSION_SETTINGS_KEY = "access-sessions";
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+let legacyMigrationPromise: Promise<void> | null = null;
+
+type AccessSessionRow = {
+  created_at: string;
+  expires_at: string;
+  name: string;
+  role: AccessRole;
+  token_hash: string;
+  user_id: string | null;
+  username: string | null;
+};
+
+type AppSettingRow = {
+  value_json: string;
+};
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("base64url");
 }
 
-function safeEqual(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
+export type AccessSession = Omit<StoredAccessSession, "tokenHash">;
 
-  if (leftBuffer.length !== rightBuffer.length) {
-    return false;
+function mapSession(row: AccessSessionRow): AccessSession {
+  return {
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    name: row.name,
+    role: row.role,
+    userId: row.user_id,
+    username: row.username,
+  };
+}
+
+function parseLegacySessions(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as StoredAccessSession[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function insertStoredSession(
+  db: DatabaseClient,
+  session: StoredAccessSession,
+) {
+  await run(
+    db,
+    `INSERT INTO access_sessions (
+      token_hash,
+      user_id,
+      username,
+      role,
+      name,
+      created_at,
+      expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(token_hash) DO UPDATE SET
+      user_id = excluded.user_id,
+      username = excluded.username,
+      role = excluded.role,
+      name = excluded.name,
+      created_at = excluded.created_at,
+      expires_at = excluded.expires_at`,
+    [
+      session.tokenHash,
+      session.userId,
+      session.username,
+      session.role,
+      session.name,
+      session.createdAt,
+      session.expiresAt,
+    ],
+  );
+}
+
+async function ensureLegacySessionsMigrated() {
+  if (!legacyMigrationPromise) {
+    legacyMigrationPromise = withDatabaseWriteTransaction(async (db) => {
+      const row = await get<AppSettingRow>(
+        db,
+        "SELECT value_json FROM app_settings WHERE key = ?",
+        [SESSION_SETTINGS_KEY],
+      );
+
+      if (!row) {
+        return;
+      }
+
+      const now = Date.now();
+      const sessions = parseLegacySessions(row.value_json);
+
+      for (const session of sessions) {
+        if (new Date(session.expiresAt).getTime() <= now) continue;
+
+        await insertStoredSession(db, {
+          ...session,
+          name: session.name ?? (session.role === "sudo" ? "sudo" : "admin"),
+          userId: session.userId ?? null,
+          username: session.username ?? null,
+        });
+      }
+
+      await run(db, "DELETE FROM app_settings WHERE key = ?", [
+        SESSION_SETTINGS_KEY,
+      ]);
+    });
   }
 
-  return timingSafeEqual(leftBuffer, rightBuffer);
+  await legacyMigrationPromise;
 }
 
-async function readSessions() {
-  const now = Date.now();
-  const sessions = await getAppSetting<StoredAccessSession[]>(
-    SESSION_SETTINGS_KEY,
-    [],
-  );
-
-  return sessions
-    .filter((session) => new Date(session.expiresAt).getTime() > now)
-    .map((session) => ({
-      ...session,
-      name: session.name ?? (session.role === "sudo" ? "sudo" : "admin"),
-      userId: session.userId ?? null,
-      username: session.username ?? null,
-    }));
+async function deleteExpiredSessions(db: DatabaseClient, now: string) {
+  await run(db, "DELETE FROM access_sessions WHERE expires_at <= ?", [now]);
 }
-
-async function writeSessions(sessions: StoredAccessSession[]) {
-  await setAppSetting(SESSION_SETTINGS_KEY, sessions);
-}
-
-export type AccessSession = Omit<StoredAccessSession, "tokenHash">;
 
 export async function createAccessSession(password: string, username = "") {
   const hasUsername = username.trim().length > 0;
@@ -68,6 +150,8 @@ export async function createAccessSession(password: string, username = "") {
     return null;
   }
 
+  await ensureLegacySessionsMigrated();
+
   const token = randomBytes(32).toString("base64url");
   const now = Date.now();
   const session: StoredAccessSession = {
@@ -79,9 +163,10 @@ export async function createAccessSession(password: string, username = "") {
     userId: user?.id ?? null,
     username: user?.username ?? null,
   };
-  const sessions = await readSessions();
-  sessions.push(session);
-  await writeSessions(sessions);
+  await withDatabaseWriteTransaction(async (db) => {
+    await deleteExpiredSessions(db, session.createdAt);
+    await insertStoredSession(db, session);
+  });
 
   return {
     expiresAt: session.expiresAt,
@@ -100,22 +185,21 @@ export async function getAccessSession(
     return null;
   }
 
+  await ensureLegacySessionsMigrated();
+
   const tokenHash = hashToken(token);
-  const sessions = await readSessions();
-  const session = sessions.find((candidate) =>
-    safeEqual(candidate.tokenHash, tokenHash),
+  const db = await getDatabase();
+  const session = await get<AccessSessionRow>(
+    db,
+    `SELECT *
+       FROM access_sessions
+      WHERE token_hash = ?
+        AND expires_at > ?`,
+    [tokenHash, new Date().toISOString()],
   );
 
   if (!session) return null;
-
-  return {
-    createdAt: session.createdAt,
-    expiresAt: session.expiresAt,
-    name: session.name,
-    role: session.role,
-    userId: session.userId,
-    username: session.username,
-  };
+  return mapSession(session);
 }
 
 export async function getAccessSessionRole(token: string) {
@@ -127,11 +211,12 @@ export async function revokeAccessSession(token: string) {
     return;
   }
 
+  await ensureLegacySessionsMigrated();
+
   const tokenHash = hashToken(token);
-  const sessions = (await readSessions()).filter(
-    (session) => !safeEqual(session.tokenHash, tokenHash),
+  await withDatabaseWriteTransaction(async (db) =>
+    run(db, "DELETE FROM access_sessions WHERE token_hash = ?", [tokenHash]),
   );
-  await writeSessions(sessions);
 }
 
 export async function revokeUserAccessSessions(userId: string) {
@@ -139,8 +224,9 @@ export async function revokeUserAccessSessions(userId: string) {
     return;
   }
 
-  const sessions = (await readSessions()).filter(
-    (session) => session.userId !== userId,
+  await ensureLegacySessionsMigrated();
+
+  await withDatabaseWriteTransaction(async (db) =>
+    run(db, "DELETE FROM access_sessions WHERE user_id = ?", [userId]),
   );
-  await writeSessions(sessions);
 }
