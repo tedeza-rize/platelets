@@ -5,45 +5,21 @@ import {
   runDatabase as run,
 } from "@/lib/database/query";
 import type { DatabaseClient } from "@/lib/database/types";
+import {
+  asIncidentStatus,
+  type IncidentEventRow,
+  type IncidentRow,
+  mapIncidentEventRow,
+  mapIncidentRow,
+} from "@/lib/disaster-response/incident-row-mappers";
 import { INITIAL_INCIDENTS } from "@/lib/disaster-response/mock-data";
 import type {
   Incident,
   IncidentActor,
   IncidentEvent,
-  IncidentEventType,
   IncidentStatus,
-  IncidentType,
-  RiskLevel,
 } from "@/lib/disaster-response/types";
 import { withDatabaseWriteTransaction } from "@/lib/points-db";
-
-type IncidentRow = {
-  address: string;
-  created_at: string;
-  description: string;
-  id: string;
-  latitude: number;
-  longitude: number;
-  occurred_at: string;
-  risk_level: string;
-  status: string;
-  title: string;
-  type: string;
-  updated_at: string;
-};
-
-type IncidentEventRow = {
-  actor_id: string | null;
-  actor_name: string | null;
-  actor_role: string | null;
-  created_at: string;
-  from_status: string | null;
-  id: string;
-  incident_id: string;
-  message: string;
-  to_status: string | null;
-  type: string;
-};
 
 type MaxIncidentIdRow = {
   max_id: number | null;
@@ -74,67 +50,6 @@ export type IncidentRepository = {
 };
 
 let databasePromise: Promise<DatabaseClient> | null = null;
-
-function asIncidentType(value: string): IncidentType {
-  return value === "rescue" ||
-    value === "medical" ||
-    value === "traffic" ||
-    value === "fire"
-    ? value
-    : "fire";
-}
-
-function asRiskLevel(value: string): RiskLevel {
-  return value === "low" || value === "medium" || value === "high"
-    ? value
-    : "medium";
-}
-
-function asIncidentStatus(value: string): IncidentStatus {
-  return value === "dispatched" || value === "closed" || value === "reported"
-    ? value
-    : "reported";
-}
-
-function asIncidentEventType(value: string): IncidentEventType {
-  return value === "created" ||
-    value === "updated" ||
-    value === "status" ||
-    value === "deleted"
-    ? value
-    : "updated";
-}
-
-function mapIncidentRow(row: IncidentRow): Incident {
-  return {
-    address: row.address,
-    createdAt: row.created_at,
-    description: row.description,
-    id: row.id,
-    latitude: row.latitude,
-    longitude: row.longitude,
-    occurredAt: row.occurred_at,
-    riskLevel: asRiskLevel(row.risk_level),
-    status: asIncidentStatus(row.status),
-    title: row.title,
-    type: asIncidentType(row.type),
-  };
-}
-
-function mapIncidentEventRow(row: IncidentEventRow): IncidentEvent {
-  return {
-    actorId: row.actor_id,
-    actorName: row.actor_name,
-    actorRole: row.actor_role,
-    createdAt: row.created_at,
-    fromStatus: row.from_status ? asIncidentStatus(row.from_status) : null,
-    id: row.id,
-    incidentId: row.incident_id,
-    message: row.message,
-    toStatus: row.to_status ? asIncidentStatus(row.to_status) : null,
-    type: asIncidentEventType(row.type),
-  };
-}
 
 async function insertIncident(db: DatabaseClient, incident: Incident) {
   await run(
@@ -277,6 +192,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
       db,
       `SELECT *
         FROM disaster_incidents
+        WHERE deleted_at IS NULL
         ORDER BY occurred_at DESC, created_at DESC`,
     );
 
@@ -287,7 +203,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
     const db = await getIncidentDatabase();
     const row = await get<IncidentRow>(
       db,
-      "SELECT * FROM disaster_incidents WHERE id = ?",
+      "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
       [id],
     );
 
@@ -354,7 +270,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
     return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
-        "SELECT * FROM disaster_incidents WHERE id = ?",
+        "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
         [id],
       );
 
@@ -400,7 +316,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
 
       const row = await get<IncidentRow>(
         db,
-        "SELECT * FROM disaster_incidents WHERE id = ?",
+        "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
         [id],
       );
 
@@ -418,7 +334,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
     return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
-        "SELECT * FROM disaster_incidents WHERE id = ?",
+        "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
         [id],
       );
 
@@ -445,7 +361,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
 
       const row = await get<IncidentRow>(
         db,
-        "SELECT * FROM disaster_incidents WHERE id = ?",
+        "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
         [id],
       );
 
@@ -459,7 +375,7 @@ export class SqliteIncidentRepository implements IncidentRepository {
     return withIncidentWriteTransaction(async (db) => {
       const current = await get<IncidentRow>(
         db,
-        "SELECT * FROM disaster_incidents WHERE id = ?",
+        "SELECT * FROM disaster_incidents WHERE id = ? AND deleted_at IS NULL",
         [id],
       );
 
@@ -467,7 +383,6 @@ export class SqliteIncidentRepository implements IncidentRepository {
         return false;
       }
 
-      await run(db, "DELETE FROM disaster_incidents WHERE id = ?", [id]);
       await insertIncidentEvent(db, {
         actor,
         createdAt: now,
@@ -477,6 +392,13 @@ export class SqliteIncidentRepository implements IncidentRepository {
         toStatus: null,
         type: "deleted",
       });
+      await run(
+        db,
+        `UPDATE disaster_incidents
+          SET deleted_at = ?, updated_at = ?
+          WHERE id = ? AND deleted_at IS NULL`,
+        [now, now, id],
+      );
 
       return true;
     });

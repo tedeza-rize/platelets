@@ -28,7 +28,14 @@ import type {
   StyleSpecification,
 } from "maplibre-gl";
 import * as maplibre from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MapLegend } from "@/components/disaster-dashboard/map-legend";
 import { SummaryMetrics } from "@/components/disaster-dashboard/summary-metrics";
 import { useIncidentEvents } from "@/components/disaster-dashboard/use-incident-events";
@@ -60,6 +67,7 @@ import {
   createVworldStyle,
   VWORLD_3D_BUILDINGS_SOURCE_ID,
 } from "@/lib/map-shell-core";
+import { safeLinkHref } from "@/lib/safe-link";
 import styles from "./disaster-dashboard.module.css";
 
 export type DashboardView =
@@ -1356,13 +1364,15 @@ function buildBuildingPopupHtml(
     safetyProfile && safetyProfile.sourceNotes.length > 0
       ? safetyProfile.sourceNotes.join(" ")
       : null;
-  const sourceLabel = safetyProfile?.sourceUrl
+  const safetyProfileSourceHref = safeLinkHref(safetyProfile?.sourceUrl);
+  const safetyProfileSourceLabel = safetyProfile?.sourceLabel ?? "";
+  const sourceLabel = safetyProfileSourceHref
     ? `<a href="${escapeHtml(
-        safetyProfile.sourceUrl,
+        safetyProfileSourceHref,
       )}" target="_blank" rel="noreferrer">${escapeHtml(
-        safetyProfile.sourceLabel,
+        safetyProfileSourceLabel,
       )}</a>`
-    : escapeHtml(safetyProfile?.sourceLabel ?? "");
+    : escapeHtml(safetyProfileSourceLabel);
   const profileHtml = safetyProfile
     ? `<section class="${styles.popupSafety}">
         <strong>${escapeHtml(text("dashboard.popup.safetyProfileTitle"))}</strong>
@@ -1544,6 +1554,7 @@ function buildBigData119PopupHtml(
   text: DashboardText,
 ) {
   const coordinateLabel = `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
+  const sourceHref = safeLinkHref(point.sourceUrl);
   const rows = [
     [text("dashboard.sheet.type"), text(BIGDATA119_KIND_LABEL[point.kind])],
     [text("dashboard.sheet.category"), point.category],
@@ -1581,7 +1592,15 @@ function buildBigData119PopupHtml(
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
-      <a href="${point.sourceUrl}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.source"))}</a>
+      ${
+        sourceHref
+          ? `<a href="${escapeHtml(
+              sourceHref,
+            )}" target="_blank" rel="noreferrer">${escapeHtml(
+              text("dashboard.sheet.source"),
+            )}</a>`
+          : ""
+      }
       <a href="${buildExternalMapSearchUrl(
         "naver",
         point.address || point.name || coordinateLabel,
@@ -1650,6 +1669,29 @@ function OperationalSourceIcon({ kind }: { kind: string }) {
   );
 }
 
+function DataSourceItemLink({
+  children,
+  unsafeHref,
+}: {
+  children: ReactNode;
+  unsafeHref: string;
+}) {
+  const safeHref = safeLinkHref(unsafeHref);
+
+  return safeHref ? (
+    <a
+      className={styles.dataSourceItem}
+      href={safeHref}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {children}
+    </a>
+  ) : (
+    <div className={styles.dataSourceItem}>{children}</div>
+  );
+}
+
 function coordinateText(latitude: number, longitude: number) {
   return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
@@ -1712,14 +1754,20 @@ function bigData119Sheet(
   text: DashboardText,
 ): MobileSheet {
   const searchQuery = point.address || point.name || point.sourceLabel;
+  const sourceHref = safeLinkHref(point.sourceUrl);
+  const sourceLinks = sourceHref
+    ? [
+        {
+          href: sourceHref,
+          label: text("dashboard.sheet.source"),
+        },
+      ]
+    : [];
 
   return {
     id: `bigdata-${point.id}`,
     links: [
-      {
-        href: point.sourceUrl,
-        label: text("dashboard.sheet.source"),
-      },
+      ...sourceLinks,
       {
         href: buildExternalMapSearchUrl("naver", searchQuery),
         label: text("dashboard.sheet.naverMap"),
@@ -3649,12 +3697,9 @@ export function DisasterDashboard({
               </div>
               <div className={styles.dataSourceGrid}>
                 {bigData119Summaries.map((source) => (
-                  <a
-                    className={styles.dataSourceItem}
-                    href={source.sourceUrl}
+                  <DataSourceItemLink
                     key={source.sourceId}
-                    rel="noreferrer"
-                    target="_blank"
+                    unsafeHref={source.sourceUrl}
                   >
                     {source.kind === "fire-water-source" ? (
                       <Droplets aria-hidden="true" size={16} />
@@ -3681,7 +3726,7 @@ export function DisasterDashboard({
                         })}
                       </span>
                     </div>
-                  </a>
+                  </DataSourceItemLink>
                 ))}
               </div>
             </section>
@@ -3701,12 +3746,9 @@ export function DisasterDashboard({
               </div>
               <div className={styles.dataSourceGrid}>
                 {bigData119OperationalSummaries.map((source) => (
-                  <a
-                    className={styles.dataSourceItem}
-                    href={source.sourceUrl}
+                  <DataSourceItemLink
                     key={source.sourceId}
-                    rel="noreferrer"
-                    target="_blank"
+                    unsafeHref={source.sourceUrl}
                   >
                     <OperationalSourceIcon kind={source.kind} />
                     <div>
@@ -3771,7 +3813,7 @@ export function DisasterDashboard({
                         </span>
                       ) : null}
                     </div>
-                  </a>
+                  </DataSourceItemLink>
                 ))}
               </div>
             </section>

@@ -6,6 +6,47 @@ import test from "node:test";
 import { copyDatabaseContents } from "@/lib/database/migration";
 import { initializeDatabaseSchema } from "@/lib/database/schema";
 import { openSqliteClient } from "@/lib/database/sqlite-adapter";
+import type { DatabaseClient } from "@/lib/database/types";
+
+async function insertIncident(db: DatabaseClient, id: string) {
+  await db.run(
+    `INSERT INTO disaster_incidents (
+      id, type, title, description, address, latitude, longitude, risk_level,
+      status, occurred_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      "fire",
+      "Integrity incident",
+      "Schema integrity test",
+      "Seoul",
+      37.5,
+      127,
+      "medium",
+      "reported",
+      "2026-06-16T00:00:00.000Z",
+      "2026-06-16T00:00:00.000Z",
+      "2026-06-16T00:00:00.000Z",
+    ],
+  );
+}
+
+async function insertIncidentEvent(db: DatabaseClient, incidentId: string) {
+  await db.run(
+    `INSERT INTO disaster_incident_events (
+      id, incident_id, type, message, from_status, to_status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      `evt-${incidentId}`,
+      incidentId,
+      "created",
+      "Incident created",
+      null,
+      "reported",
+      "2026-06-16T00:00:00.000Z",
+    ],
+  );
+}
 
 test("copyDatabaseContents replaces target rows with a consistent source copy", async () => {
   const directory = mkdtempSync(path.join(tmpdir(), "platelets-migration-"));
@@ -60,5 +101,120 @@ test("copyDatabaseContents replaces target rows with a consistent source copy", 
   } finally {
     await source.close();
     await target.close();
+  }
+});
+
+test("incident event schema enforces parent incident integrity", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "platelets-fk-"));
+  const db = openSqliteClient(path.join(directory, "events.sqlite"));
+
+  try {
+    await initializeDatabaseSchema(db);
+    await insertIncident(db, "inc-parent");
+    await insertIncidentEvent(db, "inc-parent");
+
+    await assert.rejects(
+      () => insertIncidentEvent(db, "inc-missing"),
+      /FOREIGN KEY constraint failed/,
+    );
+    await assert.rejects(
+      () =>
+        db.run("DELETE FROM disaster_incidents WHERE id = ?", ["inc-parent"]),
+      /FOREIGN KEY constraint failed/,
+    );
+  } finally {
+    await db.close();
+  }
+});
+
+test("legacy SQLite incident event tables are rebuilt with foreign keys", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "platelets-fk-migration-"));
+  const db = openSqliteClient(path.join(directory, "legacy.sqlite"));
+
+  try {
+    await db.run(`
+      CREATE TABLE disaster_incidents (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        address TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        risk_level TEXT NOT NULL,
+        status TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE disaster_incident_events (
+        id TEXT PRIMARY KEY,
+        incident_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        from_status TEXT,
+        to_status TEXT,
+        created_at TEXT NOT NULL
+      );
+    `);
+    await insertIncident(db, "inc-legacy");
+    await insertIncidentEvent(db, "inc-legacy");
+
+    await initializeDatabaseSchema(db);
+
+    const foreignKeys = await db.all<{ from: string; table: string }>(
+      'PRAGMA foreign_key_list("disaster_incident_events")',
+    );
+    assert.deepEqual(
+      foreignKeys.map((key) => [key.from, key.table]),
+      [["incident_id", "disaster_incidents"]],
+    );
+    await assert.rejects(
+      () => insertIncidentEvent(db, "inc-missing"),
+      /FOREIGN KEY constraint failed/,
+    );
+  } finally {
+    await db.close();
+  }
+});
+
+test("incident event migration rejects existing orphan rows", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "platelets-fk-orphan-"));
+  const db = openSqliteClient(path.join(directory, "orphan.sqlite"));
+
+  try {
+    await db.run(`
+      CREATE TABLE disaster_incidents (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        address TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        risk_level TEXT NOT NULL,
+        status TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE disaster_incident_events (
+        id TEXT PRIMARY KEY,
+        incident_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        from_status TEXT,
+        to_status TEXT,
+        created_at TEXT NOT NULL
+      );
+    `);
+    await insertIncidentEvent(db, "inc-orphan");
+
+    await assert.rejects(
+      () => initializeDatabaseSchema(db),
+      /orphaned disaster incident events/,
+    );
+  } finally {
+    await db.close();
   }
 });
