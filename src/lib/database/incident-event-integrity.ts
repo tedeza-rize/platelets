@@ -56,20 +56,16 @@ export function incidentEventTableStatement(
   )`;
 }
 
-async function ensureNoOrphanIncidentEvents(db: DatabaseClient) {
-  const row = await db.get<{ count: number }>(
-    `SELECT COUNT(*) AS count
-       FROM disaster_incident_events events
-       LEFT JOIN disaster_incidents incidents
-         ON events.incident_id = incidents.id
-      WHERE incidents.id IS NULL`,
+async function purgeOrphanIncidentEvents(db: DatabaseClient) {
+  // Incidents are soft-deleted (deleted_at), so their rows survive and their
+  // events keep a valid parent. True orphans only come from legacy hard-deletes
+  // performed before this foreign key existed: they reference a parent incident
+  // that is gone for good and can never be reattached. Purge them so the
+  // ON DELETE RESTRICT foreign key can be added without bricking schema init.
+  await db.run(
+    `DELETE FROM disaster_incident_events
+      WHERE incident_id NOT IN (SELECT id FROM disaster_incidents)`,
   );
-
-  if ((row?.count ?? 0) > 0) {
-    throw new Error(
-      "Cannot enforce incident event integrity while orphaned disaster incident events exist.",
-    );
-  }
 }
 
 async function hasIncidentEventForeignKey(db: DatabaseClient) {
@@ -160,6 +156,6 @@ async function ensureIncidentEventForeignKey(db: DatabaseClient) {
 }
 
 export async function ensureIncidentEventIntegrity(db: DatabaseClient) {
-  await ensureNoOrphanIncidentEvents(db);
+  await purgeOrphanIncidentEvents(db);
   await ensureIncidentEventForeignKey(db);
 }

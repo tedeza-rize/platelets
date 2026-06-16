@@ -7,14 +7,14 @@ import {
   parseOptionalKoreaCoordinates,
 } from "@/lib/coordinates";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 import { getRuntimeApiKeys } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "ai-query",
     limit: 10,
     windowMs: 60_000,

@@ -84,16 +84,41 @@ export const koUiOutput = {
   "pwa.offline.title": "오프라인 상태입니다",
   "error.action.home": "안전 지도 홈으로",
   "error.action.retry": "다시 시도",
+  "error.badRequest.description":
+    "접수에 필요한 위치, 시간, 상황 정보가 부족합니다. 입력한 내용을 확인한 뒤 다시 제출해 주세요.",
+  "error.badRequest.eyebrow": "400 · 접수 내용 확인",
+  "error.badRequest.imageAlt": "접수 서류를 확인하는 혈소판 캐릭터",
+  "error.badRequest.title": "접수 내용을 한 번 더 확인해 주세요.",
+  "error.conflict.description":
+    "다른 작업자가 이 사건을 먼저 변경했습니다. 화면을 새로고침한 뒤 최신 상태를 확인하고 다시 저장해 주세요.",
+  "error.conflict.eyebrow": "409 · 다른 곳에서 변경됨",
+  "error.conflict.imageAlt": "두 개의 상황 기록을 비교하는 혈소판 캐릭터",
+  "error.conflict.title": "작업 중인 사건 상태가 바뀌었습니다.",
+  "error.dataUnavailable.description":
+    "요청한 데이터가 아직 준비되지 않았거나 가져오기가 완료되지 않았습니다. 운영자 화면에서 자료 상태를 확인한 뒤 다시 시도해 주세요.",
+  "error.dataUnavailable.eyebrow": "자료 사용 불가",
+  "error.dataUnavailable.imageAlt": "비어 있는 자료함을 확인하는 혈소판 캐릭터",
+  "error.dataUnavailable.title": "이 자료는 아직 상황실에 도착하지 않았습니다.",
   "error.forbidden.description":
     "현재 계정으로 이 구역을 열 수 없습니다. 필요한 역할이 있으면 관리자에게 접근 권한을 요청해 주세요.",
   "error.forbidden.eyebrow": "403 · 출입 권한 없음",
   "error.forbidden.imageAlt": "출입증을 확인받는 혈소판 캐릭터",
   "error.forbidden.title": "출입증이 아직 확인되지 않았어요.",
+  "error.gatewayTimeout.description":
+    "외부 제공자나 경로 서비스의 응답이 너무 늦었습니다. 현재 사건 정보는 유지한 상태에서 다시 시도해 주세요.",
+  "error.gatewayTimeout.eyebrow": "504 · 응답 시간 초과",
+  "error.gatewayTimeout.imageAlt": "신호 시계 옆에서 기다리는 혈소판 캐릭터",
+  "error.gatewayTimeout.title": "외부 연결이 제때 응답하지 않았습니다.",
   "error.maintenance.description":
     "더 튼튼한 지도를 만들려고 잠깐 나사를 조이는 중입니다. 잠시 뒤 다시 들러 주세요.",
   "error.maintenance.eyebrow": "서비스 점검",
   "error.maintenance.imageAlt": "안전모를 쓰고 제어판을 점검하는 혈소판 캐릭터",
   "error.maintenance.title": "지도가 잠깐 건강검진을 받고 있어요.",
+  "error.mapLoad.description":
+    "지도 타일이나 브라우저 그래픽 화면이 정상적으로 시작되지 않았습니다. 새로고침한 뒤 문제가 계속되면 다른 지도 제공자로 전환해 주세요.",
+  "error.mapLoad.eyebrow": "지도 표시",
+  "error.mapLoad.imageAlt": "지도 패널을 펼치는 혈소판 캐릭터",
+  "error.mapLoad.title": "지도 화면이 제대로 열리지 않았습니다.",
   "error.notFound.description":
     "주소가 바뀌었거나 페이지가 임무를 마치고 철수한 것 같습니다. 홈에서 다시 경로를 잡아 볼게요.",
   "error.notFound.eyebrow": "404 · 길 잃은 지도",
@@ -104,17 +129,47 @@ export const koUiOutput = {
   "error.offline.eyebrow": "연결 신호 없음",
   "error.offline.imageAlt": "안테나 신호를 찾는 혈소판 캐릭터",
   "error.offline.title": "인터넷이 현장 이탈했습니다.",
+  "error.rateLimited.description":
+    "짧은 시간에 요청이 너무 많이 들어왔습니다. 공동으로 쓰는 긴급 서비스가 안정적으로 유지되도록 잠시 뒤 다시 시도해 주세요.",
+  "error.rateLimited.eyebrow": "429 · 요청 많음",
+  "error.rateLimited.imageAlt": "대기 번호판을 든 혈소판 캐릭터",
+  "error.rateLimited.title": "요청 대기 줄이 잠시 가득 찼습니다.",
   "error.reference": "참고 번호: {digest}",
+  "error.routeFailed.description":
+    "경로 계산기가 두 지점 사이의 신뢰할 수 있는 길을 찾지 못했습니다. 좌표를 확인하고 필요하면 다른 지도 제공자로 다시 시도해 주세요.",
+  "error.routeFailed.eyebrow": "경로 계산",
+  "error.routeFailed.imageAlt": "막힌 경로를 지도에 표시하는 혈소판 캐릭터",
+  "error.routeFailed.title": "출동 경로를 그릴 수 없었습니다.",
   "error.server.description":
     "예상 밖의 일이 생겨 담당 혈소판이 무전기를 붙잡았습니다. 잠깐 뒤 다시 시도해 주세요.",
   "error.server.eyebrow": "500 · 예상 밖의 상황",
   "error.server.imageAlt": "무전기로 긴급 연락하는 혈소판 캐릭터",
   "error.server.title": "서버가 작전 회의를 갑자기 소집했어요.",
+  "error.serviceUnavailable.description":
+    "이 서비스는 일시적으로 사용할 수 없습니다. 기본 지도는 열릴 수 있지만, 실시간 업무는 서비스가 복구된 뒤 다시 시도해 주세요.",
+  "error.serviceUnavailable.eyebrow": "503 · 서비스 사용 불가",
+  "error.serviceUnavailable.imageAlt": "서비스 상태판을 확인하는 혈소판 캐릭터",
+  "error.serviceUnavailable.title": "이 근무대는 잠시 자리를 비웠습니다.",
+  "error.sessionExpired.description":
+    "운영 데이터를 보호하기 위해 로그인 시간이 만료되었습니다. 제한된 대응 업무를 계속하려면 다시 로그인해 주세요.",
+  "error.sessionExpired.eyebrow": "로그인 시간 만료",
+  "error.sessionExpired.imageAlt": "만료된 출입증을 확인하는 혈소판 캐릭터",
+  "error.sessionExpired.title": "교대 근무 출입증을 다시 확인해야 합니다.",
   "error.timeSync.description":
     "기기 시간과 서버 시간이 어긋나면 사고 시각, 갱신 기록, 로그인 판단이 다르게 보일 수 있습니다. 자동 시간 설정과 NTP 동기화를 확인한 뒤 다시 시도해 주세요.",
   "error.timeSync.eyebrow": "시간 동기화",
   "error.timeSync.imageAlt": "시계와 시간 신호를 확인하는 혈소판 캐릭터",
   "error.timeSync.title": "과거나 미래에서 오셨나요?",
+  "error.trainingRoom.description":
+    "모의훈련 전용 통로를 찾았습니다. 마음껏 둘러봐도 실제 사건 기록은 바뀌지 않습니다.",
+  "error.trainingRoom.eyebrow": "이스터에그 · 훈련실",
+  "error.trainingRoom.imageAlt": "훈련 모드 스위치 옆에 선 혈소판 캐릭터",
+  "error.trainingRoom.title": "모의 브리핑실을 발견했습니다.",
+  "error.unauthorized.description":
+    "이 대응 구역을 열려면 운영자 계정으로 로그인해야 합니다. 이미 로그인했다면 세션이 만료되었을 수 있습니다.",
+  "error.unauthorized.eyebrow": "401 · 로그인 필요",
+  "error.unauthorized.imageAlt": "로그인 출입증을 제시하는 혈소판 캐릭터",
+  "error.unauthorized.title": "상황실에서 대응자를 확인해야 합니다.",
   "preferences.language": "언어",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",

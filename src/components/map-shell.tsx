@@ -5,16 +5,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import * as mapCore from "@/lib/map-shell-core";
 import type { EmergencyRouteResult } from "./emergency-routing-panel";
-import styles from "./map-shell.module.css";
 import { useInitializeMap, useMapStyleSync } from "./map-shell-map-effects";
+import popupStyles from "./map-shell-popup.module.css";
 import { MapShellView } from "./map-shell-view";
 
 const popupClassNames: mapCore.PopupClassNames = {
-  popup: styles.popup,
-  popupActions: styles.popupActions,
-  popupDetails: styles.popupDetails,
-  popupHeader: styles.popupHeader,
-  popupRow: styles.popupRow,
+  popup: popupStyles.popup,
+  popupActions: popupStyles.popupActions,
+  popupDetails: popupStyles.popupDetails,
+  popupHeader: popupStyles.popupHeader,
+  popupRow: popupStyles.popupRow,
 };
 
 function isAbortError(error: unknown) {

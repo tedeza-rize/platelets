@@ -8,7 +8,7 @@ import {
   recommendEmergencyHospitals,
 } from "@/lib/emergency-recommendation";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ const SCENARIOS = new Set<EmergencyScenario>([
 ]);
 
 export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "emergency-recommendations",
     limit: 30,
     windowMs: 60_000,

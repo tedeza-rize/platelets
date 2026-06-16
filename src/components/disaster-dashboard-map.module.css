@@ -1,0 +1,232 @@
+.mapPane {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--map-fallback);
+  overflow: hidden;
+}
+
+.mapPane::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 12%), transparent 26%),
+    radial-gradient(circle at 20% 18%, rgb(14 165 233 / 14%), transparent 24%);
+  content: "";
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+.mapControls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mapToggle,
+.mapToggleActive {
+  display: inline-flex;
+  min-width: 42px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(18px) saturate(1.12);
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 850;
+  padding: 0 10px;
+  box-shadow: var(--control-shadow);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.mapToggleActive {
+  border-color: #1d4ed8;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.mapToggle:hover,
+.mapToggle:focus-visible,
+.mapToggleActive:hover,
+.mapToggleActive:focus-visible {
+  border-color: var(--focus-ring);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.mapToggle:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.liveTicker {
+  position: absolute;
+  top: 58px;
+  right: 16px;
+  left: 16px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgb(94 234 212 / 24%);
+  border-radius: 8px;
+  background: rgb(5 15 13 / 72%);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow:
+    inset 0 0 24px rgb(20 184 166 / 8%),
+    0 18px 46px rgb(0 0 0 / 28%);
+  color: var(--text-strong);
+  overflow: hidden;
+  padding: 8px 10px;
+}
+
+.liveTicker > span {
+  display: inline-flex;
+  min-width: 68px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgb(244 63 94 / 18%);
+  color: #fecdd3;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.liveTicker > div {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.liveTickerTrack {
+  display: inline-flex;
+  min-width: max-content;
+  gap: 26px;
+  animation: ticker-scroll 28s linear infinite;
+  white-space: nowrap;
+}
+
+.liveTickerTrack strong {
+  color: #dffdf4;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-shadow: 0 0 16px rgb(94 234 212 / 28%);
+}
+
+.tickerMuted {
+  color: var(--text-muted);
+}
+
+.mapLegend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 1px solid var(--premium-glass-border);
+  border-radius: 16px;
+  background: var(--premium-glass-surface);
+  backdrop-filter: blur(18px) saturate(1.15);
+  color: var(--text-strong);
+  padding: 8px;
+  box-shadow: var(--notice-shadow);
+}
+
+.mapLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.mapLegend i {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+}
+
+.legendIncident {
+  background: #e11d48;
+}
+
+.legendStation {
+  background: #7c3aed;
+}
+
+.legendHospital {
+  background: #0f766e;
+}
+
+.legendRisk {
+  background: #d97706;
+}
+
+.legendBigDataTarget {
+  background: #0ea5e9;
+}
+
+.legendBigDataWater {
+  background: #2563eb;
+}
+
+@media (max-width: 560px) {
+  .mapLegend {
+    right: 10px;
+    left: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapToggle,
+  .mapToggleActive {
+    transition: none;
+  }
+
+  .liveTickerTrack {
+    animation: none;
+  }
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes sheet-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 28px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}

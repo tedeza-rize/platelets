@@ -8,7 +8,7 @@ import type {
   UpdateIncidentInput,
 } from "@/lib/disaster-response/types";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,7 +92,7 @@ export async function PATCH(
   );
   if (forbidden) return forbidden;
 
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incident-status",
     limit: 40,
     windowMs: 60_000,
@@ -172,7 +172,7 @@ export async function DELETE(
   );
   if (forbidden) return forbidden;
 
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incident-delete",
     limit: 20,
     windowMs: 60_000,

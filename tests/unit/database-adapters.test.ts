@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { normalizeDatabaseConfig } from "@/lib/database/config";
+import { initializeDatabaseSchema } from "@/lib/database/schema";
 import { databaseSql } from "@/lib/database/sql";
+import { openSqliteClient } from "@/lib/database/sqlite-adapter";
 
 test("databaseSql converts placeholders for PostgreSQL", () => {
   assert.equal(
@@ -67,4 +72,21 @@ test("normalizeDatabaseConfig rejects mismatched or unsupported database URLs", 
       }),
     /Database engine is not supported/,
   );
+});
+
+test("schema creates aggregate point lookup indexes", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "platelets-schema-"));
+  const db = openSqliteClient(path.join(directory, "points.sqlite"));
+
+  try {
+    await initializeDatabaseSchema(db);
+    const indexes = await db.all<{ name: string }>("PRAGMA index_list(points)");
+    const names = new Set(indexes.map((index) => index.name));
+
+    assert.equal(names.has("points_source_coordinates_idx"), true);
+    assert.equal(names.has("points_source_id_idx"), true);
+  } finally {
+    await db.close();
+    rmSync(directory, { force: true, recursive: true });
+  }
 });
