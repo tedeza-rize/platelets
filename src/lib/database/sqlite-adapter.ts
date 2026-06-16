@@ -61,5 +61,6 @@ export function openSqliteClient(
     timeout: 5_000,
   });
   database.pragma("busy_timeout = 5000");
+  database.pragma("foreign_keys = ON");
   return sqliteClient(database, { closeable: true });
 }
