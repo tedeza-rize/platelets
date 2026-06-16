@@ -7,7 +7,7 @@ responses. Review this checklist before exposing a deployment.
 ## Required Behavior
 
 1. Forward the client IP.
-   `src/lib/rate-limit.ts` keys the in-process limiter by the first
+   `src/lib/rate-limit.ts` keys shared rate-limit buckets by the first
    `X-Forwarded-For` value, then `X-Real-IP`, then `local`. If a proxy omits
    those headers, all users can appear as one proxy IP and one user's traffic
    can throttle the entire site.
@@ -22,9 +22,11 @@ responses. Review this checklist before exposing a deployment.
    idle operator dashboard.
 
 4. Keep writable SQLite deployments single-instance.
-   Incident events are published through an in-process event hub, and SQLite
-   writes are serialized by an in-process queue. Use one sticky writable Node.js
-   process until Redis/PostgreSQL or another shared broker/database is added.
+   SQLite writes are serialized by an in-process queue. Use one sticky writable
+   Node.js process for SQLite, or select PostgreSQL, MySQL, or MariaDB before
+   running multiple writable application processes. Incident SSE delivery and
+   route rate limits use shared database state when every process uses the same
+   external database.
 
 5. Terminate HTTP at HTTPS.
    Public deployments should redirect port 80 to HTTPS. AI proxy URLs are
@@ -109,9 +111,11 @@ Enable `mod_proxy`, `mod_proxy_http`, `mod_headers`, `mod_ssl`, and
 
 ## Load Balancing Notes
 
-- Keep `/api/disaster/events` and write routes on the same single writable
-  instance unless an external event broker is introduced.
+- `/api/disaster/events` can run on multiple application processes when they
+  share the same external database. The stream sends local changes immediately
+  and polls `disaster_incident_events` for changes written by other processes.
 - Use SQLite only for one persistent application process. Select PostgreSQL,
   MySQL, or MariaDB before adding writable application instances.
-- Put rate limiting at the proxy or edge when multiple app processes serve
-  public traffic; the application limiter is process-local.
+- The application rate limiter is database-backed for route handlers that call
+  external providers or mutate operational data. Keep coarse proxy or edge
+  limits in front of it to shed abusive traffic before it reaches the app.

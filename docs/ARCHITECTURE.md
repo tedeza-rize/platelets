@@ -85,9 +85,13 @@ Every new external source must be added to both
 Incident mutations publish bounded metadata to an in-process event hub after
 the database transaction succeeds. `/api/disaster/events` exposes those changes
 as a no-cache Server-Sent Events stream with heartbeats, and the dashboard
-coalesces notifications before refreshing its public snapshot. Deployments with
-multiple application processes require a shared event broker to extend this
-single-process delivery model.
+coalesces notifications before refreshing its public snapshot. The SSE route
+also tails `disaster_incident_events` as a shared event log, so clients attached
+to one application process can observe incident changes written by another
+process when all processes use the same database. A Redis Pub/Sub or managed
+message broker can still be added later for lower latency at large scale, but
+the database log is the current correctness boundary for multi-instance
+delivery.
 
 High-risk incident creation schedules post-response alert delivery. Browser
 Push subscriptions are stored in SQLite without VAPID private keys, while the
@@ -243,8 +247,12 @@ nearest-point, ranking, and grounding tools. Tool results exclude raw JSON.
 - HTML: popup builders escape source text; AI output renders as plain text
 - SQL: values are parameterized; dynamic clauses come from validated enums
 
-The in-memory public rate limiter is a single-process safety layer. A deployed
-multi-instance service should also enforce limits at the reverse proxy or edge.
+Public mutation and external-provider routes use a database-backed rate-limit
+bucket keyed by route scope and forwarded client IP, so limits are shared
+across application processes that use the same database. The lightweight
+in-memory limiter remains available for local single-process call sites, but it
+is not the production boundary. A deployed multi-instance service should still
+enforce coarse limits at the reverse proxy or edge before requests reach Node.js.
 
 ## Time
 

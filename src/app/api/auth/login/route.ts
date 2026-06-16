@@ -1,6 +1,6 @@
 import { createAccessSession } from "@/lib/auth-sessions";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 import { homePathForRole } from "@/lib/role-routing";
 import { sessionCookieHeader } from "@/lib/session-cookie";
 
@@ -17,14 +17,14 @@ export async function POST(request: Request) {
     typeof payload?.username === "string" ? payload.username : "";
   const normalizedUsername =
     username.trim().toLowerCase().slice(0, 40) || "legacy";
-  const globalLimit = enforceRateLimit(request, {
+  const globalLimit = await enforceSharedRateLimit(request, {
     bucket: "auth-login-global",
     limit: 30,
     windowMs: 60_000,
   });
   if (globalLimit) return globalLimit;
 
-  const accountLimit = enforceRateLimit(request, {
+  const accountLimit = await enforceSharedRateLimit(request, {
     bucket: `auth-login-account:${normalizedUsername}`,
     limit: 5,
     windowMs: 60_000,

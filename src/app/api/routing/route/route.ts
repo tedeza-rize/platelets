@@ -4,13 +4,13 @@ import {
 } from "@/lib/coordinates";
 import { calculateEmergencyRoute } from "@/lib/emergency-routing";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "emergency-route",
     limit: 20,
     windowMs: 60_000,
