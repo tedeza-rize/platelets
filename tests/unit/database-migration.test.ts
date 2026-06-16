@@ -178,7 +178,7 @@ test("legacy SQLite incident event tables are rebuilt with foreign keys", async 
   }
 });
 
-test("incident event migration rejects existing orphan rows", async () => {
+test("incident event migration purges legacy orphan rows", async () => {
   const directory = mkdtempSync(path.join(tmpdir(), "platelets-fk-orphan-"));
   const db = openSqliteClient(path.join(directory, "orphan.sqlite"));
 
@@ -208,11 +208,26 @@ test("incident event migration rejects existing orphan rows", async () => {
         created_at TEXT NOT NULL
       );
     `);
+    await insertIncident(db, "inc-kept");
+    await insertIncidentEvent(db, "inc-kept");
     await insertIncidentEvent(db, "inc-orphan");
 
-    await assert.rejects(
-      () => initializeDatabaseSchema(db),
-      /orphaned disaster incident events/,
+    await initializeDatabaseSchema(db);
+
+    const remaining = await db.all<{ id: string }>(
+      "SELECT id FROM disaster_incident_events ORDER BY id",
+    );
+    assert.deepEqual(
+      remaining.map((row) => row.id),
+      ["evt-inc-kept"],
+    );
+
+    const foreignKeys = await db.all<{ from: string; table: string }>(
+      'PRAGMA foreign_key_list("disaster_incident_events")',
+    );
+    assert.deepEqual(
+      foreignKeys.map((key) => [key.from, key.table]),
+      [["incident_id", "disaster_incidents"]],
     );
   } finally {
     await db.close();
