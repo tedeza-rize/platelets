@@ -1,7 +1,8 @@
-import { createAccessSession, SESSION_COOKIE_NAME } from "@/lib/auth-sessions";
+import { createAccessSession } from "@/lib/auth-sessions";
 import { noStoreJson } from "@/lib/http";
 import { enforceRateLimit } from "@/lib/rate-limit";
 import { homePathForRole } from "@/lib/role-routing";
+import { sessionCookieHeader } from "@/lib/session-cookie";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,9 +47,7 @@ export async function POST(request: Request) {
     },
     {
       headers: {
-        "Set-Cookie": `${SESSION_COOKIE_NAME}=${encodeURIComponent(
-          session.token,
-        )}; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800`,
+        "Set-Cookie": sessionCookieHeader(request, session.token),
       },
     },
   );

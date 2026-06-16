@@ -92,6 +92,8 @@ export const enUiCore = {
   Phone: "Phone",
   Protected: "Protected",
   Refresh: "Refresh",
+  "Register an AI API key in setup before asking.":
+    "Register an AI API key in setup before asking.",
   Report: "Report",
   "Report incident": "Report incident",
   "Reporting...": "Reporting...",
@@ -108,6 +110,8 @@ export const enUiCore = {
   "Staff accounts": "Staff accounts",
   "Staff login": "Staff login",
   "Temporary password": "Temporary password",
+  "The AI provider is unavailable. Try again later.":
+    "The AI provider is unavailable. Try again later.",
   "The account could not be found.": "The account could not be found.",
   "The bootstrap sudo account is protected.":
     "The bootstrap sudo account is protected.",
