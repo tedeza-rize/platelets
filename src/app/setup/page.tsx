@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { SetupWizard } from "@/components/setup-wizard";
+import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import {
   getSetupEnvironmentStatus,
@@ -21,6 +22,10 @@ export default async function SetupPage() {
       initialStatus={{
         environment: await getSetupEnvironmentStatus(),
         installed: false,
+      }}
+      setupDictionaries={{
+        en: getDictionary("en").setup,
+        ko: getDictionary("ko").setup,
       }}
     />
   );
