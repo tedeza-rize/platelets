@@ -2,10 +2,15 @@ import type { NextRequest } from "next/server";
 import { requireAccessRole } from "@/lib/access-control";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
+import { decodeListingCursor } from "@/lib/listing-cursors";
 import {
+  listPointMarkerPage,
   listPointMarkers,
   listPointSummaries,
+  listPointSummaryPage,
   listPoints,
+  listRawPointPage,
+  validatePointListCursor,
 } from "@/lib/points-db";
 
 export const runtime = "nodejs";
@@ -43,12 +48,35 @@ async function loadPoints(
   return null;
 }
 
+async function loadPointPage(
+  detail: string,
+  includeRaw: boolean,
+  options: Parameters<typeof listPoints>[0] & {
+    cursor?: ReturnType<typeof validatePointListCursor> | null;
+  },
+) {
+  if (includeRaw) {
+    return listRawPointPage(options);
+  }
+
+  if (detail === "summary") {
+    return listPointSummaryPage(options);
+  }
+
+  if (detail === "map") {
+    return listPointMarkerPage(options);
+  }
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const source = request.nextUrl.searchParams.get("source");
   const searchParams = request.nextUrl.searchParams;
   const includeUnmapped = searchParams.get("includeUnmapped") === "true";
   const includeRaw = searchParams.get("includeRaw") === "true";
   const detail = searchParams.get("detail") ?? (includeRaw ? "raw" : "map");
+  const cursorValue = searchParams.get("cursor");
   const limitParam = numberParam(searchParams, "limit");
   const minLatitude = numberParam(searchParams, "minLatitude");
   const maxLatitude = numberParam(searchParams, "maxLatitude");
@@ -113,6 +141,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const decodedCursor = decodeListingCursor(
+    cursorValue,
+    validatePointListCursor,
+  );
+
+  if (!decodedCursor.ok) {
+    return noStoreJson({ errorCode: "invalid_cursor" }, { status: 400 });
+  }
+
+  if (hasCenter && decodedCursor.cursor) {
+    return noStoreJson(
+      { errorCode: "cursor_center_sort_unsupported" },
+      { status: 400 },
+    );
+  }
+
   const selectedSource = source && isDatasetSourceId(source) ? source : null;
   const options = {
     bounds:
@@ -130,11 +174,19 @@ export async function GET(request: NextRequest) {
     limit: limitParam ?? undefined,
     source: selectedSource,
   };
-  const points = await loadPoints(detail, includeRaw, options);
+  const page = hasCenter
+    ? null
+    : await loadPointPage(detail, includeRaw, {
+        ...options,
+        cursor: decodedCursor.cursor,
+      });
+  const points = page
+    ? page.points
+    : await loadPoints(detail, includeRaw, options);
 
   if (points === null) {
     return noStoreJson({ error: "Unknown detail level" }, { status: 400 });
   }
 
-  return noStoreJson({ points });
+  return noStoreJson({ nextCursor: page?.nextCursor ?? null, points });
 }

@@ -237,9 +237,22 @@ function tableStatements(db: DatabaseClient) {
 
 const INDEXES = [
   ["points_source_idx", "points", "source"],
+  ["points_source_id_idx", "points", "source, id"],
   ["points_coordinates_idx", "points", "latitude, longitude"],
+  ["points_source_coordinates_idx", "points", "source, latitude, longitude"],
   ["api_logs_event_idx", "api_logs", "event_at DESC"],
+  ["api_logs_event_id_idx", "api_logs", "event_at DESC, id DESC"],
   ["api_logs_category_idx", "api_logs", "category, event_at DESC"],
+  [
+    "api_logs_category_event_id_idx",
+    "api_logs",
+    "category, event_at DESC, id DESC",
+  ],
+  [
+    "api_logs_source_event_id_idx",
+    "api_logs",
+    "source, event_at DESC, id DESC",
+  ],
   ["users_role_idx", "users", "role, username"],
   ["access_sessions_user_idx", "access_sessions", "user_id, expires_at"],
   ["access_sessions_expires_idx", "access_sessions", "expires_at"],

@@ -216,6 +216,7 @@ Optional query parameters:
 - `includeRaw=true`
 - `detail=map|summary`
 - `limit=number`
+- `cursor=opaque cursor returned as nextCursor`
 - `minLatitude`, `maxLatitude`, `minLongitude`, `maxLongitude`
 
 Detail levels:
@@ -223,6 +224,22 @@ Detail levels:
 - `detail=map` or no detail: marker fields only, for browser map rendering.
 - `detail=summary`: address, name, phone, and source metadata without raw source records.
 - `includeRaw=true`: full raw source record. Use only for admin/debug workflows, not for the map or LLM context by default.
+
+Cursor behavior:
+
+- Listing responses include `nextCursor`. Pass it back as `cursor` to request
+  the next page with the same filters and `detail` level.
+- Cursor pages use stable `id` ordering and enforce server-side maximum limits.
+  Proximity sorting with `centerLatitude` and `centerLongitude` is not cursor
+  paginated.
+
+Operational logs:
+
+- `GET /api/logs` accepts `limit`, `category`, `source`, and `cursor`.
+- Log cursors follow `event_at DESC, id DESC` ordering so records with the same
+  timestamp page consistently.
+- Responses include `{ logs, nextCursor }`; malformed cursors return
+  `errorCode: "invalid_cursor"`.
 
 ## Access And Secret Boundaries
 
