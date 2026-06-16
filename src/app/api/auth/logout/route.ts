@@ -1,5 +1,6 @@
 import { revokeAccessSession, SESSION_COOKIE_NAME } from "@/lib/auth-sessions";
 import { noStoreJson } from "@/lib/http";
+import { clearSessionCookieHeader } from "@/lib/session-cookie";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     { ok: true },
     {
       headers: {
-        "Set-Cookie": `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
+        "Set-Cookie": clearSessionCookieHeader(request),
       },
     },
   );

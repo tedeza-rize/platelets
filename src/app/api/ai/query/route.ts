@@ -40,10 +40,7 @@ export async function POST(request: Request) {
   const { openaiApiKey } = await getRuntimeApiKeys();
   const apiKey = openaiApiKey;
   if (!apiKey) {
-    return noStoreJson(
-      { error: "AI API key is not registered. Configure it in setup." },
-      { status: 503 },
-    );
+    return noStoreJson({ errorCode: "ai_api_key_missing" }, { status: 503 });
   }
 
   try {
@@ -109,8 +106,9 @@ export async function POST(request: Request) {
       model: settings.model,
     });
   } catch (error) {
+    console.error("AI provider query failed", error);
     return noStoreJson(
-      { error: error instanceof Error ? error.message : String(error) },
+      { errorCode: "ai_provider_unavailable" },
       { status: 502 },
     );
   }

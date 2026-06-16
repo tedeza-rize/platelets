@@ -92,6 +92,8 @@ export const koUiCore = {
   Phone: "연락처",
   Protected: "보호됨",
   Refresh: "새로고침",
+  "Register an AI API key in setup before asking.":
+    "질문하기 전에 설정에서 AI API 키를 등록하세요.",
   Report: "신고",
   "Report incident": "사고 신고",
   "Reporting...": "신고 중...",
@@ -108,6 +110,8 @@ export const koUiCore = {
   "Staff accounts": "직원 계정",
   "Staff login": "직원 로그인",
   "Temporary password": "임시 비밀번호",
+  "The AI provider is unavailable. Try again later.":
+    "AI 제공자를 사용할 수 없습니다. 잠시 후 다시 시도하세요.",
   "The account could not be found.": "계정을 찾을 수 없습니다.",
   "The bootstrap sudo account is protected.":
     "초기 최고 관리자 계정은 보호되어 있습니다.",
