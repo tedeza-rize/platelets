@@ -79,3 +79,35 @@ test("point imports and incident writes share one transaction queue", async () =
   assert.equal((await pointsDb.listPoints({ source: "hospitals" })).length, 1);
   await pointsDb.closeDatabase();
 });
+
+test("write transaction metrics track queue depth and timing", async () => {
+  const before = pointsDb.getDatabaseWriteMetrics();
+  let releaseFirst: () => void = () => undefined;
+  let markFirstStarted: () => void = () => undefined;
+  const firstStarted = new Promise<void>((resolve) => {
+    markFirstStarted = resolve;
+  });
+  const first = pointsDb.withDatabaseWriteTransaction(async () => {
+    markFirstStarted();
+    await new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+  });
+
+  await firstStarted;
+  const second = pointsDb.withDatabaseWriteTransaction(async () => "second");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  assert.equal(pointsDb.getDatabaseWriteMetrics().queuedTransactions, 1);
+  releaseFirst();
+  assert.equal(await second, "second");
+  await first;
+
+  const after = pointsDb.getDatabaseWriteMetrics();
+  assert.equal(after.activeTransactions, 0);
+  assert.equal(after.queuedTransactions, 0);
+  assert.ok(after.completedTransactions >= before.completedTransactions + 2);
+  assert.ok(after.maxQueueDepth >= 1);
+  assert.ok(after.totalWaitMs >= before.totalWaitMs);
+  assert.ok(after.totalTransactionMs >= before.totalTransactionMs);
+});

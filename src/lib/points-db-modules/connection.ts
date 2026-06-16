@@ -11,12 +11,34 @@ const dataDirectory = resolveDataDirectoryPath();
 const databasePath = getSqliteDatabasePath();
 let databasePromise: Promise<DatabaseClient> | null = null;
 let writeTransactionQueue: Promise<void> = Promise.resolve();
+let activeWriteTransactions = 0;
+let queuedWriteTransactions = 0;
+
+const writeTransactionMetrics = {
+  completedTransactions: 0,
+  failedTransactions: 0,
+  maxQueueDepth: 0,
+  totalTransactionMs: 0,
+  totalWaitMs: 0,
+};
 
 export type SqliteWriteSafetyStatus = {
   deploymentSignals: string[];
   mode: "blocked" | "single-process";
   reason: string | null;
   writesAllowed: boolean;
+};
+
+export type DatabaseWriteMetrics = {
+  activeTransactions: number;
+  averageTransactionMs: number;
+  averageWaitMs: number;
+  completedTransactions: number;
+  failedTransactions: number;
+  maxQueueDepth: number;
+  queuedTransactions: number;
+  totalTransactionMs: number;
+  totalWaitMs: number;
 };
 
 const SERVERLESS_DEPLOYMENT_SIGNALS = [
@@ -53,6 +75,26 @@ export function getSqliteWriteSafetyStatus(): SqliteWriteSafetyStatus {
     mode: "single-process",
     reason: null,
     writesAllowed: true,
+  };
+}
+
+export function getDatabaseWriteMetrics(): DatabaseWriteMetrics {
+  const finished =
+    writeTransactionMetrics.completedTransactions +
+    writeTransactionMetrics.failedTransactions;
+
+  return {
+    activeTransactions: activeWriteTransactions,
+    averageTransactionMs:
+      finished > 0 ? writeTransactionMetrics.totalTransactionMs / finished : 0,
+    averageWaitMs:
+      finished > 0 ? writeTransactionMetrics.totalWaitMs / finished : 0,
+    completedTransactions: writeTransactionMetrics.completedTransactions,
+    failedTransactions: writeTransactionMetrics.failedTransactions,
+    maxQueueDepth: writeTransactionMetrics.maxQueueDepth,
+    queuedTransactions: queuedWriteTransactions,
+    totalTransactionMs: writeTransactionMetrics.totalTransactionMs,
+    totalWaitMs: writeTransactionMetrics.totalWaitMs,
   };
 }
 
@@ -127,20 +169,37 @@ export async function withDatabaseWriteTransaction<T>(
   operation: (db: DatabaseClient) => Promise<T>,
 ) {
   const previousTransaction = writeTransactionQueue;
+  const queuedAt = Date.now();
   let releaseTransaction = () => {
     // Assigned by the queue promise constructor below.
   };
+  queuedWriteTransactions += 1;
+  writeTransactionMetrics.maxQueueDepth = Math.max(
+    writeTransactionMetrics.maxQueueDepth,
+    queuedWriteTransactions,
+  );
   writeTransactionQueue = new Promise<void>((resolve) => {
     releaseTransaction = resolve;
   });
 
   await previousTransaction;
+  queuedWriteTransactions -= 1;
+  activeWriteTransactions += 1;
+  writeTransactionMetrics.totalWaitMs += Date.now() - queuedAt;
+  const startedAt = Date.now();
 
   try {
     const db = await getDatabase();
     assertWritesAllowed(db);
-    return await db.transaction(operation);
+    const result = await db.transaction(operation);
+    writeTransactionMetrics.completedTransactions += 1;
+    return result;
+  } catch (error) {
+    writeTransactionMetrics.failedTransactions += 1;
+    throw error;
   } finally {
+    activeWriteTransactions -= 1;
+    writeTransactionMetrics.totalTransactionMs += Date.now() - startedAt;
     releaseTransaction();
   }
 }
