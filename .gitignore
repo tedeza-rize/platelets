@@ -26,6 +26,10 @@
 # local data
 /data/*.sqlite
 /data/*.sqlite-*
+/data/.platelets-secret-key
+/data/database-config.json
+/data/*secret*.json
+/data/*credentials*.json
 
 # misc
 .DS_Store
