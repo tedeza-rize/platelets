@@ -49,6 +49,8 @@ export const koDashboard: Record<string, string> = {
     "지도를 시작하지 못했습니다. 브라우저 그래픽 기능을 확인한 뒤 다시 시도하세요.",
   "dashboard.notice.mapSelected":
     "지도에서 사고 위치가 선택되었습니다. 내용을 확인한 뒤 등록하세요.",
+  "dashboard.notice.rateLimited":
+    "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
   "dashboard.notice.recommendationFailed": "추천 정보를 불러오지 못했습니다.",
   "dashboard.notice.saveFailed": "사고 정보 수정에 실패했습니다.",
   "dashboard.notice.saved": "사고 정보가 수정되었습니다.",
@@ -250,6 +252,8 @@ export const enDashboard: Record<string, string> = {
     "Could not start the map. Check browser graphics support and try again.",
   "dashboard.notice.mapSelected":
     "The map location was selected. Review the details before submitting.",
+  "dashboard.notice.rateLimited":
+    "Too many requests. Wait a moment before retrying.",
   "dashboard.notice.recommendationFailed":
     "Could not load response recommendations.",
   "dashboard.notice.saveFailed": "Could not update the incident.",

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import styles from "@/components/disaster-dashboard.module.css";
+import styles from "@/components/disaster-dashboard-styles";
 
 export type MapLegendItem = {
   id: string;

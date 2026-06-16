@@ -4,7 +4,7 @@ import {
   searchMapLocations,
 } from "@/lib/geocoding";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ function searchMode(value: unknown): MapSearchMode {
 }
 
 export async function GET(request: Request) {
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "geocoding-search",
     limit: 60,
     windowMs: 60_000,

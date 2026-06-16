@@ -125,6 +125,8 @@ export const enUiCore = {
   Username: "Username",
   "Loading incidents...": "Loading incidents...",
   "Loading users...": "Loading users...",
+  "Too many requests. Wait a moment before retrying.":
+    "Too many requests. Wait a moment before retrying.",
   "Too many sign-in attempts. Try again shortly.":
     "Too many sign-in attempts. Try again shortly.",
   admin: "Administrator",
@@ -189,4 +191,56 @@ export const enUiCore = {
   "데이터셋 갱신 주기를 저장했습니다.": "Dataset update schedule saved.",
   "데이터셋 상태": "Dataset status",
   "도로 이동시간 기반": "Based on road travel time",
+  "dashboard.context.addressFound": "Address found.",
+  "dashboard.context.addressLoading": "Finding address",
+  "dashboard.context.addressPending": "Address not checked",
+  "dashboard.context.addressUnavailable":
+    "Address is unavailable for this point.",
+  "dashboard.context.close": "Close map actions",
+  "dashboard.context.copied": "Coordinates copied.",
+  "dashboard.context.copyCoordinates": "Copy coordinates",
+  "dashboard.context.copyFailed": "Could not copy coordinates.",
+  "dashboard.context.desktopAria": "Map location actions",
+  "dashboard.context.hospital": "Hospital",
+  "dashboard.context.lookupAddress": "Find address",
+  "dashboard.context.mobileAria": "Map long-press actions",
+  "dashboard.context.nearby": "Nearby response",
+  "dashboard.context.nearbyLoading": "Checking nearby",
+  "dashboard.context.nearbyUnavailable": "Nearby response data is unavailable.",
+  "dashboard.context.nearestSummary":
+    "Nearest station: {station}. Nearest hospital: {hospital}.",
+  "dashboard.context.none": "None",
+  "dashboard.context.reportAddress": "Selected map point ({coordinates})",
+  "dashboard.context.reportHere": "Report here",
+  "dashboard.context.station": "Station",
+  "dashboard.context.subtitle": "Selected point",
+  "dashboard.context.title": "Location actions",
+  "dashboard.ticker.aria": "Live incident ticker",
+  "dashboard.ticker.empty": "No active incidents on the board.",
+  "dashboard.ticker.item": "{type} · {risk} · {status} · {title} · {address}",
+  "dashboard.ticker.live": "LIVE",
+  "dashboard.simulation.action": "Generate drill scenario",
+  "dashboard.simulation.briefing": "Simulation briefing",
+  "dashboard.simulation.description":
+    "Create a drill-only disaster scenario from the selected incident, location, building, and risk context.",
+  "dashboard.simulation.error.ai_api_key_missing":
+    "Register an AI API key before generating simulation scenarios.",
+  "dashboard.simulation.error.ai_provider_unavailable":
+    "The AI provider is unavailable. Try again later.",
+  "dashboard.simulation.error.default":
+    "Could not generate the simulation scenario.",
+  "dashboard.simulation.error.rate_limited":
+    "Too many requests. Wait a moment before retrying.",
+  "dashboard.simulation.generating": "Generating simulation scenario.",
+  "dashboard.simulation.kicker": "Training mode",
+  "dashboard.simulation.loading": "Generating",
+  "dashboard.simulation.meta": "{model} · {generatedAt}",
+  "dashboard.simulation.noBuilding": "No building selected",
+  "dashboard.simulation.noIncident": "No active incident selected",
+  "dashboard.simulation.noLocation": "No location selected",
+  "dashboard.simulation.noRisk": "No risk area selected",
+  "dashboard.simulation.ready": "Simulation scenario is ready.",
+  "dashboard.simulation.title": "AI disaster simulation",
+  "dashboard.simulation.weatherFallback":
+    "Use current season and ordinary local weather risk when live weather is unavailable.",
 } satisfies Record<string, string>;

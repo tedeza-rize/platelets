@@ -29,7 +29,10 @@ type AiAnswer = {
   model: string;
 };
 
-type AiErrorCode = "ai_api_key_missing" | "ai_provider_unavailable";
+type AiErrorCode =
+  | "ai_api_key_missing"
+  | "ai_provider_unavailable"
+  | "rate_limited";
 
 type AiConsoleProps = {
   dictionary: AppDictionary;
@@ -38,6 +41,7 @@ type AiConsoleProps = {
 const aiErrorMessageKeys: Record<AiErrorCode, string> = {
   ai_api_key_missing: "Register an AI API key in setup before asking.",
   ai_provider_unavailable: "The AI provider is unavailable. Try again later.",
+  rate_limited: "Too many requests. Wait a moment before retrying.",
 };
 
 function AccessTokenField({
