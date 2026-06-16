@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useId, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./time-skew-guard.module.css";
@@ -199,7 +200,7 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
         role="dialog"
       >
         <div className={styles.header}>
-          <h2 id={titleId}>{t("시간 동기화 경고")}</h2>
+          <h2 id={titleId}>{t("timeSkew.title")}</h2>
           <button
             aria-label={t("시간 경고 닫기")}
             className={styles.closeButton}
@@ -209,15 +210,30 @@ export function TimeSkewGuard({ dictionary }: { dictionary: AppDictionary }) {
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <p>
-          {warning.showDiagnostics
-            ? t("클라이언트-서버 또는 서버-NTP 시간 오차가")
-            : t("클라이언트-서버 시간 오차가")}{" "}
-          {formatSeconds(warning.thresholdMs, dictionary.formatLocale)}
-          {t(
-            "초 기준을 넘었습니다. 요청/응답 지연을 반영해 계산했으며, 이벤트 발생 시각과 갱신 기록이 다르게 보일 수 있습니다.",
-          )}
-        </p>
+        <div className={styles.intro}>
+          <Image
+            alt={t("timeSkew.imageAlt")}
+            height={132}
+            sizes="132px"
+            src="/error-illustrations/time-sync.png"
+            unoptimized
+            width={132}
+          />
+          <p>
+            {uiText(
+              dictionary,
+              warning.showDiagnostics
+                ? "timeSkew.summaryWithNtp"
+                : "timeSkew.summary",
+              {
+                seconds: formatSeconds(
+                  warning.thresholdMs,
+                  dictionary.formatLocale,
+                ),
+              },
+            )}
+          </p>
+        </div>
         <dl className={styles.details}>
           <div>
             <dt>{t("클라이언트-서버")}</dt>
