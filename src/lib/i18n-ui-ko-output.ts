@@ -84,6 +84,11 @@ export const koUiOutput = {
   "pwa.offline.title": "오프라인 상태입니다",
   "error.action.home": "안전 지도 홈으로",
   "error.action.retry": "다시 시도",
+  "error.forbidden.description":
+    "현재 계정으로 이 구역을 열 수 없습니다. 필요한 역할이 있으면 관리자에게 접근 권한을 요청해 주세요.",
+  "error.forbidden.eyebrow": "403 · 출입 권한 없음",
+  "error.forbidden.imageAlt": "출입증을 확인받는 혈소판 캐릭터",
+  "error.forbidden.title": "출입증이 아직 확인되지 않았어요.",
   "error.maintenance.description":
     "더 튼튼한 지도를 만들려고 잠깐 나사를 조이는 중입니다. 잠시 뒤 다시 들러 주세요.",
   "error.maintenance.eyebrow": "서비스 점검",
@@ -105,6 +110,11 @@ export const koUiOutput = {
   "error.server.eyebrow": "500 · 예상 밖의 상황",
   "error.server.imageAlt": "무전기로 긴급 연락하는 혈소판 캐릭터",
   "error.server.title": "서버가 작전 회의를 갑자기 소집했어요.",
+  "error.timeSync.description":
+    "기기 시간과 서버 시간이 어긋나면 사고 시각, 갱신 기록, 로그인 판단이 다르게 보일 수 있습니다. 자동 시간 설정과 NTP 동기화를 확인한 뒤 다시 시도해 주세요.",
+  "error.timeSync.eyebrow": "시간 동기화",
+  "error.timeSync.imageAlt": "시계와 시간 신호를 확인하는 혈소판 캐릭터",
+  "error.timeSync.title": "과거나 미래에서 오셨나요?",
   "preferences.language": "언어",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",
@@ -114,6 +124,12 @@ export const koUiOutput = {
   "preferences.theme.light": "라이트",
   "preferences.theme.system": "시스템",
   "preferences.title": "환경 설정",
+  "timeSkew.imageAlt": "시계와 시간 신호를 확인하는 혈소판 캐릭터",
+  "timeSkew.summary":
+    "기기와 서버 시간이 {seconds}초 기준을 넘었습니다. 자동 시간 설정을 켠 뒤 다시 확인해 주세요.",
+  "timeSkew.summaryWithNtp":
+    "기기-서버 또는 서버-NTP 시간이 {seconds}초 기준을 넘었습니다. 자동 시간 설정과 서버 NTP 동기화를 확인해 주세요.",
+  "timeSkew.title": "과거나 미래에서 오셨나요?",
   AI: "AI",
   ID: "ID",
   NTP: "NTP",
