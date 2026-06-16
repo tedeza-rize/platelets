@@ -100,10 +100,6 @@ export type SetupPayload = {
 export const SETUP_STATE_KEY = "setup-state";
 const PASSWORD_ITERATIONS = 210_000;
 const PASSWORD_KEY_LENGTH = 32;
-const ROLE_LABELS: Record<SetupRole, string> = {
-  admin: "operator",
-  sudo: "administrator",
-};
 
 const EMPTY_API_KEYS: SetupApiKeys = {
   kakaoMobilityRestApiKey: "",
@@ -115,6 +111,24 @@ const EMPTY_API_KEYS: SetupApiKeys = {
   vworldApiKey: "",
 };
 
+export class SetupStateError extends Error {
+  readonly errorKey: string;
+
+  constructor(errorKey: string) {
+    super(errorKey);
+    this.errorKey = errorKey;
+    this.name = "SetupStateError";
+  }
+}
+
+export function getSetupStateErrorKey(error: unknown) {
+  return error instanceof SetupStateError ? error.errorKey : null;
+}
+
+function setupError(errorKey: string): never {
+  throw new SetupStateError(errorKey);
+}
+
 function cleanText(value: unknown, maxLength: number) {
   return String(value ?? "")
     .trim()
@@ -123,26 +137,30 @@ function cleanText(value: unknown, maxLength: number) {
 
 function cleanOpenAiBaseUrl(value: unknown) {
   const candidate = cleanText(value, 500) || EMPTY_API_KEYS.openaiBaseUrl;
-  const url = new URL(candidate);
+  let url: URL;
+
+  try {
+    url = new URL(candidate);
+  } catch {
+    setupError("validation.api.openaiBaseUrl");
+  }
 
   if (url.protocol !== "https:" || url.username || url.password) {
-    throw new Error("AI provider URL must use HTTPS without credentials.");
+    setupError("validation.api.openaiBaseUrlSecure");
   }
 
   return url.toString().replace(/\/$/, "");
 }
 
-function assertEmail(value: string, label: string) {
+function assertEmail(value: string) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    throw new Error(`${label} email is invalid.`);
+    setupError("validation.account.email");
   }
 }
 
-function assertPassword(value: string, label: string) {
+function assertPassword(value: string) {
   if (!isPasswordValid(value)) {
-    throw new Error(
-      `${label} password must be at least 12 characters and include lowercase, uppercase, number, and special characters.`,
-    );
+    setupError("validation.account.password");
   }
 }
 
@@ -228,16 +246,15 @@ function accountFromPayload(
   role: SetupRole,
   input: SetupPayload[SetupRole],
 ): SetupAccount {
-  const label = ROLE_LABELS[role];
   const fullName = cleanText(input.fullName, 120);
   const email = cleanText(input.email, 200).toLowerCase();
   const password = String(input.password ?? "");
 
   if (!fullName) {
-    throw new Error(`${label} full name is required.`);
+    setupError("validation.account.fullName");
   }
-  assertEmail(email, label);
-  assertPassword(password, label);
+  assertEmail(email);
+  assertPassword(password);
 
   return {
     email,
@@ -366,11 +383,11 @@ export async function getStoredAccessRole(password: string) {
 
 export async function completeSetup(payload: SetupPayload) {
   if (await isSetupComplete()) {
-    throw new Error("Setup is already complete.");
+    setupError("database.alreadyInstalled");
   }
 
   if (!payload.licenseAccepted) {
-    throw new Error("License agreement must be accepted.");
+    setupError("validation.license");
   }
 
   const databaseConfig = normalizeDatabaseConfig(

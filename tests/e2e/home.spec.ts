@@ -1,89 +1,23 @@
 import { randomUUID } from "node:crypto";
+import { expect, test } from "@playwright/test";
 import {
-  type APIRequestContext,
-  expect,
-  type Page,
-  test,
-} from "@playwright/test";
-import webPush from "web-push";
+  E2E_VAPID_KEYS,
+  ensureSetupComplete,
+  SEOUL_COORDINATES,
+  showEnglishSetup,
+  signInAsStaff,
+} from "./home-helpers";
 
-const SEOUL_COORDINATES = {
-  latitude: 37.5665,
-  longitude: 126.978,
-} as const;
-const E2E_VAPID_KEYS = webPush.generateVAPIDKeys();
+const FIRST_RUN_SKIP_REASON =
+  "first-run setup is verified once because CI browser projects share the same test server";
 
 test.describe.configure({ mode: "serial" });
-
-async function ensureSetupComplete(request: APIRequestContext) {
-  const status = await request.get("/api/setup/status");
-  const statusPayload = (await status.json()) as { installed?: boolean };
-
-  if (statusPayload.installed) {
-    return;
-  }
-
-  const completed = await request.post("/api/setup/complete", {
-    data: {
-      admin: {
-        email: "admin@example.com",
-        fullName: "Setup Admin",
-        password: "StrongAdminPass1!",
-      },
-      apiKeys: {},
-      integrations: {
-        webPushContact: "mailto:e2e@example.com",
-        webPushPrivateKey: E2E_VAPID_KEYS.privateKey,
-        webPushPublicKey: E2E_VAPID_KEYS.publicKey,
-      },
-      licenseAccepted: true,
-      sudo: {
-        email: "sudo@example.com",
-        fullName: "Setup Sudo",
-        password: "StrongSudoPass1!",
-      },
-    },
-  });
-
-  expect(completed.ok()).toBeTruthy();
-}
-
-async function signInAsStaff(
-  request: APIRequestContext,
-  username: "admin" | "sudo",
-) {
-  const response = await request.post("/api/auth/login", {
-    data: {
-      password: username === "sudo" ? "StrongSudoPass1!" : "StrongAdminPass1!",
-      username,
-    },
-  });
-
-  expect(response.ok()).toBeTruthy();
-}
-
-async function showEnglishSetup(page: Page) {
-  if (
-    (await page
-      .getByRole("heading", { name: "Platelets에 오신 것을 환영합니다" })
-      .count()) > 0
-  ) {
-    await page.getByRole("button", { name: "EN" }).click();
-  }
-
-  await expect(
-    page.getByRole("heading", { name: "Welcome to Platelets" }),
-  ).toBeVisible();
-}
 
 test("redirects protected pages to setup before installation", async ({
   browserName,
   page,
 }) => {
-  test.skip(
-    browserName === "firefox",
-    "first-run setup is verified once because CI browser projects share the same test server",
-  );
+  test.skip(browserName === "firefox", FIRST_RUN_SKIP_REASON);
 
   await page.goto("/admin", { waitUntil: "domcontentloaded" });
 
@@ -95,10 +29,7 @@ test("redirects first-run deployments to the setup wizard", async ({
   browserName,
   page,
 }) => {
-  test.skip(
-    browserName === "firefox",
-    "first-run setup is verified once because CI browser projects share the same test server",
-  );
+  test.skip(browserName === "firefox", FIRST_RUN_SKIP_REASON);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
@@ -142,8 +73,8 @@ test("redirects first-run deployments to the setup wizard", async ({
   });
   await expect(
     page
-      .getByText("The SQLite DB file can be created during installation.")
-      .or(page.getByText(/A SQLite DB file already exists:/)),
+      .getByText("The SQLite database file can be created during installation.")
+      .or(page.getByText(/A SQLite database file already exists:/)),
   ).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -168,7 +99,7 @@ test("redirects first-run deployments to the setup wizard", async ({
   await expect(page.getByRole("heading", { name: "API keys" })).toBeVisible();
   await page.getByRole("button", { name: "Test API keys" }).click();
   await expect(
-    page.getByText("API key configuration is ready to save."),
+    page.getByText("API key settings are ready to save."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
 
