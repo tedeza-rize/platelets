@@ -1,7 +1,11 @@
+import {
+  ensureIncidentEventIntegrity,
+  incidentEventTableStatement,
+} from "@/lib/database/incident-event-integrity";
 import { quoteIdentifier } from "@/lib/database/sql";
 import type { DatabaseClient } from "@/lib/database/types";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export const DATABASE_TABLES = [
   "app_schema_versions",
@@ -214,20 +218,10 @@ function tableStatements(db: DatabaseClient) {
       status ${type.key} NOT NULL,
       occurred_at ${type.timestamp} NOT NULL,
       created_at ${type.timestamp} NOT NULL,
-      updated_at ${type.timestamp} NOT NULL
+      updated_at ${type.timestamp} NOT NULL,
+      deleted_at ${type.timestamp}
     )`,
-    `CREATE TABLE IF NOT EXISTS disaster_incident_events (
-      id ${type.key} PRIMARY KEY,
-      incident_id ${type.key} NOT NULL,
-      type ${type.key} NOT NULL,
-      message ${type.text} NOT NULL,
-      from_status ${type.key},
-      to_status ${type.key},
-      actor_id ${type.key},
-      actor_name ${type.text},
-      actor_role ${type.key},
-      created_at ${type.timestamp} NOT NULL
-    )`,
+    incidentEventTableStatement(db),
   ];
 }
 
@@ -328,16 +322,27 @@ async function ensureIncidentActorColumns(db: DatabaseClient) {
   }
 }
 
+async function ensureIncidentDeletedAtColumn(db: DatabaseClient) {
+  if (!(await columnExists(db, "disaster_incidents", "deleted_at"))) {
+    await db.run(
+      `ALTER TABLE disaster_incidents ADD COLUMN ${quoteIdentifier("deleted_at", db.dialect)} ${types(db).timestamp}`,
+    );
+  }
+}
+
 export async function initializeDatabaseSchema(db: DatabaseClient) {
   if (db.dialect === "sqlite") {
     await db.run("PRAGMA journal_mode = WAL");
+    await db.run("PRAGMA foreign_keys = ON");
   }
 
   for (const statement of tableStatements(db)) {
     await db.run(statement);
   }
 
+  await ensureIncidentDeletedAtColumn(db);
   await ensureIncidentActorColumns(db);
+  await ensureIncidentEventIntegrity(db);
 
   for (const [name, table, columns] of INDEXES) {
     if (!(await indexExists(db, name))) {
