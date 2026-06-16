@@ -173,6 +173,10 @@ copies the allowlisted application tables in bounded batches while holding a
 consistent source snapshot and a target transaction. The active database
 configuration is replaced only after the target schema and all copied rows
 succeed, so a failed migration leaves the current database active.
+`getDatabaseWriteMetrics()` exposes current queue depth, active write count,
+average wait time, average transaction duration, and failure counts so operators
+can detect SQLite write contention before moving multi-instance deployments to
+PostgreSQL, MySQL, or MariaDB.
 
 ## Assembly And Protest Notices
 
