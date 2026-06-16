@@ -69,6 +69,35 @@ export async function enforceSharedRateLimit(
   const nowIso = new Date(now).toISOString();
   const nextExpiresAt = new Date(now + options.windowMs).toISOString();
 
+  try {
+    return await enforceSharedRateLimitTransaction({
+      key,
+      nextExpiresAt,
+      now,
+      nowIso,
+      options,
+    });
+  } catch {
+    // Fail open: a transient database error must not lock operators out of
+    // critical endpoints (e.g. login). The in-memory limiter never threw, and
+    // matching that behaviour is safer than turning a DB hiccup into a 500.
+    return null;
+  }
+}
+
+function enforceSharedRateLimitTransaction({
+  key,
+  nextExpiresAt,
+  now,
+  nowIso,
+  options,
+}: {
+  key: string;
+  nextExpiresAt: string;
+  now: number;
+  nowIso: string;
+  options: { bucket: string; limit: number; windowMs: number };
+}) {
   return withDatabaseWriteTransaction(async (db) => {
     const row = await db.get<{ count: number; expires_at: string }>(
       "SELECT count, expires_at FROM rate_limit_buckets WHERE bucket_key = ?",
