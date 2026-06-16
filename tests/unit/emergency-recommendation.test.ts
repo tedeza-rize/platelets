@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { setDataDirectoryPathForTests } from "@/lib/data-paths";
+import { buildCapabilityEvidence } from "@/lib/emergency-capability-evidence";
 import type {
   EmergencyPointInput,
   replaceDataset as ReplaceDataset,
@@ -87,5 +88,38 @@ test("recommendEmergencyHospitals ranks scenario-capable hospitals first", async
   assert.equal(results[0].name, "cardiac center");
   assert.ok(results[0].scenarioMinimumPassed);
   assert.ok(results[0].score > results[1].score);
+  assert.equal(results[0].capabilityEvidence.availability.state, "known");
+  assert.equal(results[0].capabilityEvidence.freshness.state, "stale");
+  assert.ok(results[0].freshnessConfidence < 1);
   assert.ok(results.every((result) => result.name !== "no phone hospital"));
+});
+
+test("capability evidence separates missing, stale, and unavailable data", () => {
+  const missing = buildCapabilityEvidence({
+    emergencyBeds: null,
+    ratios: {
+      availability: 0.45,
+      bedType: 0.2,
+      criticalCare: 0.1,
+      specialty: 0.1,
+    },
+    sourceUpdatedAt: null,
+  });
+  const unavailable = buildCapabilityEvidence({
+    emergencyBeds: 0,
+    ratios: {
+      availability: 0.05,
+      bedType: 0.1,
+      criticalCare: 0.9,
+      specialty: 0.9,
+    },
+    sourceUpdatedAt: "202001010000",
+  });
+
+  assert.equal(missing.availability.state, "unknown");
+  assert.equal(missing.freshness.state, "unknown");
+  assert.equal(unavailable.availability.state, "unavailable");
+  assert.equal(unavailable.bedType.state, "unavailable");
+  assert.equal(unavailable.criticalCare.state, "known");
+  assert.equal(unavailable.freshness.state, "stale");
 });

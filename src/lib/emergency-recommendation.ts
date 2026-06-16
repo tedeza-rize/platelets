@@ -1,7 +1,12 @@
+import { buildCapabilityEvidence } from "@/lib/emergency-capability-evidence";
+import {
+  estimatedEta,
+  mapWithConcurrency,
+  withRecommendationTimeout,
+} from "@/lib/emergency-recommendation-routing";
 import {
   calculateEmergencyRoute,
   hasKakaoMobilityKey,
-  haversineMeters,
 } from "@/lib/emergency-routing";
 import {
   findNearestEmergencyInstitutions,
@@ -32,7 +37,6 @@ type EmergencyInstitutionCandidate = Awaited<
 >[number];
 
 const LIVE_ETA_CANDIDATE_LIMIT = 5;
-const RECOMMENDATION_TIMEOUT_MS = 8_000;
 
 function emergencyBedRatios(
   emergencyBeds: number | null,
@@ -304,45 +308,6 @@ function passesScenarioMinimum(params: {
   };
 }
 
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  mapper: (value: T) => Promise<R>,
-) {
-  const output = new Array<R>(values.length);
-  let index = 0;
-
-  async function worker() {
-    while (index < values.length) {
-      const current = index;
-      index += 1;
-      output[current] = await mapper(values[current]);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, values.length) }, worker),
-  );
-  return output;
-}
-
-function estimatedEta(
-  candidate: EmergencyInstitutionCandidate,
-  origin: { latitude: number; longitude: number },
-) {
-  const roadDistance = Math.max(
-    candidate.distanceMeters * 1.25,
-    haversineMeters(origin, candidate),
-  );
-
-  return {
-    candidate,
-    distanceMeters: Math.round(roadDistance),
-    durationSeconds: Math.round(roadDistance / 11.1),
-    etaSource: "estimated" as const,
-  };
-}
-
 function candidateEtaPriority(
   candidate: EmergencyInstitutionCandidate,
   scenario: EmergencyScenario,
@@ -361,24 +326,6 @@ function candidateEtaPriority(
     gradeRatio(candidate.category) * 20 -
     Math.min(candidate.distanceMeters / 1000, 120)
   );
-}
-
-async function withRecommendationTimeout<T>(promise: Promise<T>) {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(
-      () => reject(new Error("recommendation_timeout")),
-      RECOMMENDATION_TIMEOUT_MS,
-    );
-  });
-
-  try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
 }
 
 export async function recommendEmergencyHospitals(params: {
@@ -462,6 +409,11 @@ export async function recommendEmergencyHospitals(params: {
         specialty: termRatio(text, CAPABILITY_TERMS.specialty[params.scenario]),
         travelTime: Math.max(0.05, 1 - travelMinutes / 90),
       };
+      const capabilityEvidence = buildCapabilityEvidence({
+        emergencyBeds,
+        ratios,
+        sourceUpdatedAt: candidate.sourceUpdatedAt,
+      });
       const minimum = passesScenarioMinimum({
         availabilityRatio,
         bedRatio,
@@ -498,9 +450,11 @@ export async function recommendEmergencyHospitals(params: {
       return {
         address: candidate.address,
         category: candidate.category,
+        capabilityEvidence,
         distanceMeters,
         durationSeconds,
         etaSource,
+        freshnessConfidence: capabilityEvidence.freshness.confidence,
         id: candidate.id,
         latitude: candidate.latitude,
         longitude: candidate.longitude,
