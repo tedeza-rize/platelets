@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type {
   GeoJSONSource,
+  LayerSpecification,
   MapGeoJSONFeature,
   MapLayerMouseEvent,
   Map as MapLibreMap,
@@ -26,6 +27,7 @@ import type {
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
+import * as maplibre from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapLegend } from "@/components/disaster-dashboard/map-legend";
 import { SummaryMetrics } from "@/components/disaster-dashboard/summary-metrics";
@@ -54,7 +56,10 @@ import {
   DEFAULT_MAP_RENDERING_SETTINGS,
   type MapRenderingSettings,
 } from "@/lib/map-settings";
-import { createVworldStyle } from "@/lib/map-shell-core";
+import {
+  createVworldStyle,
+  VWORLD_3D_BUILDINGS_SOURCE_ID,
+} from "@/lib/map-shell-core";
 import styles from "./disaster-dashboard.module.css";
 
 export type DashboardView =
@@ -171,11 +176,6 @@ type MobileSheet = {
 
 const MAP_CENTER: [number, number] = [127.85, 36.45];
 const DEFAULT_ZOOM = 6.35;
-const MAP_ROTATION_TUNING = {
-  pitchDegreesPerPixelMoved: -0.18,
-  rollDegreesPerPixelMoved: 0.12,
-  rotateDegreesPerPixelMoved: 0.24,
-};
 const OPENFREEMAP_SOURCE_ID = "dashboard-openmaptiles";
 const OSM_OFFICIAL_SOURCE_ID = "dashboard-osm-shortbread";
 const BUILDING_FOOTPRINT_LAYER_ID = "dashboard-building-footprint";
@@ -404,27 +404,6 @@ function createOpenFreeMapDashboardStyle(): StyleSpecification {
         type: "fill",
       },
       {
-        id: BUILDING_3D_LAYER_ID,
-        minzoom: 14,
-        paint: {
-          "fill-extrusion-base": BUILDING_BASE_HEIGHT_EXPRESSION,
-          "fill-extrusion-color": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            14,
-            palette.building,
-            16,
-            "#c7c0b4",
-          ],
-          "fill-extrusion-height": BUILDING_HEIGHT_EXPRESSION,
-          "fill-extrusion-opacity": 0.74,
-        },
-        source: OPENFREEMAP_SOURCE_ID,
-        "source-layer": "building",
-        type: "fill-extrusion",
-      },
-      {
         id: "road-casing",
         minzoom: 7,
         paint: {
@@ -615,27 +594,6 @@ function createOfficialOsmDashboardStyle(): StyleSpecification {
         type: "fill",
       },
       {
-        id: BUILDING_3D_LAYER_ID,
-        minzoom: 14,
-        paint: {
-          "fill-extrusion-base": 0,
-          "fill-extrusion-color": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            14,
-            palette.building,
-            16,
-            "#c7c0b4",
-          ],
-          "fill-extrusion-height": 12,
-          "fill-extrusion-opacity": 0.72,
-        },
-        source: OSM_OFFICIAL_SOURCE_ID,
-        "source-layer": "buildings",
-        type: "fill-extrusion",
-      },
-      {
         id: "dashboard-osm-street-polygons",
         minzoom: 13,
         paint: { "fill-color": palette.road },
@@ -783,8 +741,8 @@ function createDashboardMapStyle(
     return createVworldStyle(vworldApiKey, settings.mapTileMode, {
       buildingFootprintLayerId: BUILDING_FOOTPRINT_LAYER_ID,
       buildingThreeDimensionalLayerId: BUILDING_3D_LAYER_ID,
-      includeThreeDimensionalBuildings: true,
-      threeDimensionalVisible: true,
+      includeThreeDimensionalBuildings: false,
+      threeDimensionalVisible: false,
     });
   }
 
@@ -793,11 +751,119 @@ function createDashboardMapStyle(
     : createOpenFreeMapDashboardStyle();
 }
 
+function dashboardBuildingThreeDimensionalLayer(
+  settings: MapRenderingSettings,
+): LayerSpecification {
+  const palette = VECTOR_PALETTE;
+  const buildingColor = [
+    "interpolate",
+    ["linear"],
+    ["zoom"],
+    14,
+    palette.building,
+    16,
+    "#c7c0b4",
+  ];
+
+  if (settings.mapProvider === "vworld") {
+    return {
+      id: BUILDING_3D_LAYER_ID,
+      minzoom: 14,
+      paint: {
+        "fill-extrusion-base": BUILDING_BASE_HEIGHT_EXPRESSION,
+        "fill-extrusion-color": buildingColor,
+        "fill-extrusion-height": BUILDING_HEIGHT_EXPRESSION,
+        "fill-extrusion-opacity": 0.74,
+      },
+      source: VWORLD_3D_BUILDINGS_SOURCE_ID,
+      "source-layer": "building",
+      type: "fill-extrusion",
+    } as LayerSpecification;
+  }
+
+  if (settings.osmTileSource === "official") {
+    return {
+      id: BUILDING_3D_LAYER_ID,
+      minzoom: 14,
+      paint: {
+        "fill-extrusion-base": 0,
+        "fill-extrusion-color": buildingColor,
+        "fill-extrusion-height": 12,
+        "fill-extrusion-opacity": 0.72,
+      },
+      source: OSM_OFFICIAL_SOURCE_ID,
+      "source-layer": "buildings",
+      type: "fill-extrusion",
+    } as LayerSpecification;
+  }
+
+  return {
+    id: BUILDING_3D_LAYER_ID,
+    minzoom: 14,
+    paint: {
+      "fill-extrusion-base": BUILDING_BASE_HEIGHT_EXPRESSION,
+      "fill-extrusion-color": buildingColor,
+      "fill-extrusion-height": BUILDING_HEIGHT_EXPRESSION,
+      "fill-extrusion-opacity": 0.74,
+    },
+    source: OPENFREEMAP_SOURCE_ID,
+    "source-layer": "building",
+    type: "fill-extrusion",
+  } as LayerSpecification;
+}
+
+function ensureDashboardThreeDimensionalSource(
+  map: MapLibreMap,
+  settings: MapRenderingSettings,
+) {
+  if (
+    settings.mapProvider !== "vworld" ||
+    map.getSource(VWORLD_3D_BUILDINGS_SOURCE_ID)
+  ) {
+    return;
+  }
+
+  map.addSource(VWORLD_3D_BUILDINGS_SOURCE_ID, {
+    attribution:
+      '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap</a>',
+    type: "vector",
+    url: "https://tiles.openfreemap.org/planet",
+  });
+}
+
+function ensureDashboardThreeDimensionalLayer(
+  map: MapLibreMap,
+  settings: MapRenderingSettings,
+) {
+  if (map.getLayer(BUILDING_3D_LAYER_ID)) {
+    return;
+  }
+
+  ensureDashboardThreeDimensionalSource(map, settings);
+
+  const layer = dashboardBuildingThreeDimensionalLayer(settings);
+  const beforeId = map.getLayer(POI_LABEL_LAYER_ID)
+    ? POI_LABEL_LAYER_ID
+    : undefined;
+
+  if (beforeId) {
+    map.addLayer(layer, beforeId);
+    return;
+  }
+
+  map.addLayer(layer);
+}
+
 function syncThreeDimensionalView(
   map: MapLibreMap,
   enabled: boolean,
+  settings: MapRenderingSettings,
   animate = true,
 ) {
+  if (enabled) {
+    ensureDashboardThreeDimensionalLayer(map, settings);
+  }
+
   if (map.getLayer(BUILDING_3D_LAYER_ID)) {
     map.setLayoutProperty(
       BUILDING_3D_LAYER_ID,
@@ -2118,8 +2184,8 @@ export function DisasterDashboard({
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [isThreeDimensional, setIsThreeDimensional] = useState(true);
-  const isThreeDimensionalRef = useRef(true);
+  const [isThreeDimensional, setIsThreeDimensional] = useState(false);
+  const isThreeDimensionalRef = useRef(false);
   const effectiveMapSettings = useMemo(
     () => ({
       ...DEFAULT_MAP_RENDERING_SETTINGS,
@@ -2428,18 +2494,16 @@ export function DisasterDashboard({
             zoom: Math.max(map.getZoom(), 15),
           });
 
-          void import("maplibre-gl").then((maplibre) => {
-            popupRef.current?.remove();
-            popupRef.current = new maplibre.Popup({
-              closeButton: true,
-              maxWidth: "300px",
-              offset: 14,
-            })
-              .setLngLat([location.longitude, location.latitude])
-              .setHTML(buildReportLocationPopupHtml(report, dashboardText))
-              .addTo(map);
-            suppressPopupContextMenu(popupRef.current);
-          });
+          popupRef.current?.remove();
+          popupRef.current = new maplibre.Popup({
+            closeButton: true,
+            maxWidth: "300px",
+            offset: 14,
+          })
+            .setLngLat([location.longitude, location.latitude])
+            .setHTML(buildReportLocationPopupHtml(report, dashboardText))
+            .addTo(map);
+          suppressPopupContextMenu(popupRef.current);
         }
 
         setIsLocating(false);
@@ -2515,8 +2579,8 @@ export function DisasterDashboard({
       return;
     }
 
-    syncThreeDimensionalView(map, isThreeDimensional);
-  }, [isMapReady, isThreeDimensional]);
+    syncThreeDimensionalView(map, isThreeDimensional, effectiveMapSettings);
+  }, [effectiveMapSettings, isMapReady, isThreeDimensional]);
 
   useEffect(() => {
     userLocationRef.current = userLocation;
@@ -2586,18 +2650,21 @@ export function DisasterDashboard({
 
     let disposed = false;
 
-    async function createMap() {
-      const maplibre = await import("maplibre-gl");
-
+    function createMap() {
       if (disposed || !mapContainerRef.current) {
         return;
       }
 
       const map = new maplibre.Map({
         attributionControl: { compact: true },
+        bearing: isThreeDimensionalRef.current ? THREE_DIMENSIONAL_BEARING : 0,
+        canvasContextAttributes: {
+          antialias: true,
+          contextType: "webgl",
+        },
         center: MAP_CENTER,
         container: mapContainerRef.current,
-        ...MAP_ROTATION_TUNING,
+        pitch: isThreeDimensionalRef.current ? THREE_DIMENSIONAL_PITCH : 0,
         style: createDashboardMapStyle(effectiveMapSettings, vworldApiKey),
         zoom: DEFAULT_ZOOM,
       });
@@ -2778,7 +2845,12 @@ export function DisasterDashboard({
           REPORT_LOCATION_SOURCE_ID,
           reportLocationData(reportLocationRef.current, dashboardText),
         );
-        syncThreeDimensionalView(map, isThreeDimensionalRef.current, false);
+        syncThreeDimensionalView(
+          map,
+          isThreeDimensionalRef.current,
+          effectiveMapSettings,
+          false,
+        );
         setIsMapReady(true);
       });
       map.on("click", INCIDENT_LAYER_ID, (event: MapLayerMouseEvent) => {
@@ -2966,6 +3038,10 @@ export function DisasterDashboard({
         BUILDING_3D_LAYER_ID,
         BUILDING_FOOTPRINT_LAYER_ID,
       ]) {
+        if (!map.getLayer(layerId)) {
+          continue;
+        }
+
         map.on("mouseenter", layerId, () => {
           map.getCanvas().style.cursor = "pointer";
         });
@@ -2975,7 +3051,7 @@ export function DisasterDashboard({
       }
     }
 
-    void createMap();
+    createMap();
 
     return () => {
       disposed = true;

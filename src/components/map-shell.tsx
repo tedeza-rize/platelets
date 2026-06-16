@@ -1,29 +1,13 @@
 "use client";
 
-import { Ambulance, Box } from "lucide-react";
-import type {
-  MapGeoJSONFeature,
-  MapLayerMouseEvent,
-  Map as MapLibreMap,
-  StyleSpecification,
-} from "maplibre-gl";
+import type { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
-import { uiText } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
-import {
-  type EmergencyRouteResult,
-  EmergencyRoutingPanel,
-} from "./emergency-routing-panel";
+import type { EmergencyRouteResult } from "./emergency-routing-panel";
 import styles from "./map-shell.module.css";
-import {
-  DatasetPanel,
-  HazardModal,
-  MapNavbar,
-  MobileMapTools,
-  MobileNav,
-  SourceMenu,
-} from "./map-shell-controls";
+import { useInitializeMap, useMapStyleSync } from "./map-shell-map-effects";
+import { MapShellView } from "./map-shell-view";
 
 const popupClassNames: mapCore.PopupClassNames = {
   popup: styles.popup,
@@ -457,265 +441,24 @@ export function MapShell({
     );
   }, [emergencyRoute]);
 
-  useEffect(() => {
-    let isDisposed = false;
-
-    async function initializeMap() {
-      if (!mapContainerRef.current || mapRef.current) {
-        return;
-      }
-
-      const maplibre = await import("maplibre-gl");
-
-      if (isDisposed || !mapContainerRef.current || mapRef.current) {
-        return;
-      }
-
-      const map = new maplibre.Map({
-        attributionControl: {
-          compact: true,
-        },
-        bearing: isThreeDimensionalRef.current
-          ? mapCore.THREE_DIMENSIONAL_BEARING
-          : 0,
-        canvasContextAttributes: {
-          antialias: true,
-        },
-        center: mapCore.MAP_CENTER,
-        container: mapContainerRef.current,
-        pitch: isThreeDimensionalRef.current
-          ? mapCore.THREE_DIMENSIONAL_PITCH
-          : 0,
-        style: initialStyleRef.current,
-        zoom: mapCore.DEFAULT_ZOOM,
-      });
-
-      mapRef.current = map;
-
-      map.addControl(
-        new maplibre.NavigationControl({
-          showCompass: true,
-        }),
-        "top-right",
-      );
-
-      async function showPointPopup(feature: MapGeoJSONFeature) {
-        if (!feature?.properties) {
-          return;
-        }
-
-        const point = feature.properties as mapCore.PointFeatureProperties;
-        const coordinates: [number, number] = [
-          Number(point.longitude),
-          Number(point.latitude),
-        ];
-
-        if (
-          !(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))
-        ) {
-          return;
-        }
-
-        const response = await fetch(`/api/points/${point.id}`, {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = (await response.json()) as mapCore.PointDetailResponse;
-        popupRef.current?.remove();
-        popupRef.current = new maplibre.Popup({
-          closeButton: true,
-          maxWidth: "320px",
-          offset: 16,
-        })
-          .setLngLat(coordinates)
-          .setHTML(
-            mapCore.buildPopupHtml(
-              payload.point,
-              dictionary,
-              sourceLabelsRef.current.get(payload.point.source) ??
-                payload.point.source,
-              popupClassNames,
-            ),
-          )
-          .addTo(map);
-      }
-
-      async function showSeoulPopulationPopup(feature: MapGeoJSONFeature) {
-        if (!feature?.properties) {
-          return;
-        }
-
-        const area = feature.properties as mapCore.SeoulAreaProperties;
-        const point = feature.properties as mapCore.SeoulAreaPointProperties;
-        const coordinates: [number, number] = [
-          Number(point.longitude),
-          Number(point.latitude),
-        ];
-
-        if (
-          !(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))
-        ) {
-          return;
-        }
-
-        const response = await fetch(
-          `/api/seoul/population?areaCode=${encodeURIComponent(area.areaCode)}`,
-          { cache: "no-store" },
-        );
-        const payload = (await response
-          .json()
-          .catch(() => ({}))) as mapCore.SeoulPopulationResponse;
-        const population = response.ok ? (payload.population ?? null) : null;
-
-        if (population) {
-          setSeoulAreas((current) =>
-            current
-              ? mapCore.updateSeoulAreaPopulation(current, population)
-              : current,
-          );
-        }
-
-        popupRef.current?.remove();
-        popupRef.current = new maplibre.Popup({
-          closeButton: true,
-          maxWidth: "340px",
-          offset: 12,
-        })
-          .setLngLat(coordinates)
-          .setHTML(
-            mapCore.buildSeoulPopulationPopupHtml(
-              area,
-              population,
-              population
-                ? null
-                : (payload.error ??
-                    uiText(dictionary, "실시간 인구 조회 실패")),
-              dictionary,
-              popupClassNames,
-            ),
-          )
-          .addTo(map);
-      }
-
-      map.on("click", async (event: MapLayerMouseEvent) => {
-        const layers = [
-          mapCore.POINTS_SYMBOL_LAYER_ID,
-          mapCore.POINTS_LAYER_ID,
-          mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID,
-          mapCore.SEOUL_AREAS_LAYER_ID,
-          mapCore.SEOUL_AREAS_HALO_LAYER_ID,
-          mapCore.HAZARDS_LAYER_ID,
-        ].filter((layerId) => map.getLayer(layerId));
-
-        if (layers.length === 0) {
-          return;
-        }
-
-        const feature = map.queryRenderedFeatures(event.point, { layers })[0] as
-          | MapGeoJSONFeature
-          | undefined;
-
-        if (!feature?.properties) {
-          return;
-        }
-
-        if (
-          feature.layer.id === mapCore.POINTS_LAYER_ID ||
-          feature.layer.id === mapCore.POINTS_SYMBOL_LAYER_ID
-        ) {
-          await showPointPopup(feature);
-          return;
-        }
-
-        if (
-          feature.layer.id === mapCore.SEOUL_AREAS_HALO_LAYER_ID ||
-          feature.layer.id === mapCore.SEOUL_AREAS_LAYER_ID ||
-          feature.layer.id === mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID
-        ) {
-          await showSeoulPopulationPopup(feature);
-          return;
-        }
-
-        const eventId = String(
-          (feature.properties as mapCore.HazardFeatureProperties).eventId,
-        );
-        const hazard = hazardsRef.current.find(
-          (current) => current.eventId === eventId,
-        );
-
-        if (hazard) {
-          focusHazard(hazard);
-        }
-      });
-
-      map.on("mouseenter", mapCore.POINTS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.POINTS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-      map.on("mouseenter", mapCore.POINTS_SYMBOL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.POINTS_SYMBOL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-      map.on("mouseenter", mapCore.SEOUL_AREAS_HALO_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.SEOUL_AREAS_HALO_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-      map.on("mouseenter", mapCore.SEOUL_AREAS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.SEOUL_AREAS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-      map.on("mouseenter", mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-      map.on("mouseenter", mapCore.HAZARDS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", mapCore.HAZARDS_LAYER_ID, () => {
-        map.getCanvas().style.cursor = "";
-      });
-
-      map.once("load", () => {
-        setIsMapReady(true);
-        mapCore.syncSeoulAreaLayerWhenReady(
-          map,
-          seoulAreasRef.current,
-          dictionary,
-        );
-        mapCore.syncPointLayerWhenReady(map, pointsRef.current);
-        mapCore.syncHazardLayerWhenReady(map, hazardsRef.current);
-        mapCore.syncEmergencyRouteLayerWhenReady(
-          map,
-          emergencyRouteRef.current,
-        );
-      });
-    }
-
-    void initializeMap();
-
-    return () => {
-      isDisposed = true;
-      pointRequestRef.current?.controller.abort();
-      popupRef.current?.remove();
-      mapRef.current?.remove();
-      mapRef.current = null;
-      setIsMapReady(false);
-    };
-  }, [dictionary, focusHazard]);
+  useInitializeMap({
+    dictionary,
+    emergencyRouteRef,
+    focusHazard,
+    hazardsRef,
+    initialStyleRef,
+    isThreeDimensionalRef,
+    mapContainerRef,
+    mapRef,
+    pointRequestRef,
+    pointsRef,
+    popupClassNames,
+    popupRef,
+    seoulAreasRef,
+    setIsMapReady,
+    setSeoulAreas,
+    sourceLabelsRef,
+  });
 
   useEffect(() => {
     isThreeDimensionalRef.current = isThreeDimensional;
@@ -727,70 +470,18 @@ export function MapShell({
     mapCore.syncThreeDimensionalView(mapRef.current, isThreeDimensional);
   }, [isMapReady, isThreeDimensional]);
 
-  useEffect(() => {
-    if (!mapRef.current) {
-      return;
-    }
-
-    const map = mapRef.current;
-    let isDisposed = false;
-    let timeoutId: number | undefined;
-
-    async function updateStyle() {
-      const style = mapCore.createMapStyle(
-        activeProvider,
-        vworldApiKey,
-        mapSettings,
-        {
-          includeThreeDimensionalBuildings: true,
-          threeDimensionalVisible: isThreeDimensionalRef.current,
-        },
-      );
-      const syncOverlays = () => {
-        map.resize();
-        mapCore.syncSeoulAreaLayerWhenReady(
-          map,
-          seoulAreasRef.current,
-          dictionary,
-        );
-        mapCore.syncPointLayerWhenReady(map, pointsRef.current);
-        mapCore.syncHazardLayerWhenReady(map, hazardsRef.current);
-        mapCore.syncEmergencyRouteLayerWhenReady(
-          map,
-          emergencyRouteRef.current,
-        );
-        mapCore.syncThreeDimensionalView(map, isThreeDimensionalRef.current, {
-          animate: false,
-        });
-      };
-
-      if (isDisposed) {
-        return;
-      }
-
-      map.setStyle(style);
-
-      timeoutId = window.setTimeout(() => {
-        syncOverlays();
-      }, mapCore.STYLE_LOAD_TIMEOUT_MS);
-
-      map.once("style.load", () => {
-        if (timeoutId) {
-          window.clearTimeout(timeoutId);
-        }
-        syncOverlays();
-      });
-    }
-
-    void updateStyle();
-
-    return () => {
-      isDisposed = true;
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [activeProvider, dictionary, mapSettings, vworldApiKey]);
+  useMapStyleSync({
+    activeProvider,
+    dictionary,
+    emergencyRouteRef,
+    hazardsRef,
+    isThreeDimensionalRef,
+    mapRef,
+    mapSettings,
+    pointsRef,
+    seoulAreasRef,
+    vworldApiKey,
+  });
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -850,105 +541,47 @@ export function MapShell({
   }
 
   return (
-    <div className={styles.page}>
-      <MapNavbar
-        dictionary={dictionary}
-        isMenuOpen={isMenuOpen}
-        onOpenSourceSearch={openSourceSearch}
-        provider={provider}
-        providerMenuRef={providerMenuRef}
-        selectedProviderLabel={selectedProviderLabel}
-        setIsMenuOpen={setIsMenuOpen}
-        setProvider={setProvider}
-      />
-      <main className={styles.main}>
-        <div
-          aria-label={dictionary.map.ariaLabel}
-          className={styles.map}
-          ref={mapContainerRef}
-          role="application"
-        />
-        <button
-          aria-label={dictionary.map.dimensionButtonLabel.replace(
-            "{dimension}",
-            selectedDimensionLabel,
-          )}
-          aria-pressed={isThreeDimensional}
-          className={
-            isThreeDimensional
-              ? styles.dimensionButtonActive
-              : styles.dimensionButton
-          }
-          onClick={() => setIsThreeDimensional((current) => !current)}
-          title={selectedDimensionLabel}
-          type="button"
-        >
-          <Box aria-hidden="true" size={15} strokeWidth={2.5} />
-          <span>{selectedDimensionLabel}</span>
-        </button>
-        <button
-          className={styles.emergencyLauncher}
-          onClick={openEmergencyPanel}
-          type="button"
-        >
-          <Ambulance aria-hidden="true" size={18} strokeWidth={2.5} />
-          <span>{uiText(dictionary, "응급 출동·이송")}</span>
-        </button>
-        {isEmergencyPanelOpen ? (
-          <EmergencyRoutingPanel
-            dictionary={dictionary}
-            onClose={() => setIsEmergencyPanelOpen(false)}
-            onRoute={setEmergencyRoute}
-            origin={emergencyOrigin}
-          />
-        ) : null}
-        <SourceMenu
-          autoFocusHazards={autoFocusHazards}
-          datasetsLength={datasets.length}
-          dictionary={dictionary}
-          filteredDatasets={filteredDatasets}
-          isOpen={isSourceMenuOpen}
-          selectedDatasetCount={selectedDatasetCount}
-          setAutoFocusHazards={setAutoFocusHazards}
-          setIsOpen={setIsSourceMenuOpen}
-          setSourceQuery={setSourceQuery}
-          setVisibleSources={setVisibleSources}
-          sourceMenuRef={sourceMenuRef}
-          sourcePointCounts={sourcePointCounts}
-          sourceQuery={sourceQuery}
-          sourceSearchInputRef={sourceSearchInputRef}
-          visibleSources={visibleSources}
-        />
-        <MobileMapTools
-          dictionary={dictionary}
-          isMenuOpen={isMenuOpen}
-          mobileProviderMenuRef={mobileProviderMenuRef}
-          provider={provider}
-          selectedProviderLabel={selectedProviderLabel}
-          setIsMenuOpen={setIsMenuOpen}
-          setProvider={setProvider}
-        />
-        <DatasetPanel
-          dataError={dataError}
-          dictionary={dictionary}
-          hazardsCount={hazards.length}
-          isLoadingData={isLoadingData}
-          latestFetchedAt={latestFetchedAt}
-          mappedPointCount={mappedPointCount}
-        />
-        {activeHazard ? (
-          <HazardModal
-            activeHazard={activeHazard}
-            activeHazardImageUrl={activeHazardImageUrl}
-            dictionary={dictionary}
-            onClose={() => setActiveHazard(null)}
-          />
-        ) : null}
-      </main>
-      <MobileNav
-        dictionary={dictionary}
-        onOpenSourceSearch={openSourceSearch}
-      />
-    </div>
+    <MapShellView
+      activeHazard={activeHazard}
+      activeHazardImageUrl={activeHazardImageUrl}
+      autoFocusHazards={autoFocusHazards}
+      dataError={dataError}
+      datasets={datasets}
+      dictionary={dictionary}
+      emergencyOrigin={emergencyOrigin}
+      filteredDatasets={filteredDatasets}
+      hazardsCount={hazards.length}
+      isEmergencyPanelOpen={isEmergencyPanelOpen}
+      isLoadingData={isLoadingData}
+      isMenuOpen={isMenuOpen}
+      isSourceMenuOpen={isSourceMenuOpen}
+      isThreeDimensional={isThreeDimensional}
+      latestFetchedAt={latestFetchedAt}
+      mappedPointCount={mappedPointCount}
+      mapContainerRef={mapContainerRef}
+      mobileProviderMenuRef={mobileProviderMenuRef}
+      onOpenEmergencyPanel={openEmergencyPanel}
+      onOpenSourceSearch={openSourceSearch}
+      provider={provider}
+      providerMenuRef={providerMenuRef}
+      selectedDatasetCount={selectedDatasetCount}
+      selectedDimensionLabel={selectedDimensionLabel}
+      selectedProviderLabel={selectedProviderLabel}
+      setActiveHazard={setActiveHazard}
+      setAutoFocusHazards={setAutoFocusHazards}
+      setEmergencyRoute={setEmergencyRoute}
+      setIsEmergencyPanelOpen={setIsEmergencyPanelOpen}
+      setIsMenuOpen={setIsMenuOpen}
+      setIsSourceMenuOpen={setIsSourceMenuOpen}
+      setIsThreeDimensional={setIsThreeDimensional}
+      setProvider={setProvider}
+      setSourceQuery={setSourceQuery}
+      setVisibleSources={setVisibleSources}
+      sourceMenuRef={sourceMenuRef}
+      sourcePointCounts={sourcePointCounts}
+      sourceQuery={sourceQuery}
+      sourceSearchInputRef={sourceSearchInputRef}
+      visibleSources={visibleSources}
+    />
   );
 }
