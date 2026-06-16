@@ -1605,12 +1605,12 @@ function OperationalSourceIcon({ kind }: { kind: string }) {
 
 function DataSourceItemLink({
   children,
-  href,
+  unsafeHref,
 }: {
   children: ReactNode;
-  href: string;
+  unsafeHref: string;
 }) {
-  const safeHref = safeLinkHref(href);
+  const safeHref = safeLinkHref(unsafeHref);
 
   return safeHref ? (
     <a
@@ -3622,8 +3622,8 @@ export function DisasterDashboard({
               <div className={styles.dataSourceGrid}>
                 {bigData119Summaries.map((source) => (
                   <DataSourceItemLink
-                    href={source.sourceUrl}
                     key={source.sourceId}
+                    unsafeHref={source.sourceUrl}
                   >
                     {source.kind === "fire-water-source" ? (
                       <Droplets aria-hidden="true" size={16} />
@@ -3671,8 +3671,8 @@ export function DisasterDashboard({
               <div className={styles.dataSourceGrid}>
                 {bigData119OperationalSummaries.map((source) => (
                   <DataSourceItemLink
-                    href={source.sourceUrl}
                     key={source.sourceId}
+                    unsafeHref={source.sourceUrl}
                   >
                     <OperationalSourceIcon kind={source.kind} />
                     <div>
