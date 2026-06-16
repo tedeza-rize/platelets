@@ -4,6 +4,20 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100";
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
+const firefoxLaunchOptions = {
+  env: {
+    ...process.env,
+    LIBGL_ALWAYS_SOFTWARE: process.env.LIBGL_ALWAYS_SOFTWARE ?? "1",
+    MOZ_WEBGL_FORCE_ENABLE: process.env.MOZ_WEBGL_FORCE_ENABLE ?? "1",
+  },
+  firefoxUserPrefs: {
+    "gfx.webrender.software": true,
+    "layers.acceleration.force-enabled": true,
+    "webgl.disabled": false,
+    "webgl.enable-webgl2": true,
+    "webgl.force-enabled": true,
+  },
+};
 const e2eRoot = path.join(process.cwd(), ".playwright-data");
 const e2eDataDir = path.join(
   e2eRoot,
@@ -28,7 +42,10 @@ const projects = browserChannel
       },
       {
         name: "firefox",
-        use: { ...devices["Desktop Firefox"] },
+        use: {
+          ...devices["Desktop Firefox"],
+          launchOptions: firefoxLaunchOptions,
+        },
       },
     ];
 
