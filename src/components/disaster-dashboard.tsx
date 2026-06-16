@@ -55,6 +55,7 @@ import {
   type MapRenderingSettings,
 } from "@/lib/map-settings";
 import { createVworldStyle } from "@/lib/map-shell-core";
+import { safeLinkHref } from "@/lib/safe-link";
 import styles from "./disaster-dashboard.module.css";
 
 export type DashboardView =
@@ -1290,13 +1291,15 @@ function buildBuildingPopupHtml(
     safetyProfile && safetyProfile.sourceNotes.length > 0
       ? safetyProfile.sourceNotes.join(" ")
       : null;
-  const sourceLabel = safetyProfile?.sourceUrl
+  const safetyProfileSourceHref = safeLinkHref(safetyProfile?.sourceUrl);
+  const safetyProfileSourceLabel = safetyProfile?.sourceLabel ?? "";
+  const sourceLabel = safetyProfileSourceHref
     ? `<a href="${escapeHtml(
-        safetyProfile.sourceUrl,
+        safetyProfileSourceHref,
       )}" target="_blank" rel="noreferrer">${escapeHtml(
-        safetyProfile.sourceLabel,
+        safetyProfileSourceLabel,
       )}</a>`
-    : escapeHtml(safetyProfile?.sourceLabel ?? "");
+    : escapeHtml(safetyProfileSourceLabel);
   const profileHtml = safetyProfile
     ? `<section class="${styles.popupSafety}">
         <strong>${escapeHtml(text("dashboard.popup.safetyProfileTitle"))}</strong>
@@ -1478,6 +1481,7 @@ function buildBigData119PopupHtml(
   text: DashboardText,
 ) {
   const coordinateLabel = `${point.latitude.toFixed(5)}, ${point.longitude.toFixed(5)}`;
+  const sourceHref = safeLinkHref(point.sourceUrl);
   const rows = [
     [text("dashboard.sheet.type"), text(BIGDATA119_KIND_LABEL[point.kind])],
     [text("dashboard.sheet.category"), point.category],
@@ -1515,7 +1519,15 @@ function buildBigData119PopupHtml(
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
     <div class="${styles.popupActions}">
-      <a href="${point.sourceUrl}" target="_blank" rel="noreferrer">${escapeHtml(text("dashboard.sheet.source"))}</a>
+      ${
+        sourceHref
+          ? `<a href="${escapeHtml(
+              sourceHref,
+            )}" target="_blank" rel="noreferrer">${escapeHtml(
+              text("dashboard.sheet.source"),
+            )}</a>`
+          : ""
+      }
       <a href="${buildExternalMapSearchUrl(
         "naver",
         point.address || point.name || coordinateLabel,
@@ -1646,14 +1658,20 @@ function bigData119Sheet(
   text: DashboardText,
 ): MobileSheet {
   const searchQuery = point.address || point.name || point.sourceLabel;
+  const sourceHref = safeLinkHref(point.sourceUrl);
+  const sourceLinks = sourceHref
+    ? [
+        {
+          href: sourceHref,
+          label: text("dashboard.sheet.source"),
+        },
+      ]
+    : [];
 
   return {
     id: `bigdata-${point.id}`,
     links: [
-      {
-        href: point.sourceUrl,
-        label: text("dashboard.sheet.source"),
-      },
+      ...sourceLinks,
       {
         href: buildExternalMapSearchUrl("naver", searchQuery),
         label: text("dashboard.sheet.naverMap"),
