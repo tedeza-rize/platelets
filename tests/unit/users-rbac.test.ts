@@ -184,6 +184,13 @@ test("incident mutation routes require and record a staff session", async () => 
     { params: Promise.resolve({ id: incident.id }) },
   );
   assert.equal(deleted.status, 200);
+  assert.equal(await incidentService.getIncident(incident.id), null);
+  assert.equal(
+    (await incidentService.listIncidentEvents(incident.id)).some(
+      (event) => event.type === "deleted",
+    ),
+    true,
+  );
 });
 
 test("account deletion protects the current and sudo accounts", async () => {
