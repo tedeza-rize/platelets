@@ -125,6 +125,8 @@ export const koUiCore = {
   Username: "아이디",
   "Loading incidents...": "사고 목록을 불러오는 중입니다.",
   "Loading users...": "사용자 목록을 불러오는 중입니다.",
+  "Too many requests. Wait a moment before retrying.":
+    "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
   "Too many sign-in attempts. Try again shortly.":
     "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.",
   admin: "관리자",
@@ -225,6 +227,8 @@ export const koUiCore = {
   "dashboard.simulation.error.ai_provider_unavailable":
     "AI 제공자를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
   "dashboard.simulation.error.default": "모의 시나리오를 생성하지 못했습니다.",
+  "dashboard.simulation.error.rate_limited":
+    "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.",
   "dashboard.simulation.generating": "모의 시나리오를 생성하고 있습니다.",
   "dashboard.simulation.kicker": "훈련 모드",
   "dashboard.simulation.loading": "생성 중",

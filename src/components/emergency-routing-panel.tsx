@@ -159,7 +159,11 @@ export function EmergencyRoutingPanel({
       const payload = (await response.json()) as RecommendationResponse;
 
       if (!response.ok) {
-        throw new Error(payload.error ?? t("응급기관 추천에 실패했습니다."));
+        throw new Error(
+          response.status === 429
+            ? t("Too many requests. Wait a moment before retrying.")
+            : (payload.error ?? t("응급기관 추천에 실패했습니다.")),
+        );
       }
 
       setDispatchStation(payload.dispatchStation);
@@ -201,7 +205,11 @@ export function EmergencyRoutingPanel({
       };
 
       if (!(response.ok && payload.route)) {
-        throw new Error(payload.error ?? t("이송 경로 계산에 실패했습니다."));
+        throw new Error(
+          response.status === 429
+            ? t("Too many requests. Wait a moment before retrying.")
+            : (payload.error ?? t("이송 경로 계산에 실패했습니다.")),
+        );
       }
 
       setActiveRoute(payload.route);
