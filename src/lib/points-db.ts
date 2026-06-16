@@ -20,10 +20,14 @@ import {
   findNearestPoints,
   getPointSummary,
   listEmergencyHospitalFallbackPoints,
+  listPointMarkerPage,
   listPointMarkers,
   listPointSummaries,
+  listPointSummaryPage,
   listPoints,
+  listRawPointPage,
   searchPointSummaries,
+  validatePointListCursor,
 } from "@/lib/points-db-modules/point-repository";
 
 export {
@@ -37,10 +41,14 @@ export {
   getPointSummary,
   getSqliteWriteSafetyStatus,
   listEmergencyHospitalFallbackPoints,
+  listPointMarkerPage,
   listPointMarkers,
   listPointSummaries,
+  listPointSummaryPage,
   listPoints,
+  listRawPointPage,
   searchPointSummaries,
+  validatePointListCursor,
   withDatabaseWriteTransaction,
 };
 

@@ -3,6 +3,7 @@ import {
   getDatabaseRow as getSqlite,
 } from "@/lib/database/query";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
+import { encodeListingCursor, readCursorRecord } from "@/lib/listing-cursors";
 import type {
   EmergencyPoint,
   EmergencyPointMarker,
@@ -10,6 +11,10 @@ import type {
   PointSearchOptions,
 } from "@/lib/points-db";
 import { getDatabase } from "@/lib/points-db-modules/connection";
+
+export type PointListCursor = {
+  id: number;
+};
 
 type PointRow = {
   address: string;
@@ -96,6 +101,23 @@ function clampPointLimit(
   return Math.min(Math.max(Math.trunc(value ?? fallback), 1), maximum);
 }
 
+export function validatePointListCursor(
+  value: unknown,
+): PointListCursor | null {
+  const record = readCursorRecord(value);
+
+  if (
+    !record ||
+    typeof record.id !== "number" ||
+    !Number.isSafeInteger(record.id) ||
+    record.id < 1
+  ) {
+    return null;
+  }
+
+  return { id: record.id };
+}
+
 function buildPointWhereClause(options: PointSearchOptions) {
   const conditions: Array<keyof typeof POINT_WHERE_CLAUSES> = [];
   const params: unknown[] = [];
@@ -117,6 +139,21 @@ function buildPointWhereClause(options: PointSearchOptions) {
   return {
     params,
     where: selected.length > 0 ? `WHERE ${selected.join(" AND ")}` : "",
+  };
+}
+
+function buildPointPageWhereClause(
+  options: PointSearchOptions & { cursor?: PointListCursor | null },
+) {
+  const { params, where } = buildPointWhereClause(options);
+
+  if (!options.cursor) {
+    return { params, where };
+  }
+
+  return {
+    params: [...params, options.cursor.id],
+    where: where ? `${where} AND p.id > ?` : "WHERE p.id > ?",
   };
 }
 
@@ -157,6 +194,83 @@ export async function listPointSummaries(options: PointSearchOptions = {}) {
     [...params, ...orderParams, limit],
   );
   return rows.map(mapPointSummaryRow);
+}
+
+async function listPointPage<T>(
+  options: PointSearchOptions & { cursor?: PointListCursor | null },
+  query: {
+    limitFallback: number;
+    limitMaximum: number;
+    map: (row: PointRow) => T;
+    select: string;
+  },
+) {
+  const db = await getDatabase();
+  const { params, where } = buildPointPageWhereClause(options);
+  const limit = clampPointLimit(
+    options.limit,
+    query.limitFallback,
+    query.limitMaximum,
+  );
+  const rows = await allSqlite<PointRow>(
+    db,
+    `${query.select}
+      ${where}
+      ORDER BY p.id ASC
+      LIMIT ?`,
+    [...params, limit + 1],
+  );
+  const pageRows = rows.slice(0, limit);
+  const last = pageRows.at(-1);
+
+  return {
+    nextCursor:
+      rows.length > limit && last ? encodeListingCursor({ id: last.id }) : null,
+    points: pageRows.map(query.map),
+  };
+}
+
+export async function listPointSummaryPage(
+  options: PointSearchOptions & { cursor?: PointListCursor | null } = {},
+) {
+  return listPointPage(options, {
+    limitFallback: 20_000,
+    limitMaximum: 20_000,
+    map: mapPointSummaryRow,
+    select: `SELECT p.id, p.source, p.source_record_id, p.name, p.category,
+        p.address, p.phone, p.parent_name, p.latitude, p.longitude,
+        p.source_updated_at, '' AS raw_json, u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source`,
+  });
+}
+
+export async function listPointMarkerPage(
+  options: PointSearchOptions & { cursor?: PointListCursor | null } = {},
+) {
+  return listPointPage(options, {
+    limitFallback: 20_000,
+    limitMaximum: 20_000,
+    map: mapPointMarkerRow,
+    select: `SELECT p.id, p.source, '' AS source_record_id, '' AS name,
+        p.category, '' AS address, NULL AS phone, NULL AS parent_name,
+        p.latitude, p.longitude, NULL AS source_updated_at,
+        '' AS raw_json, NULL AS fetched_at
+      FROM points p`,
+  });
+}
+
+export async function listRawPointPage(
+  options: PointSearchOptions & { cursor?: PointListCursor | null } = {},
+) {
+  return listPointPage(options, {
+    limitFallback: 5_000,
+    limitMaximum: 20_000,
+    map: mapPointRow,
+    select: `SELECT p.*, u.fetched_at
+      FROM points p
+      LEFT JOIN dataset_updates u ON u.source = p.source`,
+  });
 }
 
 export async function searchPointSummaries(query: string, limit = 20) {
