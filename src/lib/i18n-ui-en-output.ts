@@ -87,6 +87,12 @@ export const enUiOutput = {
   "pwa.offline.title": "You are offline",
   "error.action.home": "Return to the safety map",
   "error.action.retry": "Try again",
+  "error.forbidden.description":
+    "This account cannot open this area. Ask an administrator for access if your response role needs it.",
+  "error.forbidden.eyebrow": "403 · Access needed",
+  "error.forbidden.imageAlt":
+    "Platelet character having an access badge checked",
+  "error.forbidden.title": "This badge is not cleared yet.",
   "error.maintenance.description":
     "We are tightening a few bolts to make the map sturdier. Please check back shortly.",
   "error.maintenance.eyebrow": "Scheduled maintenance",
@@ -110,6 +116,12 @@ export const enUiOutput = {
   "error.server.eyebrow": "500 · Unexpected situation",
   "error.server.imageAlt": "Platelet character making an urgent radio call",
   "error.server.title": "The server called an emergency briefing.",
+  "error.timeSync.description":
+    "When device and server time drift apart, incident times, update records, and sign-in decisions can look wrong. Turn on automatic time and check NTP synchronization, then try again.",
+  "error.timeSync.eyebrow": "Time synchronization",
+  "error.timeSync.imageAlt":
+    "Platelet character checking a clock and time signal",
+  "error.timeSync.title": "Did you arrive from the past or future?",
   "preferences.language": "Language",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",
@@ -119,6 +131,12 @@ export const enUiOutput = {
   "preferences.theme.light": "Light",
   "preferences.theme.system": "System",
   "preferences.title": "Preferences",
+  "timeSkew.imageAlt": "Platelet character checking a clock and time signal",
+  "timeSkew.summary":
+    "Device and server time are beyond the {seconds}s limit. Turn on automatic time, then check again.",
+  "timeSkew.summaryWithNtp":
+    "Device-server or server-NTP time is beyond the {seconds}s limit. Check automatic time and server NTP synchronization.",
+  "timeSkew.title": "Did you arrive from the past or future?",
   AI: "AI",
   ID: "ID",
   NTP: "NTP",

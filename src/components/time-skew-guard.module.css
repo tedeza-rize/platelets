@@ -46,6 +46,19 @@
   line-height: 1;
 }
 
+.intro {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.intro img {
+  width: 96px;
+  height: auto;
+  object-fit: contain;
+}
+
 .modal p {
   color: var(--text-muted);
   font-size: 0.9rem;
@@ -105,6 +118,12 @@
 }
 
 @media (max-width: 420px) {
+  .intro {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
   .details div {
     grid-template-columns: 1fr;
   }

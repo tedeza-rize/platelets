@@ -30,11 +30,11 @@ const setupDictionary = {
     "environment.checking.detail": "Reading runtime and filesystem status.",
     "environment.checking.title": "Checking server",
     "environment.clock.browserSkewed":
-      "This browser's clock does not match the server. Turn on automatic time settings, then try again.",
+      "Did this browser arrive from the past or future? Its clock does not match the server. Turn on automatic time settings, then try again.",
     "environment.clock.ok": "Server and browser time are synchronized.",
     "environment.clock.pending": "Checking server and browser time.",
     "environment.clock.serverSkewed":
-      "The server clock is not synchronized. Check the server time settings, then try again.",
+      "Did the server arrive from the past or future? Its clock is not synchronized. Check the server time settings, then try again.",
     "environment.clock.title": "Time synchronization",
     "environment.clock.unavailable":
       "The server could not verify time synchronization. Check network access and server time settings.",
@@ -60,7 +60,7 @@ const setupDictionary = {
     "environment.ntp.ok":
       "{host} reports the server clock is {offsetSeconds}s from NTP, within the {thresholdSeconds}s limit.",
     "environment.ntp.skewed":
-      "{host} reports the server clock is {offsetSeconds}s from NTP, above the {thresholdSeconds}s limit.",
+      "{host} reports the server clock is {offsetSeconds}s from NTP, above the {thresholdSeconds}s limit. Check server NTP before operators rely on event times.",
     "environment.ntp.title": "NTP-server clock",
     "environment.ntp.unavailable":
       "No NTP server responded, so the {thresholdSeconds}s limit could not be verified.",
@@ -182,11 +182,11 @@ const setupDictionary = {
     "environment.checking.detail": "런타임과 파일 시스템 상태를 읽는 중입니다.",
     "environment.checking.title": "서버 확인 중",
     "environment.clock.browserSkewed":
-      "이 브라우저의 시간이 서버와 맞지 않습니다. 기기 시간을 자동 설정으로 맞춘 뒤 다시 시도하세요.",
+      "이 브라우저가 과거나 미래에서 온 것 같습니다. 기기 시간을 자동 설정으로 맞춘 뒤 다시 시도하세요.",
     "environment.clock.ok": "서버와 브라우저 시간이 정상 범위입니다.",
     "environment.clock.pending": "서버와 브라우저 시간을 확인하고 있습니다.",
     "environment.clock.serverSkewed":
-      "서버 시간이 맞지 않습니다. 서버의 시간 동기화 설정을 확인한 뒤 다시 시도하세요.",
+      "서버가 과거나 미래에서 온 것 같습니다. 서버의 시간 동기화 설정을 확인한 뒤 다시 시도하세요.",
     "environment.clock.title": "시간 동기화",
     "environment.clock.unavailable":
       "시간 동기화를 확인하지 못했습니다. 서버의 네트워크와 시간 설정을 확인하세요.",
@@ -211,7 +211,7 @@ const setupDictionary = {
     "environment.ntp.ok":
       "{host} 기준 서버 시계의 NTP 오차는 {offsetSeconds}초로 {thresholdSeconds}초 이내입니다.",
     "environment.ntp.skewed":
-      "{host} 기준 서버 시계의 NTP 오차는 {offsetSeconds}초로 {thresholdSeconds}초를 넘었습니다.",
+      "{host} 기준 서버 시계의 NTP 오차는 {offsetSeconds}초로 {thresholdSeconds}초를 넘었습니다. 운영자가 사건 시각을 믿기 전에 서버 NTP를 확인하세요.",
     "environment.ntp.title": "NTP-서버 시계",
     "environment.ntp.unavailable":
       "응답한 NTP 서버가 없어 {thresholdSeconds}초 기준을 확인할 수 없습니다.",

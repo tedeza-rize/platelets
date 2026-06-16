@@ -8,13 +8,21 @@ import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./error-state.module.css";
 import { offlineImageB64 } from "./offline-image-b64";
 
-export type ErrorKind = "maintenance" | "notFound" | "offline" | "server";
+export type ErrorKind =
+  | "forbidden"
+  | "maintenance"
+  | "notFound"
+  | "offline"
+  | "server"
+  | "timeSync";
 
 const ERROR_IMAGES: Record<ErrorKind, string> = {
+  forbidden: "/error-illustrations/forbidden.png",
   maintenance: "/error-illustrations/maintenance.png",
   notFound: "/error-illustrations/not-found.png",
   offline: offlineImageB64,
   server: "/error-illustrations/server-error.png",
+  timeSync: "/error-illustrations/time-sync.png",
 };
 
 type ErrorStateProps = {
@@ -34,7 +42,8 @@ export function ErrorState({
   const t = (textKey: string, values: Record<string, string | number> = {}) =>
     uiText(dictionary, textKey, values);
   const errorKey = `error.${kind}`;
-  const isRefreshLink = kind === "maintenance" || kind === "offline";
+  const isRefreshLink =
+    kind === "maintenance" || kind === "offline" || kind === "timeSync";
 
   return (
     <main className={styles.page}>
