@@ -27,6 +27,12 @@ type ScoreCategory =
   | "gradeStability";
 
 type ScoreWeights = Record<ScoreCategory, number>;
+type EmergencyInstitutionCandidate = Awaited<
+  ReturnType<typeof findNearestEmergencyInstitutions>
+>[number];
+
+const LIVE_ETA_CANDIDATE_LIMIT = 5;
+const RECOMMENDATION_TIMEOUT_MS = 8_000;
 
 function emergencyBedRatios(
   emergencyBeds: number | null,
@@ -320,6 +326,61 @@ async function mapWithConcurrency<T, R>(
   return output;
 }
 
+function estimatedEta(
+  candidate: EmergencyInstitutionCandidate,
+  origin: { latitude: number; longitude: number },
+) {
+  const roadDistance = Math.max(
+    candidate.distanceMeters * 1.25,
+    haversineMeters(origin, candidate),
+  );
+
+  return {
+    candidate,
+    distanceMeters: Math.round(roadDistance),
+    durationSeconds: Math.round(roadDistance / 11.1),
+    etaSource: "estimated" as const,
+  };
+}
+
+function candidateEtaPriority(
+  candidate: EmergencyInstitutionCandidate,
+  scenario: EmergencyScenario,
+) {
+  const text = rawSearchText(candidate.raw);
+  const emergencyBeds = numeric(candidate.raw, ["realtimeBed.hvec", "hvec"]);
+  const emergencyBedScore =
+    emergencyBeds === null ? 0.35 : Math.min(1, Math.max(0, emergencyBeds / 8));
+  const capabilityScore =
+    termRatio(text, CAPABILITY_TERMS.specialty[scenario]) * 0.45 +
+    termRatio(text, CAPABILITY_TERMS.criticalCare[scenario]) * 0.35 +
+    emergencyBedScore * 0.2;
+
+  return (
+    capabilityScore * 100 +
+    gradeRatio(candidate.category) * 20 -
+    Math.min(candidate.distanceMeters / 1000, 120)
+  );
+}
+
+async function withRecommendationTimeout<T>(promise: Promise<T>) {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("recommendation_timeout")),
+      RECOMMENDATION_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export async function recommendEmergencyHospitals(params: {
   latitude: number;
   longitude: number;
@@ -332,43 +393,50 @@ export async function recommendEmergencyHospitals(params: {
     radiusMeters: 120_000,
   });
   const useKakaoEta = await hasKakaoMobilityKey();
-  const withEta = await mapWithConcurrency(candidates, 3, async (candidate) => {
+  const rankedCandidates = candidates
+    .filter((candidate) => Boolean(candidate.phone))
+    .sort(
+      (left, right) =>
+        candidateEtaPriority(right, params.scenario) -
+        candidateEtaPriority(left, params.scenario),
+    );
+  const liveEtaIds = new Set(
+    rankedCandidates
+      .slice(0, LIVE_ETA_CANDIDATE_LIMIT)
+      .map((candidate) => candidate.id),
+  );
+  const etaWork = mapWithConcurrency(rankedCandidates, 3, async (candidate) => {
     if (useKakaoEta) {
       try {
-        const route = await calculateEmergencyRoute({
-          destination: {
-            latitude: candidate.latitude,
-            longitude: candidate.longitude,
-          },
-          origin,
-          provider: "kakao",
-        });
-        return {
-          candidate,
-          distanceMeters: route.distanceMeters,
-          durationSeconds: route.durationSeconds,
-          etaSource: "kakao" as const,
-        };
+        if (liveEtaIds.has(candidate.id)) {
+          const route = await calculateEmergencyRoute({
+            destination: {
+              latitude: candidate.latitude,
+              longitude: candidate.longitude,
+            },
+            origin,
+            provider: "kakao",
+          });
+          return {
+            candidate,
+            distanceMeters: route.distanceMeters,
+            durationSeconds: route.durationSeconds,
+            etaSource: "kakao" as const,
+          };
+        }
       } catch {
         // One failed route must not discard the remaining hospitals.
       }
     }
 
-    const roadDistance = Math.max(
-      candidate.distanceMeters * 1.25,
-      haversineMeters(origin, candidate),
-    );
-    return {
-      candidate,
-      distanceMeters: Math.round(roadDistance),
-      durationSeconds: Math.round(roadDistance / 11.1),
-      etaSource: "estimated" as const,
-    };
+    return estimatedEta(candidate, origin);
   });
+  const withEta = await withRecommendationTimeout(etaWork).catch(() =>
+    rankedCandidates.map((candidate) => estimatedEta(candidate, origin)),
+  );
   const weights = WEIGHTS[params.scenario];
 
   return withEta
-    .filter(({ candidate }) => Boolean(candidate.phone))
     .map(({ candidate, distanceMeters, durationSeconds, etaSource }) => {
       const text = rawSearchText(candidate.raw);
       const emergencyBeds = numeric(candidate.raw, [
