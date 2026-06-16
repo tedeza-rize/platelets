@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { requireAccessRole } from "@/lib/access-control";
+import { listApiLogPage, validateApiLogCursor } from "@/lib/api-log-repository";
 import { isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
-import { listApiLogs } from "@/lib/points-db";
+import { decodeListingCursor } from "@/lib/listing-cursors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
 
   const category = request.nextUrl.searchParams.get("category");
   const source = request.nextUrl.searchParams.get("source");
+  const cursorValue = request.nextUrl.searchParams.get("cursor");
   const limitValue = Number(request.nextUrl.searchParams.get("limit") ?? 200);
 
   if (category && !isLogCategory(category)) {
@@ -40,14 +42,21 @@ export async function GET(request: NextRequest) {
     return noStoreJson({ error: "Unknown source" }, { status: 400 });
   }
 
+  const decodedCursor = decodeListingCursor(cursorValue, validateApiLogCursor);
+
+  if (!decodedCursor.ok) {
+    return noStoreJson({ errorCode: "invalid_cursor" }, { status: 400 });
+  }
+
   const selectedCategory =
     category && isLogCategory(category) ? category : null;
   const selectedSource = source && isDatasetSourceId(source) ? source : null;
-  const logs = await listApiLogs({
+  const { logs, nextCursor } = await listApiLogPage({
     category: selectedCategory,
+    cursor: decodedCursor.cursor,
     limit: Number.isFinite(limitValue) ? limitValue : 200,
     source: selectedSource,
   });
 
-  return noStoreJson({ logs });
+  return noStoreJson({ logs, nextCursor });
 }
