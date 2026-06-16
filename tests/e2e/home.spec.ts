@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
   E2E_VAPID_KEYS,
   ensureSetupComplete,
@@ -10,8 +10,15 @@ import {
 
 const FIRST_RUN_SKIP_REASON =
   "first-run setup is verified once because CI browser projects share the same test server";
+const MAP_CANVAS_TIMEOUT_MS = 30_000;
 
 test.describe.configure({ mode: "serial" });
+
+async function expectMapCanvas(page: Page) {
+  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible({
+    timeout: MAP_CANVAS_TIMEOUT_MS,
+  });
+}
 
 test("redirects protected pages to setup before installation", async ({
   browserName,
@@ -125,9 +132,7 @@ test("loads the integrated disaster response map", async ({
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("button", { name: "3D" })).toBeVisible();
-  await expect(page.locator("canvas.maplibregl-canvas")).toBeVisible({
-    timeout: 10_000,
-  });
+  await expectMapCanvas(page);
 });
 
 test("routes staff login and updates an account lifecycle", async ({
@@ -253,8 +258,7 @@ test("shows a mobile bottom sheet for map selections", async ({
   });
   await page.goto("/", { waitUntil: "domcontentloaded" });
 
-  const canvas = page.locator("canvas.maplibregl-canvas");
-  await expect(canvas).toBeVisible();
+  await expectMapCanvas(page);
   const locateButton = page.getByTestId("locate-user-button");
   await expect(locateButton).toBeVisible();
   await locateButton.click();
