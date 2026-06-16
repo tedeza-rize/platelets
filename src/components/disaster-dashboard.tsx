@@ -27,7 +27,6 @@ import type {
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
-import * as maplibre from "maplibre-gl";
 import {
   type ReactNode,
   useCallback,
@@ -180,6 +179,13 @@ type MobileSheet = {
   rows: MobileSheetRow[];
   subtitle: string;
   title: string;
+};
+type MapLibreModule = typeof import("maplibre-gl");
+type DashboardMapCreateOptions = {
+  forceWebgl: boolean;
+  mapSettings: MapRenderingSettings;
+  threeDimensional: boolean;
+  vworldApiKey: string;
 };
 
 const MAP_CENTER: [number, number] = [127.85, 36.45];
@@ -757,6 +763,35 @@ function createDashboardMapStyle(
   return settings.osmTileSource === "official"
     ? createOfficialOsmDashboardStyle()
     : createOpenFreeMapDashboardStyle();
+}
+
+function createDashboardMapInstance(
+  maplibre: MapLibreModule,
+  container: HTMLDivElement,
+  options: DashboardMapCreateOptions,
+) {
+  return new maplibre.Map({
+    attributionControl: { compact: true },
+    bearing: options.threeDimensional ? THREE_DIMENSIONAL_BEARING : 0,
+    canvasContextAttributes: options.forceWebgl
+      ? {
+          antialias: true,
+          contextType: "webgl",
+        }
+      : {
+          antialias: true,
+        },
+    center: MAP_CENTER,
+    container,
+    pitch: options.threeDimensional ? THREE_DIMENSIONAL_PITCH : 0,
+    style: createDashboardMapStyle(options.mapSettings, options.vworldApiKey),
+    zoom: DEFAULT_ZOOM,
+  });
+}
+
+function resetDashboardMapContainer(container: HTMLDivElement) {
+  container.replaceChildren();
+  container.classList.remove("maplibregl-map");
 }
 
 function dashboardBuildingThreeDimensionalLayer(
@@ -2229,8 +2264,9 @@ export function DisasterDashboard({
   vworldApiKey = "",
 }: DisasterDashboardProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const maplibreRef = useRef<MapLibreModule | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const popupRef = useRef<import("maplibre-gl").Popup | null>(null);
+  const popupRef = useRef<MapLibrePopup | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const isThreeDimensionalRef = useRef(false);
@@ -2530,8 +2566,9 @@ export function DisasterDashboard({
         setMobileSheetDragOffset(0);
 
         const map = mapRef.current;
+        const maplibre = maplibreRef.current;
 
-        if (map) {
+        if (map && maplibre) {
           map.flyTo({
             bearing: isThreeDimensionalRef.current
               ? THREE_DIMENSIONAL_BEARING
@@ -2698,24 +2735,59 @@ export function DisasterDashboard({
 
     let disposed = false;
 
-    function createMap() {
+    async function createMap() {
       if (disposed || !mapContainerRef.current) {
         return;
       }
 
-      const map = new maplibre.Map({
-        attributionControl: { compact: true },
-        bearing: isThreeDimensionalRef.current ? THREE_DIMENSIONAL_BEARING : 0,
-        canvasContextAttributes: {
-          antialias: true,
-          contextType: "webgl",
-        },
-        center: MAP_CENTER,
-        container: mapContainerRef.current,
-        pitch: isThreeDimensionalRef.current ? THREE_DIMENSIONAL_PITCH : 0,
-        style: createDashboardMapStyle(effectiveMapSettings, vworldApiKey),
-        zoom: DEFAULT_ZOOM,
-      });
+      let maplibre: MapLibreModule;
+
+      try {
+        maplibre = await import("maplibre-gl");
+      } catch {
+        if (!disposed) {
+          setNotice(dashboardText("dashboard.notice.mapFailed"));
+        }
+        return;
+      }
+
+      const container = mapContainerRef.current;
+
+      if (disposed || !container || mapRef.current) {
+        return;
+      }
+
+      maplibreRef.current = maplibre;
+      let map: MapLibreMap;
+
+      try {
+        map = createDashboardMapInstance(maplibre, container, {
+          forceWebgl: true,
+          mapSettings: effectiveMapSettings,
+          threeDimensional: isThreeDimensionalRef.current,
+          vworldApiKey,
+        });
+      } catch {
+        resetDashboardMapContainer(container);
+
+        try {
+          map = createDashboardMapInstance(maplibre, container, {
+            forceWebgl: false,
+            mapSettings: effectiveMapSettings,
+            threeDimensional: isThreeDimensionalRef.current,
+            vworldApiKey,
+          });
+        } catch {
+          resetDashboardMapContainer(container);
+          setNotice(dashboardText("dashboard.notice.mapFailed"));
+          return;
+        }
+      }
+
+      if (disposed) {
+        map.remove();
+        return;
+      }
 
       mapRef.current = map;
       map.addControl(
@@ -3099,7 +3171,7 @@ export function DisasterDashboard({
       }
     }
 
-    createMap();
+    void createMap();
 
     return () => {
       disposed = true;
@@ -3107,6 +3179,8 @@ export function DisasterDashboard({
       popupRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
+      maplibreRef.current = null;
+      setIsMapReady(false);
     };
   }, [
     dashboardText,
