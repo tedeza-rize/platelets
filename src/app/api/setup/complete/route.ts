@@ -1,5 +1,9 @@
 import { noStoreJson } from "@/lib/http";
-import { completeSetup, isSetupComplete } from "@/lib/setup-state";
+import {
+  completeSetup,
+  getSetupStateErrorKey,
+  isSetupComplete,
+} from "@/lib/setup-state";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (await isSetupComplete()) {
     return noStoreJson(
-      { error: "Setup is already complete." },
+      { errorKey: "database.alreadyInstalled", ok: false },
       { status: 409 },
     );
   }
@@ -21,9 +25,8 @@ export async function POST(request: Request) {
       ok: true,
     });
   } catch (error) {
-    return noStoreJson(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 400 },
-    );
+    const errorKey = getSetupStateErrorKey(error) ?? "install.failed";
+
+    return noStoreJson({ errorKey, ok: false }, { status: 400 });
   }
 }

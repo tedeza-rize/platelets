@@ -1,0 +1,341 @@
+.lead {
+  margin: 0 0 28px;
+  color: var(--setup-muted);
+  line-height: 1.6;
+}
+
+.infoPanel,
+.termsBox {
+  padding: 20px;
+  color: var(--setup-muted);
+  background: var(--setup-accent-soft);
+  border: 1px solid
+    color-mix(in srgb, var(--setup-accent) 22%, var(--setup-border));
+  border-radius: 16px;
+  line-height: 1.65;
+}
+
+.termsBox {
+  max-height: 260px;
+  overflow: auto;
+  background: var(--setup-field-alt);
+}
+
+.termsBox h2 {
+  margin: 0 0 8px;
+  color: var(--setup-text);
+  font-size: 0.95rem;
+}
+
+.termsBox p {
+  margin: 0 0 18px;
+}
+
+.checkRow {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 0 16px;
+  border: 1px solid var(--setup-border);
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-weight: 700;
+}
+
+.field input {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--setup-border);
+  border-radius: 13px;
+  color: var(--setup-text);
+  background: var(--setup-field);
+  font: inherit;
+  font-weight: 500;
+}
+
+.field input:focus {
+  outline: 3px solid color-mix(in srgb, var(--setup-accent) 18%, transparent);
+  border-color: var(--setup-accent);
+}
+
+.fieldInvalid input,
+.field input[aria-invalid="true"] {
+  border-color: #dc2626;
+}
+
+.fieldInvalid input:focus,
+.field input[aria-invalid="true"]:focus {
+  outline: 3px solid rgb(220 38 38 / 14%);
+  border-color: #dc2626;
+}
+
+.fieldError {
+  color: #b42318;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.passwordChecklist {
+  display: grid;
+  gap: 10px;
+  margin: -6px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--setup-border);
+  border-radius: 14px;
+  background: var(--setup-field-alt);
+}
+
+.passwordChecklistTitle {
+  color: var(--setup-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.passwordChecklist ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passwordChecklist li {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--setup-muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.passwordChecklist .passwordRequirementMet {
+  color: #047857;
+}
+
+.passwordChecklist .passwordRequirementMissing {
+  color: #b42318;
+}
+
+.passwordChecklist li svg {
+  flex: 0 0 auto;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.checkList {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.checkItem {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--setup-border);
+  border-radius: 14px;
+}
+
+.checkItemFailed {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--setup-border));
+}
+
+.checkItem strong,
+.checkItem p {
+  display: block;
+  margin: 0;
+}
+
+.checkItem > div {
+  min-width: 0;
+}
+
+.checkItem p {
+  margin-top: 4px;
+  color: var(--setup-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.checkActionButton {
+  min-height: 34px;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, #dc2626 48%, var(--setup-border));
+  border-radius: 9px;
+  color: #b42318;
+  background: color-mix(in srgb, #dc2626 8%, var(--setup-card));
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.checkActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.databasePanel {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--setup-border);
+  border-radius: 16px;
+  background: var(--setup-field-alt);
+}
+
+.databasePanel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.databaseOptions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.databaseOptions legend {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+  color: var(--setup-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.databaseOptions button {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--setup-border);
+  border-radius: 10px;
+  color: var(--setup-text);
+  background: var(--setup-card);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.databaseOptions button[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--setup-accent);
+  border-color: var(--setup-accent);
+}
+
+.databaseOptions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.okMark,
+.failMark,
+.pendingMark {
+  inline-size: 28px;
+  block-size: 28px;
+  min-inline-size: 28px;
+  min-block-size: 28px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.okMark {
+  color: #ffffff;
+  background: var(--setup-accent);
+}
+
+.failMark {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.pendingMark {
+  color: var(--setup-accent);
+  background: color-mix(in srgb, var(--setup-accent) 10%, var(--setup-card));
+}
+
+.secondaryButton {
+  min-width: 150px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--setup-accent-strong);
+  background: var(--setup-accent-soft);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.successText {
+  margin: 14px 0 0;
+  color: #047857;
+  font-weight: 700;
+}
+
+.helpText {
+  margin: -6px 0 0;
+  color: var(--setup-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 820px) {
+  .lead {
+    margin-bottom: 22px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .passwordChecklist ul {
+    grid-template-columns: 1fr;
+  }
+
+  .databaseOptions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

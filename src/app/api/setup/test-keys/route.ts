@@ -192,7 +192,7 @@ export async function POST(request: Request) {
   > | null;
 
   if (!payload) {
-    return noStoreJson({ error: "Invalid API key payload." }, { status: 400 });
+    return noStoreJson({ errorKey: "api.failed", ok: false }, { status: 400 });
   }
 
   const checks = [
