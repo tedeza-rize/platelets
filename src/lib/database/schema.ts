@@ -5,7 +5,7 @@ import {
 import { quoteIdentifier } from "@/lib/database/sql";
 import type { DatabaseClient } from "@/lib/database/types";
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export const DATABASE_TABLES = [
   "app_schema_versions",
@@ -17,6 +17,7 @@ export const DATABASE_TABLES = [
   "dataset_import_progress",
   "api_usage_windows",
   "api_logs",
+  "rate_limit_buckets",
   "admin_update_cooldowns",
   "incident_push_subscriptions",
   "hazard_events",
@@ -122,6 +123,12 @@ function tableStatements(db: DatabaseClient) {
       message ${type.text} NOT NULL,
       request_count INTEGER NOT NULL DEFAULT 0,
       metadata_json ${type.text} NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS rate_limit_buckets (
+      bucket_key ${type.key} PRIMARY KEY,
+      count INTEGER NOT NULL,
+      expires_at ${type.timestamp} NOT NULL,
+      updated_at ${type.timestamp} NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS app_settings (
       key ${type.key} PRIMARY KEY,
@@ -253,6 +260,7 @@ const INDEXES = [
     "api_logs",
     "source, event_at DESC, id DESC",
   ],
+  ["rate_limit_buckets_expires_idx", "rate_limit_buckets", "expires_at"],
   ["users_role_idx", "users", "role, username"],
   ["access_sessions_user_idx", "access_sessions", "user_id, expires_at"],
   ["access_sessions_expires_idx", "access_sessions", "expires_at"],

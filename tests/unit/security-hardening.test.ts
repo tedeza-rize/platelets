@@ -12,6 +12,7 @@ setDataDirectoryPathForTests(dataDirectory);
 const pointsDb = await import("@/lib/points-db");
 const setupState = await import("@/lib/setup-state");
 const authSessions = await import("@/lib/auth-sessions");
+const rateLimit = await import("@/lib/rate-limit");
 const loginRoute = await import("@/app/api/auth/login/route");
 const aiRoute = await import("@/app/api/ai/query/route");
 
@@ -106,6 +107,34 @@ test("next config applies baseline security headers globally", async () => {
   assert.match(headers.get("Permissions-Policy") ?? "", /geolocation=\(self\)/);
   assert.equal(headers.get("X-Content-Type-Options"), "nosniff");
   assert.equal(headers.get("X-Frame-Options"), "DENY");
+});
+
+test("shared rate limits are stored in the application database", async () => {
+  await ensureSetup();
+  const request = new Request("http://platelets.local/api/test", {
+    headers: {
+      "x-forwarded-for": "203.0.113.10",
+    },
+  });
+
+  assert.equal(
+    await rateLimit.enforceSharedRateLimit(request, {
+      bucket: "unit-shared-limit",
+      limit: 1,
+      windowMs: 60_000,
+    }),
+    null,
+  );
+  const limited = await rateLimit.enforceSharedRateLimit(request, {
+    bucket: "unit-shared-limit",
+    limit: 1,
+    windowMs: 60_000,
+  });
+
+  assert.ok(limited);
+  assert.equal(limited.status, 429);
+  assert.ok(Number(limited.headers.get("retry-after")) >= 1);
+  assert.deepEqual(await limited.json(), { errorCode: "rate_limited" });
 });
 
 test("AI provider failures return stable public errors", async () => {

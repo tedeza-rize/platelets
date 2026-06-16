@@ -9,20 +9,42 @@ import styles from "./error-state.module.css";
 import { offlineImageB64 } from "./offline-image-b64";
 
 export type ErrorKind =
+  | "badRequest"
+  | "conflict"
+  | "dataUnavailable"
   | "forbidden"
+  | "gatewayTimeout"
   | "maintenance"
+  | "mapLoad"
   | "notFound"
   | "offline"
+  | "rateLimited"
+  | "routeFailed"
   | "server"
-  | "timeSync";
+  | "serviceUnavailable"
+  | "sessionExpired"
+  | "timeSync"
+  | "trainingRoom"
+  | "unauthorized";
 
 const ERROR_IMAGES: Record<ErrorKind, string> = {
+  badRequest: "/error-illustrations/not-found.png",
+  conflict: "/error-illustrations/maintenance.png",
+  dataUnavailable: "/error-illustrations/offline.png",
   forbidden: "/error-illustrations/forbidden.png",
+  gatewayTimeout: "/error-illustrations/time-sync.png",
   maintenance: "/error-illustrations/maintenance.png",
+  mapLoad: "/error-illustrations/not-found.png",
   notFound: "/error-illustrations/not-found.png",
   offline: offlineImageB64,
+  rateLimited: "/error-illustrations/maintenance.png",
+  routeFailed: "/error-illustrations/not-found.png",
   server: "/error-illustrations/server-error.png",
+  serviceUnavailable: "/error-illustrations/server-error.png",
+  sessionExpired: "/error-illustrations/time-sync.png",
   timeSync: "/error-illustrations/time-sync.png",
+  trainingRoom: "/error-illustrations/maintenance.png",
+  unauthorized: "/error-illustrations/forbidden.png",
 };
 
 type ErrorStateProps = {

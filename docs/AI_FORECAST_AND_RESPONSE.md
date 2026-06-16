@@ -108,6 +108,11 @@ Current implementation:
 - Kakao Mobility ETA is used when configured. If the Kakao route call is not
   available, the recommendation falls back to a road-distance estimate rather
   than dropping the candidate.
+- `/api/disaster/simulation` creates drill-only disaster scenarios from the
+  selected dashboard incident, location, building, weather, and risk context
+  using the configured OpenAI-compatible provider. The dashboard displays the
+  generated briefing in simulation mode without creating or mutating live
+  incident records.
 
 Minimum hospital fields used by the ranking path:
 

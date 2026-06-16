@@ -27,7 +27,9 @@ import {
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
-import styles from "./map-shell.module.css";
+import styles from "./map-shell-controls.module.css";
+import datasetStyles from "./map-shell-dataset-panel.module.css";
+import hazardStyles from "./map-shell-hazard-modal.module.css";
 
 type ProviderControlProps = {
   dictionary: AppDictionary;
@@ -281,15 +283,15 @@ export function DatasetPanel({
   return (
     <section
       aria-label={dictionary.map.datasets.panelLabel}
-      className={styles.datasetPanel}
+      className={datasetStyles.datasetPanel}
     >
-      <div className={styles.datasetStats}>
-        <span className={styles.datasetMetric}>
+      <div className={datasetStyles.datasetStats}>
+        <span className={datasetStyles.datasetMetric}>
           <MapPin aria-hidden="true" size={16} strokeWidth={2.4} />
           <span>{mappedPointCount.toLocaleString("ko-KR")}</span>
           <span>{dictionary.map.datasets.points}</span>
         </span>
-        <span className={styles.datasetMetric}>
+        <span className={datasetStyles.datasetMetric}>
           <Database aria-hidden="true" size={16} strokeWidth={2.4} />
           <span>{dictionary.map.datasets.lastUpdated}</span>
           <span>
@@ -297,7 +299,7 @@ export function DatasetPanel({
               dictionary.map.datasets.neverUpdated}
           </span>
         </span>
-        <span className={styles.datasetMetric}>
+        <span className={datasetStyles.datasetMetric}>
           <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
           <span>{hazardsCount.toLocaleString("ko-KR")}</span>
           <span>{uiText(dictionary, "최근 이벤트")}</span>
@@ -305,7 +307,7 @@ export function DatasetPanel({
       </div>
 
       {isLoadingData || dataError ? (
-        <output className={styles.dataNotice}>
+        <output className={datasetStyles.dataNotice}>
           {dataError ?? dictionary.map.datasets.loading}
         </output>
       ) : null}
@@ -321,14 +323,14 @@ export function HazardModal({
 }: HazardModalProps) {
   const titleId = useId();
   return (
-    <div className={styles.modalBackdrop} role="presentation">
+    <div className={hazardStyles.modalBackdrop} role="presentation">
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className={styles.hazardModal}
+        className={hazardStyles.hazardModal}
         role="dialog"
       >
-        <div className={styles.hazardHeader}>
+        <div className={hazardStyles.hazardHeader}>
           <div>
             <span>
               {mapCore.hazardTypeLabel(activeHazard.eventType, dictionary)}
@@ -337,14 +339,14 @@ export function HazardModal({
           </div>
           <button
             aria-label={uiText(dictionary, "이벤트 정보 닫기")}
-            className={styles.modalCloseButton}
+            className={hazardStyles.modalCloseButton}
             onClick={onClose}
             type="button"
           >
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <dl className={styles.hazardDetails}>
+        <dl className={hazardStyles.hazardDetails}>
           <div>
             <dt>{uiText(dictionary, "통보 시각")}</dt>
             <dd>{mapCore.formatDateTime(activeHazard.issuedAt) ?? "-"}</dd>
@@ -371,13 +373,15 @@ export function HazardModal({
           </div>
         </dl>
         {activeHazard.description ? (
-          <p className={styles.hazardDescription}>{activeHazard.description}</p>
+          <p className={hazardStyles.hazardDescription}>
+            {activeHazard.description}
+          </p>
         ) : null}
         {activeHazardImageUrl ? (
-          <figure className={styles.hazardImageFrame}>
+          <figure className={hazardStyles.hazardImageFrame}>
             <Image
               alt={`${activeHazard.title} ${uiText(dictionary, "기상청 관측 이미지")}`}
-              className={styles.hazardImage}
+              className={hazardStyles.hazardImage}
               height={800}
               loading="lazy"
               src={activeHazardImageUrl}

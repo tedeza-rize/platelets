@@ -9,7 +9,7 @@ import type {
   RiskLevel,
 } from "@/lib/disaster-response/types";
 import { noStoreJson } from "@/lib/http";
-import { enforceRateLimit } from "@/lib/rate-limit";
+import { enforceSharedRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   );
   if (forbidden) return forbidden;
 
-  const limited = enforceRateLimit(request, {
+  const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incidents",
     limit: 20,
     windowMs: 60_000,

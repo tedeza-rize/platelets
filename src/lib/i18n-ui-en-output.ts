@@ -87,18 +87,46 @@ export const enUiOutput = {
   "pwa.offline.title": "You are offline",
   "error.action.home": "Return to the safety map",
   "error.action.retry": "Try again",
+  "error.badRequest.description":
+    "The request was missing information the response desk needs. Check the entered location, time, and incident details, then submit again.",
+  "error.badRequest.eyebrow": "400 · Check the report",
+  "error.badRequest.imageAlt":
+    "Platelet character reviewing an incident form on a clipboard",
+  "error.badRequest.title": "The report needs one more check.",
+  "error.conflict.description":
+    "Another update reached this record first. Refresh the screen and review the latest incident state before saving again.",
+  "error.conflict.eyebrow": "409 · Updated elsewhere",
+  "error.conflict.imageAlt": "Platelet character comparing two operation notes",
+  "error.conflict.title": "This incident changed while you were working.",
+  "error.dataUnavailable.description":
+    "The requested dataset is not ready or has not been imported yet. Check the source status in the operator console, then try again.",
+  "error.dataUnavailable.eyebrow": "Data unavailable",
+  "error.dataUnavailable.imageAlt":
+    "Platelet character looking at an empty data tray",
+  "error.dataUnavailable.title": "This data has not arrived at the desk.",
   "error.forbidden.description":
     "This account cannot open this area. Ask an administrator for access if your response role needs it.",
   "error.forbidden.eyebrow": "403 · Access needed",
   "error.forbidden.imageAlt":
     "Platelet character having an access badge checked",
   "error.forbidden.title": "This badge is not cleared yet.",
+  "error.gatewayTimeout.description":
+    "A provider or route service took too long to answer. Keep the current incident information, then try the request again.",
+  "error.gatewayTimeout.eyebrow": "504 · Response timed out",
+  "error.gatewayTimeout.imageAlt":
+    "Platelet character waiting beside a signal clock",
+  "error.gatewayTimeout.title": "The outside line did not answer in time.",
   "error.maintenance.description":
     "We are tightening a few bolts to make the map sturdier. Please check back shortly.",
   "error.maintenance.eyebrow": "Scheduled maintenance",
   "error.maintenance.imageAlt":
     "Platelet character in a hard hat checking a control panel",
   "error.maintenance.title": "The map is having a quick checkup.",
+  "error.mapLoad.description":
+    "The map tiles or browser graphics layer did not start cleanly. Reload the page, and switch map providers if the problem continues.",
+  "error.mapLoad.eyebrow": "Map renderer",
+  "error.mapLoad.imageAlt": "Platelet character unfolding a map panel",
+  "error.mapLoad.title": "The map surface did not open correctly.",
   "error.notFound.description":
     "The address may have changed, or the page finished its mission and headed home. Let us plot a new route from the map.",
   "error.notFound.eyebrow": "404 · Map wandered off",
@@ -110,18 +138,53 @@ export const enUiOutput = {
   "error.offline.imageAlt":
     "Platelet character searching for an antenna signal",
   "error.offline.title": "The internet left its post for a moment.",
+  "error.rateLimited.description":
+    "Too many requests arrived in a short time. Wait a moment before retrying so shared emergency services stay available.",
+  "error.rateLimited.eyebrow": "429 · Too many requests",
+  "error.rateLimited.imageAlt":
+    "Platelet character holding a queue number display",
+  "error.rateLimited.title": "The request lane is briefly full.",
   "error.reference": "Reference: {digest}",
+  "error.routeFailed.description":
+    "The route engine could not find a reliable path for this pair of points. Confirm the coordinates and try another map provider if needed.",
+  "error.routeFailed.eyebrow": "Route calculation",
+  "error.routeFailed.imageAlt":
+    "Platelet character tracing a blocked route on a map",
+  "error.routeFailed.title": "The dispatch route could not be drawn.",
   "error.server.description":
     "Something unexpected happened, and the duty platelet is already on the radio. Please try again in a moment.",
   "error.server.eyebrow": "500 · Unexpected situation",
   "error.server.imageAlt": "Platelet character making an urgent radio call",
   "error.server.title": "The server called an emergency briefing.",
+  "error.serviceUnavailable.description":
+    "This service is temporarily unavailable. The map shell may still work, but live operations need a retry after the service recovers.",
+  "error.serviceUnavailable.eyebrow": "503 · Service unavailable",
+  "error.serviceUnavailable.imageAlt":
+    "Platelet character checking a service status board",
+  "error.serviceUnavailable.title": "This station is temporarily off duty.",
+  "error.sessionExpired.description":
+    "Your login session expired to protect operational data. Sign in again before continuing with restricted response work.",
+  "error.sessionExpired.eyebrow": "Session expired",
+  "error.sessionExpired.imageAlt":
+    "Platelet character checking an expired access pass",
+  "error.sessionExpired.title": "The shift pass needs a fresh sign-in.",
   "error.timeSync.description":
     "When device and server time drift apart, incident times, update records, and sign-in decisions can look wrong. Turn on automatic time and check NTP synchronization, then try again.",
   "error.timeSync.eyebrow": "Time synchronization",
   "error.timeSync.imageAlt":
     "Platelet character checking a clock and time signal",
   "error.timeSync.title": "Did you arrive from the past or future?",
+  "error.trainingRoom.description":
+    "Simulation mode found a drill-only lane. It is safe to explore, but live incident records stay untouched.",
+  "error.trainingRoom.eyebrow": "Easter egg · Drill room",
+  "error.trainingRoom.imageAlt":
+    "Platelet character standing beside a training mode switch",
+  "error.trainingRoom.title": "You found the practice briefing room.",
+  "error.unauthorized.description":
+    "Sign in with an operator account before opening this response area. If you are already signed in, the session may have expired.",
+  "error.unauthorized.eyebrow": "401 · Sign-in required",
+  "error.unauthorized.imageAlt": "Platelet character presenting a login pass",
+  "error.unauthorized.title": "The desk needs to know who is responding.",
   "preferences.language": "Language",
   "preferences.language.en": "English",
   "preferences.language.ko": "한국어",

@@ -3,7 +3,7 @@
 import { Ambulance, Flame, LoaderCircle, Route, X } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
-import styles from "./map-shell.module.css";
+import styles from "./emergency-routing-panel.module.css";
 
 type Coordinate = {
   latitude: number;

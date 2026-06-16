@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Ambulance,
   Building2,
+  Copy,
   Database,
   Droplets,
   Flame,
@@ -14,8 +15,10 @@ import {
   Plus,
   RefreshCw,
   Route,
+  Search,
   ShieldAlert,
   Truck,
+  X,
 } from "lucide-react";
 import type {
   GeoJSONSource,
@@ -67,7 +70,7 @@ import {
   VWORLD_3D_BUILDINGS_SOURCE_ID,
 } from "@/lib/map-shell-core";
 import { safeLinkHref } from "@/lib/safe-link";
-import styles from "./disaster-dashboard.module.css";
+import styles from "./disaster-dashboard-styles";
 
 export type DashboardView =
   | "dashboard"
@@ -123,6 +126,43 @@ type DispatchRoute = {
 type DispatchRouteResponse = {
   error?: string;
   route?: DispatchRoute;
+};
+
+type SimulationResponse = {
+  errorCode?: string;
+  scenario?: {
+    generatedAt: string;
+    model: string;
+    scenario: string;
+  };
+};
+
+type MapContextRecommendation = {
+  hospitalName: string | null;
+  stationName: string | null;
+};
+
+type MapContextMenuState = {
+  address: string | null;
+  isAddressLoading: boolean;
+  isMobile: boolean;
+  isRecommendationLoading: boolean;
+  latitude: number;
+  longitude: number;
+  recommendation: MapContextRecommendation | null;
+  screenX: number;
+  screenY: number;
+  status: string | null;
+};
+
+type ReverseGeocodingResponse = {
+  addresses?: string[];
+  errorCode?: string;
+};
+
+type EmergencyRecommendationResponse = {
+  dispatchStation?: FireStation | null;
+  hospitals?: HospitalRecommendation[];
 };
 
 type IncidentForm = {
@@ -2311,8 +2351,14 @@ export function DisasterDashboard({
   >([]);
   const [mobileSheet, setMobileSheet] = useState<MobileSheet | null>(null);
   const [mobileSheetDragOffset, setMobileSheetDragOffset] = useState(0);
+  const [mapContextMenu, setMapContextMenu] =
+    useState<MapContextMenuState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [simulationScenario, setSimulationScenario] = useState<
+    SimulationResponse["scenario"] | null
+  >(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSimulationLoading, setIsSimulationLoading] = useState(false);
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isIncidentDeleting, setIsIncidentDeleting] = useState(false);
   const [isIncidentSaving, setIsIncidentSaving] = useState(false);
@@ -2353,6 +2399,26 @@ export function DisasterDashboard({
     },
     [dictionary],
   );
+
+  const applyReportLocation = useCallback(
+    (report: ReportLocation, message: string) => {
+      reportLocationRef.current = report;
+      setReportLocation(report);
+      setForm((current) => ({
+        ...current,
+        address: report.address,
+        latitude: report.latitude.toFixed(6),
+        longitude: report.longitude.toFixed(6),
+      }));
+      setNotice(message);
+      setView("create");
+    },
+    [],
+  );
+
+  const closeMapContextMenu = useCallback(() => {
+    setMapContextMenu(null);
+  }, []);
 
   const loadSnapshot = useCallback(async () => {
     setIsLoading(true);
@@ -2734,6 +2800,7 @@ export function DisasterDashboard({
     }
 
     let disposed = false;
+    const cleanupFns: (() => void)[] = [];
 
     async function createMap() {
       if (disposed || !mapContainerRef.current) {
@@ -2794,16 +2861,120 @@ export function DisasterDashboard({
       );
 
       function selectReportLocation(report: ReportLocation, message: string) {
-        reportLocationRef.current = report;
-        setReportLocation(report);
-        setForm((current) => ({
-          ...current,
-          address: report.address,
-          latitude: report.latitude.toFixed(6),
-          longitude: report.longitude.toFixed(6),
-        }));
-        setNotice(message);
-        setView("create");
+        applyReportLocation(report, message);
+      }
+
+      function openMapActionMenu(
+        point: { x: number; y: number },
+        lngLat: { lat: number; lng: number },
+        isMobile: boolean,
+      ) {
+        popupRef.current?.remove();
+        setMobileSheet(null);
+        setMobileSheetDragOffset(0);
+        mobileSheetDragStartRef.current = null;
+        const latitude = Number(lngLat.lat.toFixed(6));
+        const longitude = Number(lngLat.lng.toFixed(6));
+        const menuWidth = 312;
+        const menuHeight = 280;
+        const screenX = Math.min(
+          Math.max(point.x, 12),
+          Math.max(12, container.clientWidth - menuWidth - 12),
+        );
+        const screenY = Math.min(
+          Math.max(point.y, 12),
+          Math.max(12, container.clientHeight - menuHeight - 12),
+        );
+
+        setMapContextMenu({
+          address: null,
+          isAddressLoading: false,
+          isMobile,
+          isRecommendationLoading: false,
+          latitude,
+          longitude,
+          recommendation: null,
+          screenX,
+          screenY,
+          status: null,
+        });
+      }
+
+      function installLongPressMenu() {
+        const canvas = map.getCanvas();
+        let startPoint: { x: number; y: number } | null = null;
+        let startLngLat: { lat: number; lng: number } | null = null;
+        let timeoutId: number | null = null;
+
+        function clearLongPress() {
+          if (timeoutId !== null) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          startPoint = null;
+          startLngLat = null;
+        }
+
+        function canvasPoint(event: PointerEvent) {
+          const rect = canvas.getBoundingClientRect();
+          return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+          };
+        }
+
+        function beginLongPress(event: PointerEvent) {
+          if (event.pointerType === "mouse") {
+            return;
+          }
+
+          startPoint = canvasPoint(event);
+          const lngLat = map.unproject([startPoint.x, startPoint.y]);
+          startLngLat = { lat: lngLat.lat, lng: lngLat.lng };
+          timeoutId = window.setTimeout(() => {
+            if (!(startPoint && startLngLat)) {
+              return;
+            }
+
+            event.preventDefault();
+            openMapActionMenu(startPoint, startLngLat, true);
+            clearLongPress();
+          }, 650);
+        }
+
+        function updateLongPress(event: PointerEvent) {
+          if (!(startPoint && timeoutId !== null)) {
+            return;
+          }
+
+          const point = canvasPoint(event);
+          const moved = Math.hypot(
+            point.x - startPoint.x,
+            point.y - startPoint.y,
+          );
+
+          if (moved > 12) {
+            clearLongPress();
+          }
+        }
+
+        canvas.addEventListener("pointerdown", beginLongPress, {
+          passive: false,
+        });
+        canvas.addEventListener("pointermove", updateLongPress, {
+          passive: true,
+        });
+        canvas.addEventListener("pointercancel", clearLongPress);
+        canvas.addEventListener("pointerleave", clearLongPress);
+        canvas.addEventListener("pointerup", clearLongPress);
+        cleanupFns.push(() => {
+          clearLongPress();
+          canvas.removeEventListener("pointerdown", beginLongPress);
+          canvas.removeEventListener("pointermove", updateLongPress);
+          canvas.removeEventListener("pointercancel", clearLongPress);
+          canvas.removeEventListener("pointerleave", clearLongPress);
+          canvas.removeEventListener("pointerup", clearLongPress);
+        });
       }
 
       async function showBuildingPopup(
@@ -3142,6 +3313,15 @@ export function DisasterDashboard({
         );
         showReportLocationPopup(report);
       });
+      map.on("contextmenu", (event) => {
+        event.preventDefault();
+        openMapActionMenu(
+          { x: event.point.x, y: event.point.y },
+          { lat: event.lngLat.lat, lng: event.lngLat.lng },
+          false,
+        );
+      });
+      installLongPressMenu();
       for (const layerId of [
         REPORT_LOCATION_POINT_LAYER_ID,
         REPORT_LOCATION_LABEL_LAYER_ID,
@@ -3173,6 +3353,9 @@ export function DisasterDashboard({
 
     return () => {
       disposed = true;
+      for (const cleanup of cleanupFns.splice(0)) {
+        cleanup();
+      }
       popupRef.current?.remove();
       popupRef.current = null;
       mapRef.current?.remove();
@@ -3184,6 +3367,7 @@ export function DisasterDashboard({
     dashboardText,
     dictionary.formatLocale,
     effectiveMapSettings,
+    applyReportLocation,
     loadRecommendations,
     visibleBigDataKinds,
     vworldApiKey,
@@ -3267,6 +3451,54 @@ export function DisasterDashboard({
   const bigData119Summaries = snapshot?.bigData119Summaries ?? [];
   const bigData119OperationalSummaries =
     snapshot?.bigData119OperationalSummaries ?? [];
+
+  async function generateSimulationScenario() {
+    const location =
+      reportLocation ?? activeIncident ?? snapshot?.activeIncident;
+    const riskArea = activeRiskArea ?? snapshot?.riskAreas[0] ?? null;
+    const incident = activeIncident ?? snapshot?.activeIncident ?? null;
+
+    setIsSimulationLoading(true);
+    setNotice(dashboardText("dashboard.simulation.generating"));
+
+    try {
+      const response = await fetch("/api/disaster/simulation", {
+        body: JSON.stringify({
+          buildingContext: location
+            ? `${location.address} (${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`
+            : dashboardText("dashboard.simulation.noBuilding"),
+          incidentContext: incident
+            ? `${incident.title} / ${incident.type} / ${incident.riskLevel} / ${incident.description}`
+            : dashboardText("dashboard.simulation.noIncident"),
+          locationContext: location
+            ? `${location.address} (${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)})`
+            : dashboardText("dashboard.simulation.noLocation"),
+          riskContext: riskArea
+            ? `${riskArea.name} / ${riskArea.riskLevel} / ${riskArea.factors.join(", ")}`
+            : dashboardText("dashboard.simulation.noRisk"),
+          weatherContext: dashboardText("dashboard.simulation.weatherFallback"),
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload = (await response.json()) as SimulationResponse;
+
+      if (!(response.ok && payload.scenario)) {
+        throw new Error(
+          payload.errorCode
+            ? dashboardText(`dashboard.simulation.error.${payload.errorCode}`)
+            : dashboardText("dashboard.simulation.error.default"),
+        );
+      }
+
+      setSimulationScenario(payload.scenario);
+      setNotice(dashboardText("dashboard.simulation.ready"));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSimulationLoading(false);
+    }
+  }
 
   async function createIncident(event: React.FormEvent) {
     event.preventDefault();
@@ -3447,6 +3679,161 @@ export function DisasterDashboard({
     mobileSheetDragStartRef.current = null;
   }
 
+  async function copyMapContextCoordinates() {
+    if (!mapContextMenu) {
+      return;
+    }
+
+    const label = coordinateText(
+      mapContextMenu.latitude,
+      mapContextMenu.longitude,
+    );
+
+    try {
+      await navigator.clipboard.writeText(label);
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              status: dashboardText("dashboard.context.copied"),
+            }
+          : current,
+      );
+    } catch {
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              status: dashboardText("dashboard.context.copyFailed"),
+            }
+          : current,
+      );
+    }
+  }
+
+  async function lookupMapContextAddress() {
+    if (!mapContextMenu) {
+      return;
+    }
+
+    setMapContextMenu((current) =>
+      current ? { ...current, isAddressLoading: true, status: null } : current,
+    );
+
+    try {
+      const response = await fetch(
+        `/api/geocoding/reverse?latitude=${encodeURIComponent(
+          String(mapContextMenu.latitude),
+        )}&longitude=${encodeURIComponent(String(mapContextMenu.longitude))}`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json()) as ReverseGeocodingResponse;
+      const address = payload.addresses?.[0] ?? null;
+
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              address,
+              isAddressLoading: false,
+              status: address
+                ? dashboardText("dashboard.context.addressFound")
+                : dashboardText("dashboard.context.addressUnavailable"),
+            }
+          : current,
+      );
+    } catch {
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              isAddressLoading: false,
+              status: dashboardText("dashboard.context.addressUnavailable"),
+            }
+          : current,
+      );
+    }
+  }
+
+  async function loadMapContextRecommendations() {
+    if (!mapContextMenu) {
+      return;
+    }
+
+    setMapContextMenu((current) =>
+      current
+        ? { ...current, isRecommendationLoading: true, status: null }
+        : current,
+    );
+
+    try {
+      const response = await fetch("/api/emergency/recommendations", {
+        body: JSON.stringify({
+          incidentType: "fire",
+          latitude: mapContextMenu.latitude,
+          longitude: mapContextMenu.longitude,
+          scenario: "general",
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload =
+        (await response.json()) as EmergencyRecommendationResponse;
+      const stationName = payload.dispatchStation?.name ?? null;
+      const hospitalName = payload.hospitals?.[0]?.hospital.name ?? null;
+
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              isRecommendationLoading: false,
+              recommendation: { hospitalName, stationName },
+              status:
+                stationName || hospitalName
+                  ? dashboardText("dashboard.context.nearestSummary", {
+                      hospital:
+                        hospitalName ?? dashboardText("dashboard.context.none"),
+                      station:
+                        stationName ?? dashboardText("dashboard.context.none"),
+                    })
+                  : dashboardText("dashboard.context.nearbyUnavailable"),
+            }
+          : current,
+      );
+    } catch {
+      setMapContextMenu((current) =>
+        current
+          ? {
+              ...current,
+              isRecommendationLoading: false,
+              status: dashboardText("dashboard.context.nearbyUnavailable"),
+            }
+          : current,
+      );
+    }
+  }
+
+  function useMapContextForReport() {
+    if (!mapContextMenu) {
+      return;
+    }
+
+    const coordinates = coordinateText(
+      mapContextMenu.latitude,
+      mapContextMenu.longitude,
+    );
+    const report = createReportLocation(
+      [mapContextMenu.longitude, mapContextMenu.latitude],
+      mapContextMenu.address ??
+        dashboardText("dashboard.context.reportAddress", { coordinates }),
+    );
+
+    applyReportLocation(report, dashboardText("dashboard.notice.mapSelected"));
+    setMobileSheet(reportLocationSheet(report, dashboardText));
+    setMobileSheetDragOffset(0);
+    closeMapContextMenu();
+  }
+
   function beginMobileSheetDrag(event: React.PointerEvent<HTMLElement>) {
     mobileSheetDragStartRef.current = event.clientY;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -3482,6 +3869,11 @@ export function DisasterDashboard({
   const riskAreas = snapshot?.riskAreas ?? [];
   const incidents = snapshot?.incidents ?? [];
   const recommendations = snapshot?.resourceRecommendations ?? [];
+  const tickerItems = useMemo(
+    () =>
+      incidents.filter((incident) => incident.status !== "closed").slice(0, 6),
+    [incidents],
+  );
   const filteredIncidents = useMemo(() => {
     const query = incidentSearch.trim().toLowerCase();
 
@@ -3617,6 +4009,54 @@ export function DisasterDashboard({
               {dashboardText("소방용수")}
             </button>
           </div>
+          <div
+            aria-label={dashboardText("dashboard.ticker.aria")}
+            className={styles.liveTicker}
+            role="status"
+          >
+            <span>{dashboardText("dashboard.ticker.live")}</span>
+            <div>
+              <div className={styles.liveTickerTrack}>
+                {(tickerItems.length > 0 ? tickerItems : [null]).map(
+                  (incident, index) => (
+                    <strong
+                      key={incident?.id ?? `empty-${index}`}
+                      className={incident ? undefined : styles.tickerMuted}
+                    >
+                      {incident
+                        ? dashboardText("dashboard.ticker.item", {
+                            address: incident.address,
+                            risk: dashboardText(
+                              RISK_LEVEL_LABEL[incident.riskLevel],
+                            ),
+                            status: dashboardText(
+                              INCIDENT_STATUS_LABEL[incident.status],
+                            ),
+                            title: incident.title,
+                            type: dashboardText(
+                              INCIDENT_TYPE_LABEL[incident.type],
+                            ),
+                          })
+                        : dashboardText("dashboard.ticker.empty")}
+                    </strong>
+                  ),
+                )}
+                {tickerItems.map((incident) => (
+                  <strong aria-hidden="true" key={`${incident.id}-repeat`}>
+                    {dashboardText("dashboard.ticker.item", {
+                      address: incident.address,
+                      risk: dashboardText(RISK_LEVEL_LABEL[incident.riskLevel]),
+                      status: dashboardText(
+                        INCIDENT_STATUS_LABEL[incident.status],
+                      ),
+                      title: incident.title,
+                      type: dashboardText(INCIDENT_TYPE_LABEL[incident.type]),
+                    })}
+                  </strong>
+                ))}
+              </div>
+            </div>
+          </div>
           <MapLegend
             items={[
               {
@@ -3651,6 +4091,118 @@ export function DisasterDashboard({
               },
             ]}
           />
+          {mapContextMenu ? (
+            <aside
+              aria-label={dashboardText(
+                mapContextMenu.isMobile
+                  ? "dashboard.context.mobileAria"
+                  : "dashboard.context.desktopAria",
+              )}
+              className={
+                mapContextMenu.isMobile
+                  ? styles.mapContextSheet
+                  : styles.mapContextMenu
+              }
+              data-testid="map-context-menu"
+              style={
+                mapContextMenu.isMobile
+                  ? undefined
+                  : {
+                      left: mapContextMenu.screenX,
+                      top: mapContextMenu.screenY,
+                    }
+              }
+            >
+              <div className={styles.mapContextHeader}>
+                <div>
+                  <span>{dashboardText("dashboard.context.subtitle")}</span>
+                  <strong>{dashboardText("dashboard.context.title")}</strong>
+                </div>
+                <button
+                  aria-label={dashboardText("dashboard.context.close")}
+                  onClick={closeMapContextMenu}
+                  type="button"
+                >
+                  <X aria-hidden="true" size={16} />
+                </button>
+              </div>
+              <dl className={styles.mapContextDetails}>
+                <div>
+                  <dt>{dashboardText("dashboard.sheet.coordinates")}</dt>
+                  <dd>
+                    {coordinateText(
+                      mapContextMenu.latitude,
+                      mapContextMenu.longitude,
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{dashboardText("dashboard.sheet.address")}</dt>
+                  <dd>
+                    {mapContextMenu.address ??
+                      dashboardText("dashboard.context.addressPending")}
+                  </dd>
+                </div>
+                {mapContextMenu.recommendation ? (
+                  <>
+                    <div>
+                      <dt>{dashboardText("dashboard.context.station")}</dt>
+                      <dd>
+                        {mapContextMenu.recommendation.stationName ??
+                          dashboardText("dashboard.context.none")}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{dashboardText("dashboard.context.hospital")}</dt>
+                      <dd>
+                        {mapContextMenu.recommendation.hospitalName ??
+                          dashboardText("dashboard.context.none")}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
+              </dl>
+              {mapContextMenu.status ? (
+                <p className={styles.mapContextStatus}>
+                  {mapContextMenu.status}
+                </p>
+              ) : null}
+              <div className={styles.mapContextActions}>
+                <button onClick={copyMapContextCoordinates} type="button">
+                  <Copy aria-hidden="true" size={15} />
+                  {dashboardText("dashboard.context.copyCoordinates")}
+                </button>
+                <button
+                  disabled={mapContextMenu.isAddressLoading}
+                  onClick={lookupMapContextAddress}
+                  type="button"
+                >
+                  <Search aria-hidden="true" size={15} />
+                  {dashboardText(
+                    mapContextMenu.isAddressLoading
+                      ? "dashboard.context.addressLoading"
+                      : "dashboard.context.lookupAddress",
+                  )}
+                </button>
+                <button
+                  disabled={mapContextMenu.isRecommendationLoading}
+                  onClick={loadMapContextRecommendations}
+                  type="button"
+                >
+                  <Truck aria-hidden="true" size={15} />
+                  {dashboardText(
+                    mapContextMenu.isRecommendationLoading
+                      ? "dashboard.context.nearbyLoading"
+                      : "dashboard.context.nearby",
+                  )}
+                </button>
+                <button onClick={useMapContextForReport} type="button">
+                  <MapPin aria-hidden="true" size={15} />
+                  {dashboardText("dashboard.context.reportHere")}
+                </button>
+              </div>
+            </aside>
+          ) : null}
           {mobileSheet ? (
             <aside
               aria-label={dashboardText("dashboard.sheet.aria")}
@@ -3754,6 +4306,50 @@ export function DisasterDashboard({
           />
 
           {notice ? <output className={styles.notice}>{notice}</output> : null}
+
+          <section className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <span className={styles.kicker}>
+                {dashboardText("dashboard.simulation.kicker")}
+              </span>
+              <strong>{dashboardText("dashboard.simulation.title")}</strong>
+            </div>
+            <p className={styles.description}>
+              {dashboardText("dashboard.simulation.description")}
+            </p>
+            <div className={styles.statusActions}>
+              <button
+                className={styles.primaryButton}
+                disabled={isSimulationLoading}
+                onClick={generateSimulationScenario}
+                type="button"
+              >
+                <ShieldAlert aria-hidden="true" size={16} />
+                {isSimulationLoading
+                  ? dashboardText("dashboard.simulation.loading")
+                  : dashboardText("dashboard.simulation.action")}
+              </button>
+            </div>
+            {simulationScenario ? (
+              <article className={styles.analysisCard}>
+                <strong>
+                  {dashboardText("dashboard.simulation.briefing")}
+                </strong>
+                <small>
+                  {dashboardText("dashboard.simulation.meta", {
+                    generatedAt: formatDateTime(
+                      simulationScenario.generatedAt,
+                      dictionary.formatLocale,
+                    ),
+                    model: simulationScenario.model,
+                  })}
+                </small>
+                <p className={styles.itemReasons}>
+                  {simulationScenario.scenario}
+                </p>
+              </article>
+            ) : null}
+          </section>
 
           {bigData119Summaries.length > 0 ? (
             <section className={styles.section}>
