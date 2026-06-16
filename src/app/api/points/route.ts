@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { requireAccessRole } from "@/lib/access-control";
-import { isDatasetSourceId } from "@/lib/dataset-sources";
+import { type DatasetSourceId, isDatasetSourceId } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import { decodeListingCursor } from "@/lib/listing-cursors";
 import {
@@ -26,6 +26,26 @@ function numberParam(searchParams: URLSearchParams, name: string) {
   const value = Number(raw);
 
   return Number.isFinite(value) ? value : Number.NaN;
+}
+
+function parseSources(searchParams: URLSearchParams) {
+  const values = searchParams
+    .getAll("source")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const uniqueValues = [...new Set(values)];
+  const sources: DatasetSourceId[] = [];
+
+  for (const value of uniqueValues) {
+    if (!isDatasetSourceId(value)) {
+      return null;
+    }
+
+    sources.push(value);
+  }
+
+  return sources;
 }
 
 async function loadPoints(
@@ -71,8 +91,8 @@ async function loadPointPage(
 }
 
 export async function GET(request: NextRequest) {
-  const source = request.nextUrl.searchParams.get("source");
   const searchParams = request.nextUrl.searchParams;
+  const sources = parseSources(searchParams);
   const includeUnmapped = searchParams.get("includeUnmapped") === "true";
   const includeRaw = searchParams.get("includeRaw") === "true";
   const detail = searchParams.get("detail") ?? (includeRaw ? "raw" : "map");
@@ -85,7 +105,7 @@ export async function GET(request: NextRequest) {
   const centerLatitude = numberParam(searchParams, "centerLatitude");
   const centerLongitude = numberParam(searchParams, "centerLongitude");
 
-  if (source && !isDatasetSourceId(source)) {
+  if (sources === null) {
     return noStoreJson({ error: "Unknown source" }, { status: 400 });
   }
 
@@ -157,7 +177,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const selectedSource = source && isDatasetSourceId(source) ? source : null;
   const options = {
     bounds:
       minLatitude !== null &&
@@ -172,7 +191,8 @@ export async function GET(request: NextRequest) {
         : undefined,
     includeUnmapped,
     limit: limitParam ?? undefined,
-    source: selectedSource,
+    source: sources.length === 1 ? sources[0] : null,
+    sources: sources.length > 1 ? sources : undefined,
   };
   const page = hasCenter
     ? null

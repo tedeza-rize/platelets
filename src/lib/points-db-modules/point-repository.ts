@@ -120,9 +120,15 @@ export function validatePointListCursor(
 
 function buildPointWhereClause(options: PointSearchOptions) {
   const conditions: Array<keyof typeof POINT_WHERE_CLAUSES> = [];
+  const dynamicConditions: string[] = [];
   const params: unknown[] = [];
 
-  if (options.source) {
+  if (options.sources && options.sources.length > 0) {
+    dynamicConditions.push(
+      `p.source IN (${options.sources.map(() => "?").join(", ")})`,
+    );
+    params.push(...options.sources);
+  } else if (options.source) {
     conditions.push("source");
     params.push(options.source);
   }
@@ -135,7 +141,10 @@ function buildPointWhereClause(options: PointSearchOptions) {
     params.push(options.bounds.minLongitude, options.bounds.maxLongitude);
   }
 
-  const selected = conditions.map((id) => POINT_WHERE_CLAUSES[id]);
+  const selected = [
+    ...dynamicConditions,
+    ...conditions.map((id) => POINT_WHERE_CLAUSES[id]),
+  ];
   return {
     params,
     where: selected.length > 0 ? `WHERE ${selected.join(" AND ")}` : "",
