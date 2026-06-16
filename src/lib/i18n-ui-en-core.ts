@@ -125,6 +125,8 @@ export const enUiCore = {
   Username: "Username",
   "Loading incidents...": "Loading incidents...",
   "Loading users...": "Loading users...",
+  "Too many requests. Wait a moment before retrying.":
+    "Too many requests. Wait a moment before retrying.",
   "Too many sign-in attempts. Try again shortly.":
     "Too many sign-in attempts. Try again shortly.",
   admin: "Administrator",
@@ -227,6 +229,8 @@ export const enUiCore = {
     "The AI provider is unavailable. Try again later.",
   "dashboard.simulation.error.default":
     "Could not generate the simulation scenario.",
+  "dashboard.simulation.error.rate_limited":
+    "Too many requests. Wait a moment before retrying.",
   "dashboard.simulation.generating": "Generating simulation scenario.",
   "dashboard.simulation.kicker": "Training mode",
   "dashboard.simulation.loading": "Generating",

@@ -2432,7 +2432,9 @@ export function DisasterDashboard({
 
       if (!response.ok) {
         throw new Error(
-          payload.error ?? dashboardText("dashboard.notice.loadFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload.error ?? dashboardText("dashboard.notice.loadFailed")),
         );
       }
 
@@ -2480,8 +2482,10 @@ export function DisasterDashboard({
 
       if (!response.ok) {
         setNotice(
-          payload.error ??
-            dashboardText("dashboard.notice.recommendationFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload.error ??
+                dashboardText("dashboard.notice.recommendationFailed")),
         );
         return;
       }
@@ -2545,7 +2549,9 @@ export function DisasterDashboard({
 
         if (!(response.ok && payload.route)) {
           throw new Error(
-            payload.error ?? dashboardText("dashboard.route.failed"),
+            response.status === 429
+              ? dashboardText("dashboard.notice.rateLimited")
+              : (payload.error ?? dashboardText("dashboard.route.failed")),
           );
         }
 
@@ -3522,7 +3528,9 @@ export function DisasterDashboard({
 
       if (!(response.ok && payload.incident)) {
         throw new Error(
-          payload.error ?? dashboardText("dashboard.notice.createFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload.error ?? dashboardText("dashboard.notice.createFailed")),
         );
       }
 
@@ -3561,7 +3569,9 @@ export function DisasterDashboard({
 
       if (!(response.ok && payload.incident)) {
         throw new Error(
-          payload.error ?? dashboardText("dashboard.notice.statusFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload.error ?? dashboardText("dashboard.notice.statusFailed")),
         );
       }
 
@@ -3615,7 +3625,9 @@ export function DisasterDashboard({
 
       if (!(response.ok && payload.incident)) {
         throw new Error(
-          payload.error ?? dashboardText("dashboard.notice.saveFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload.error ?? dashboardText("dashboard.notice.saveFailed")),
         );
       }
 
@@ -3654,7 +3666,10 @@ export function DisasterDashboard({
 
       if (!(response.ok && payload?.deleted)) {
         throw new Error(
-          payload?.error ?? dashboardText("dashboard.notice.deleteFailed"),
+          response.status === 429
+            ? dashboardText("dashboard.notice.rateLimited")
+            : (payload?.error ??
+                dashboardText("dashboard.notice.deleteFailed")),
         );
       }
 
@@ -3729,6 +3744,13 @@ export function DisasterDashboard({
       );
       const payload = (await response.json()) as ReverseGeocodingResponse;
       const address = payload.addresses?.[0] ?? null;
+      const addressStatusKey = address
+        ? "dashboard.context.addressFound"
+        : "dashboard.context.addressUnavailable";
+      const status =
+        response.status === 429
+          ? dashboardText("dashboard.notice.rateLimited")
+          : dashboardText(addressStatusKey);
 
       setMapContextMenu((current) =>
         current
@@ -3736,9 +3758,7 @@ export function DisasterDashboard({
               ...current,
               address,
               isAddressLoading: false,
-              status: address
-                ? dashboardText("dashboard.context.addressFound")
-                : dashboardText("dashboard.context.addressUnavailable"),
+              status,
             }
           : current,
       );
