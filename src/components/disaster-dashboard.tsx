@@ -26,7 +26,14 @@ import type {
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MapLegend } from "@/components/disaster-dashboard/map-legend";
 import { SummaryMetrics } from "@/components/disaster-dashboard/summary-metrics";
 import { useIncidentEvents } from "@/components/disaster-dashboard/use-incident-events";
@@ -1593,6 +1600,29 @@ function OperationalSourceIcon({ kind }: { kind: string }) {
     <Truck aria-hidden="true" size={16} />
   ) : (
     <AlertTriangle aria-hidden="true" size={16} />
+  );
+}
+
+function DataSourceItemLink({
+  children,
+  href,
+}: {
+  children: ReactNode;
+  href: string;
+}) {
+  const safeHref = safeLinkHref(href);
+
+  return safeHref ? (
+    <a
+      className={styles.dataSourceItem}
+      href={safeHref}
+      rel="noreferrer"
+      target="_blank"
+    >
+      {children}
+    </a>
+  ) : (
+    <div className={styles.dataSourceItem}>{children}</div>
   );
 }
 
@@ -3591,12 +3621,9 @@ export function DisasterDashboard({
               </div>
               <div className={styles.dataSourceGrid}>
                 {bigData119Summaries.map((source) => (
-                  <a
-                    className={styles.dataSourceItem}
+                  <DataSourceItemLink
                     href={source.sourceUrl}
                     key={source.sourceId}
-                    rel="noreferrer"
-                    target="_blank"
                   >
                     {source.kind === "fire-water-source" ? (
                       <Droplets aria-hidden="true" size={16} />
@@ -3623,7 +3650,7 @@ export function DisasterDashboard({
                         })}
                       </span>
                     </div>
-                  </a>
+                  </DataSourceItemLink>
                 ))}
               </div>
             </section>
@@ -3643,12 +3670,9 @@ export function DisasterDashboard({
               </div>
               <div className={styles.dataSourceGrid}>
                 {bigData119OperationalSummaries.map((source) => (
-                  <a
-                    className={styles.dataSourceItem}
+                  <DataSourceItemLink
                     href={source.sourceUrl}
                     key={source.sourceId}
-                    rel="noreferrer"
-                    target="_blank"
                   >
                     <OperationalSourceIcon kind={source.kind} />
                     <div>
@@ -3713,7 +3737,7 @@ export function DisasterDashboard({
                         </span>
                       ) : null}
                     </div>
-                  </a>
+                  </DataSourceItemLink>
                 ))}
               </div>
             </section>
