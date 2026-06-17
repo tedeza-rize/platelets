@@ -5,10 +5,23 @@ import { requireSetupComplete } from "@/lib/setup-redirect";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export default async function AdminPage(props: { searchParams: SearchParams }) {
   await requireSetupComplete();
+
+  const searchParams = await props.searchParams;
+  const tab =
+    typeof searchParams.tab === "string" ? searchParams.tab : undefined;
 
   const dictionary = getDictionary(await getRequestLocale());
 
-  return <ManagementConsole dictionary={dictionary} mode="admin" />;
+  return (
+    <ManagementConsole
+      dictionary={dictionary}
+      mode="admin"
+      hasSudoSession={false}
+      tab={tab}
+    />
+  );
 }

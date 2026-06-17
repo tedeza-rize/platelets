@@ -1,28 +1,16 @@
 "use client";
 
 import { KeyRound, LoaderCircle, RefreshCw, Save } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  API_KEY_FIELDS,
+  type ApiKeyField,
+  INTEGRATION_FIELDS,
+  type SecretField,
+  SecretInput,
+} from "@/components/secret-input";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.css";
-
-const API_KEY_FIELDS = [
-  "vworldApiKey",
-  "publicDataApiKey",
-  "kakaoRestApiKey",
-  "kakaoMobilityRestApiKey",
-  "seoulOpenApiKey",
-  "openaiApiKey",
-] as const;
-const INTEGRATION_FIELDS = [
-  "itsOpenApiKey",
-  "incidentWebhookUrls",
-  "webPushPublicKey",
-  "webPushPrivateKey",
-  "webPushContact",
-] as const;
-type ApiKeyField = (typeof API_KEY_FIELDS)[number];
-type IntegrationField = (typeof INTEGRATION_FIELDS)[number];
-type SecretField = ApiKeyField | IntegrationField;
 
 type SettingsSummary = {
   apiKeys: {
@@ -41,155 +29,189 @@ function emptyDraft() {
   ) as Record<SecretField, string>;
 }
 
-function SecretInput({
-  clear,
+type SettingsGridProps = {
+  panelTab: "map" | "data" | "ai" | "notification";
+  configured: (field: SecretField) => boolean;
+  dictionary: AppDictionary;
+  draft: Record<SecretField, string>;
+  setDraft: React.Dispatch<React.SetStateAction<Record<SecretField, string>>>;
+};
+
+function SettingsGrid({
+  panelTab,
   configured,
   dictionary,
-  field,
-  multiline = false,
-  onClear,
-  onValue,
-  value,
-}: {
-  clear: boolean;
-  configured: boolean;
-  dictionary: AppDictionary;
-  field: SecretField;
-  multiline?: boolean;
-  onClear: (checked: boolean) => void;
-  onValue: (value: string) => void;
-  value: string;
-}) {
-  const t = (key: string) => uiText(dictionary, key);
-  const inputId = `integration-${field}`;
-  const inputProps = {
-    autoComplete: "off",
-    className: styles.textInput,
-    disabled: clear,
-    id: inputId,
-    onChange: (
-      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => onValue(event.target.value),
-    placeholder: configured
-      ? t("integrationSettings.configured")
-      : t("integrationSettings.notConfigured"),
-    value,
+  draft,
+  setDraft,
+}: SettingsGridProps) {
+  const setField = (field: SecretField, value: string) => {
+    setDraft((current) => ({ ...current, [field]: value }));
   };
 
-  return (
-    <div className={styles.secretField}>
-      <label className={styles.fieldLabel} htmlFor={inputId}>
-        {t(`integrationSettings.field.${field}`)}
-        {multiline ? (
-          <textarea {...inputProps} rows={3} />
-        ) : (
-          <input {...inputProps} type="password" />
-        )}
-      </label>
-      <label className={styles.clearRow}>
-        <input
-          checked={clear}
-          onChange={(event) => onClear(event.target.checked)}
-          type="checkbox"
+  if (panelTab === "map") {
+    return (
+      <>
+        <SecretInput
+          configured={configured("vworldApiKey")}
+          dictionary={dictionary}
+          field="vworldApiKey"
+          onValue={(val) => setField("vworldApiKey", val)}
+          value={draft.vworldApiKey}
         />
-        {t("integrationSettings.clear")}
-      </label>
-    </div>
-  );
+        <SecretInput
+          configured={configured("kakaoRestApiKey")}
+          dictionary={dictionary}
+          field="kakaoRestApiKey"
+          onValue={(val) => setField("kakaoRestApiKey", val)}
+          value={draft.kakaoRestApiKey}
+        />
+        <SecretInput
+          configured={configured("kakaoMobilityRestApiKey")}
+          dictionary={dictionary}
+          field="kakaoMobilityRestApiKey"
+          onValue={(val) => setField("kakaoMobilityRestApiKey", val)}
+          value={draft.kakaoMobilityRestApiKey}
+        />
+      </>
+    );
+  }
+
+  if (panelTab === "data") {
+    return (
+      <>
+        <SecretInput
+          configured={configured("publicDataApiKey")}
+          dictionary={dictionary}
+          field="publicDataApiKey"
+          onValue={(val) => setField("publicDataApiKey", val)}
+          value={draft.publicDataApiKey}
+        />
+        <SecretInput
+          configured={configured("seoulOpenApiKey")}
+          dictionary={dictionary}
+          field="seoulOpenApiKey"
+          onValue={(val) => setField("seoulOpenApiKey", val)}
+          value={draft.seoulOpenApiKey}
+        />
+        <SecretInput
+          configured={configured("itsOpenApiKey")}
+          dictionary={dictionary}
+          field="itsOpenApiKey"
+          onValue={(val) => setField("itsOpenApiKey", val)}
+          value={draft.itsOpenApiKey}
+        />
+      </>
+    );
+  }
+
+  if (panelTab === "ai") {
+    return (
+      <SecretInput
+        configured={configured("openaiApiKey")}
+        dictionary={dictionary}
+        field="openaiApiKey"
+        onValue={(val) => setField("openaiApiKey", val)}
+        value={draft.openaiApiKey}
+      />
+    );
+  }
+
+  if (panelTab === "notification") {
+    return (
+      <>
+        <SecretInput
+          configured={configured("incidentWebhookUrls")}
+          dictionary={dictionary}
+          field="incidentWebhookUrls"
+          multiline={true}
+          onValue={(val) => setField("incidentWebhookUrls", val)}
+          value={draft.incidentWebhookUrls}
+        />
+        <SecretInput
+          configured={configured("webPushPublicKey")}
+          dictionary={dictionary}
+          field="webPushPublicKey"
+          onValue={(val) => setField("webPushPublicKey", val)}
+          value={draft.webPushPublicKey}
+        />
+        <SecretInput
+          configured={configured("webPushPrivateKey")}
+          dictionary={dictionary}
+          field="webPushPrivateKey"
+          onValue={(val) => setField("webPushPrivateKey", val)}
+          value={draft.webPushPrivateKey}
+        />
+        <SecretInput
+          configured={configured("webPushContact")}
+          dictionary={dictionary}
+          field="webPushContact"
+          onValue={(val) => setField("webPushContact", val)}
+          value={draft.webPushContact}
+        />
+      </>
+    );
+  }
+
+  return null;
 }
 
 export function IntegrationSettingsPanel({
   dictionary,
   ensureSudoSession,
+  isSudoActive,
 }: {
   dictionary: AppDictionary;
   ensureSudoSession: () => Promise<void>;
+  isSudoActive?: boolean;
 }) {
-  const t = (key: string) => uiText(dictionary, key);
+  const t = useCallback((key: string) => uiText(dictionary, key), [dictionary]);
   const [summary, setSummary] = useState<SettingsSummary | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
-  const [clearFields, setClearFields] = useState<Set<SecretField>>(new Set());
   const [busy, setBusy] = useState<"load" | "save" | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [panelTab, setPanelTab] = useState<
+    "map" | "data" | "ai" | "notification"
+  >("map");
 
-  function configured(field: SecretField) {
-    if (!summary) return false;
-    if (field === "itsOpenApiKey") {
-      return summary.integrations.itsOpenApiKeyConfigured;
-    }
-    if (field === "incidentWebhookUrls") {
-      return summary.integrations.incidentWebhookCount > 0;
-    }
-    if (field.startsWith("webPush")) {
-      return summary.integrations.webPushConfigured;
-    }
-    return summary.apiKeys.configured[field as ApiKeyField];
-  }
+  const configured = useCallback(
+    (field: SecretField) => {
+      if (!summary) return false;
+      if (field === "itsOpenApiKey") {
+        return summary.integrations.itsOpenApiKeyConfigured;
+      }
+      if (field === "incidentWebhookUrls") {
+        return summary.integrations.incidentWebhookCount > 0;
+      }
+      if (field.startsWith("webPush")) {
+        return summary.integrations.webPushConfigured;
+      }
+      return summary.apiKeys.configured[field as ApiKeyField];
+    },
+    [summary],
+  );
 
-  function updateClear(field: SecretField, checked: boolean) {
-    setClearFields((current) => {
-      const next = new Set(current);
-      if (checked) next.add(field);
-      else next.delete(field);
-      return next;
-    });
-  }
-
-  async function request(action: "load" | "save") {
-    setBusy(action);
+  const loadSettings = useCallback(async () => {
+    setBusy("load");
     setNotice("");
     setError("");
 
     try {
       await ensureSudoSession();
       const response = await fetch("/api/admin/integrations", {
-        body:
-          action === "save"
-            ? JSON.stringify({
-                apiKeys: {
-                  ...Object.fromEntries(
-                    API_KEY_FIELDS.map((field) => [field, draft[field]]),
-                  ),
-                },
-                clearApiKeys: API_KEY_FIELDS.filter((field) =>
-                  clearFields.has(field),
-                ),
-                integrations: {
-                  ...Object.fromEntries(
-                    INTEGRATION_FIELDS.map((field) => [field, draft[field]]),
-                  ),
-                  clear: INTEGRATION_FIELDS.filter((field) =>
-                    clearFields.has(field),
-                  ),
-                },
-              })
-            : undefined,
-        headers: { "Content-Type": "application/json" },
-        method: action === "save" ? "PUT" : "GET",
+        cache: "no-store",
+        method: "GET",
       });
-      const payload = (await response.json().catch(() => null)) as
-        | (SettingsSummary & { errorKey?: string })
-        | null;
+      const payload = (await response
+        .json()
+        .catch(() => null)) as SettingsSummary | null;
 
       if (!(response.ok && payload?.apiKeys && payload.integrations)) {
-        throw new Error(
-          payload?.errorKey
-            ? t(payload.errorKey)
-            : t("integrationSettings.loadFailed"),
-        );
+        throw new Error(t("integrationSettings.loadFailed"));
       }
 
       setSummary(payload);
       setDraft(emptyDraft());
-      setClearFields(new Set());
-      setNotice(
-        t(
-          action === "save"
-            ? "integrationSettings.saved"
-            : "integrationSettings.loaded",
-        ),
-      );
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -199,7 +221,79 @@ export function IntegrationSettingsPanel({
     } finally {
       setBusy(null);
     }
-  }
+  }, [ensureSudoSession, t]);
+
+  const saveSettings = useCallback(async () => {
+    setBusy("save");
+    setNotice("");
+    setError("");
+
+    const keysToClear = API_KEY_FIELDS.filter(
+      (field) => configured(field) && !draft[field].trim(),
+    );
+    const integrationsToClear = INTEGRATION_FIELDS.filter(
+      (field) => configured(field) && !draft[field].trim(),
+    );
+
+    const apiKeysToSend = Object.fromEntries(
+      API_KEY_FIELDS.map((field) => [field, draft[field]]),
+    );
+    const integrationsToSend = Object.fromEntries(
+      INTEGRATION_FIELDS.map((field) => [field, draft[field]]),
+    );
+
+    try {
+      await ensureSudoSession();
+      const response = await fetch("/api/admin/integrations", {
+        body: JSON.stringify({
+          apiKeys: apiKeysToSend,
+          clearApiKeys: keysToClear,
+          integrations: {
+            ...integrationsToSend,
+            clear: integrationsToClear,
+          },
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PUT",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | (SettingsSummary & { errorKey?: string })
+        | null;
+
+      if (!(response.ok && payload?.apiKeys && payload.integrations)) {
+        throw new Error(
+          payload?.errorKey
+            ? t(payload.errorKey)
+            : t("integrationSettings.saveFailed"),
+        );
+      }
+
+      setSummary(payload);
+      setDraft(emptyDraft());
+      setNotice(t("integrationSettings.saved"));
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : t("integrationSettings.saveFailed"),
+      );
+    } finally {
+      setBusy(null);
+    }
+  }, [ensureSudoSession, draft, configured, t]);
+
+  useEffect(() => {
+    if (isSudoActive) {
+      void loadSettings();
+    }
+  }, [isSudoActive, loadSettings]);
+
+  const panelTabs = [
+    { id: "map", label: t("지도 & 위치 API") },
+    { id: "data", label: t("공공 데이터 & 교통") },
+    { id: "ai", label: t("AI 설정") },
+    { id: "notification", label: t("알림 & 웹훅") },
+  ] as const;
 
   return (
     <section className={styles.card}>
@@ -208,59 +302,64 @@ export function IntegrationSettingsPanel({
           <KeyRound aria-hidden="true" size={18} strokeWidth={2.4} />
           {t("integrationSettings.title")}
         </span>
-        <button
-          className={styles.actionButton}
-          disabled={Boolean(busy)}
-          onClick={() => void request("load")}
-          type="button"
-        >
-          {busy === "load" ? (
-            <LoaderCircle className={styles.spinning} size={16} />
-          ) : (
-            <RefreshCw aria-hidden="true" size={16} />
-          )}
-          {t("integrationSettings.load")}
-        </button>
-      </div>
-      <p className={styles.muted}>{t("integrationSettings.description")}</p>
-      {summary ? (
-        <>
-          <div className={styles.settingsGrid}>
-            {API_KEY_FIELDS.map((field) => (
-              <SecretInput
-                clear={clearFields.has(field)}
-                configured={configured(field)}
-                dictionary={dictionary}
-                field={field}
-                key={field}
-                onClear={(checked) => updateClear(field, checked)}
-                onValue={(value) =>
-                  setDraft((current) => ({ ...current, [field]: value }))
-                }
-                value={draft[field]}
-              />
-            ))}
-            {INTEGRATION_FIELDS.map((field) => (
-              <SecretInput
-                clear={clearFields.has(field)}
-                configured={configured(field)}
-                dictionary={dictionary}
-                field={field}
-                key={field}
-                multiline={field === "incidentWebhookUrls"}
-                onClear={(checked) => updateClear(field, checked)}
-                onValue={(value) =>
-                  setDraft((current) => ({ ...current, [field]: value }))
-                }
-                value={draft[field]}
-              />
-            ))}
-          </div>
+        {Boolean(isSudoActive) && summary && (
           <button
             className={styles.actionButton}
             disabled={Boolean(busy)}
-            onClick={() => void request("save")}
+            onClick={() => void loadSettings()}
             type="button"
+          >
+            {busy === "load" ? (
+              <LoaderCircle className={styles.spinning} size={16} />
+            ) : (
+              <RefreshCw aria-hidden="true" size={16} />
+            )}
+            {t("새로고침")}
+          </button>
+        )}
+      </div>
+      <p className={styles.muted}>{t("integrationSettings.description")}</p>
+
+      {summary ? (
+        <>
+          <div
+            className={styles.tabList}
+            role="tablist"
+            style={{ marginBottom: "16px", marginTop: "8px" }}
+          >
+            {panelTabs.map((tab) => (
+              <button
+                aria-selected={panelTab === tab.id}
+                className={styles.tabButton}
+                key={tab.id}
+                onClick={() => setPanelTab(tab.id)}
+                role="tab"
+                type="button"
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div
+            className={styles.settingsGrid}
+            style={{ gridTemplateColumns: "1fr" }}
+          >
+            <SettingsGrid
+              panelTab={panelTab}
+              configured={configured}
+              dictionary={dictionary}
+              draft={draft}
+              setDraft={setDraft}
+            />
+          </div>
+
+          <button
+            className={styles.actionButton}
+            disabled={Boolean(busy)}
+            onClick={() => void saveSettings()}
+            type="button"
+            style={{ marginTop: "16px" }}
           >
             {busy === "save" ? (
               <LoaderCircle className={styles.spinning} size={16} />

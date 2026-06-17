@@ -150,16 +150,26 @@
   background: var(--krds-primary-strong);
 }
 
-.secondary {
-  background: #ffffff;
-  border-color: var(--krds-border);
-  color: var(--krds-text);
+.primary:active {
+  background: #083891;
 }
 
-.secondary:hover {
+.secondary {
   background: #ecf2fe;
   border-color: var(--krds-primary);
   color: var(--krds-primary-strong);
+}
+
+.secondary:hover {
+  background: #dbe7fd;
+  border-color: var(--krds-primary-strong);
+  color: var(--krds-primary-strong);
+}
+
+.secondary:active {
+  background: #b1cefb;
+  border-color: #083891;
+  color: #083891;
 }
 
 .danger {
@@ -439,4 +449,20 @@
   .field textarea:focus-visible {
     outline: 3px solid Highlight;
   }
+}
+
+.pageCentered {
+  background: var(--krds-background);
+  color: var(--krds-text);
+  font-family:
+    "Pretendard GOV", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px calc(32px + env(safe-area-inset-bottom));
 }
