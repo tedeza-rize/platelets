@@ -26,7 +26,22 @@ type TrafficItem = {
   travelTime?: unknown;
 };
 
+type NormalizedTrafficItem = {
+  createdDate: string | null;
+  roadName: string | null;
+  speed: number | null;
+  travelTime: number | null;
+};
+
+type TrafficBounds = {
+  maxLatitude: number;
+  maxLongitude: number;
+  minLatitude: number;
+  minLongitude: number;
+};
+
 const ITS_TRAFFIC_URL = "https://openapi.its.go.kr:9443/trafficInfo";
+const DEFAULT_AREA_RADIUS_DEGREES = 0.035;
 
 function numberValue(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -72,7 +87,10 @@ function collectTrafficItems(value: unknown, output: TrafficItem[] = []) {
   return output;
 }
 
-function routeBounds(origin: Coordinate, destination: Coordinate) {
+function routeBounds(
+  origin: Coordinate,
+  destination: Coordinate,
+): TrafficBounds {
   const minLatitude = Math.min(origin.latitude, destination.latitude);
   const maxLatitude = Math.max(origin.latitude, destination.latitude);
   const minLongitude = Math.min(origin.longitude, destination.longitude);
@@ -88,6 +106,24 @@ function routeBounds(origin: Coordinate, destination: Coordinate) {
     maxLongitude: Math.min(132, maxLongitude + longitudePadding),
     minLatitude: Math.max(32, minLatitude - latitudePadding),
     minLongitude: Math.max(124, minLongitude - longitudePadding),
+  };
+}
+
+function areaBounds(params: {
+  latitude: number;
+  longitude: number;
+  radiusDegrees?: number;
+}): TrafficBounds {
+  const radius = Math.max(
+    0.005,
+    Math.min(params.radiusDegrees ?? DEFAULT_AREA_RADIUS_DEGREES, 0.2),
+  );
+
+  return {
+    maxLatitude: Math.min(39, params.latitude + radius),
+    maxLongitude: Math.min(132, params.longitude + radius),
+    minLatitude: Math.max(32, params.latitude - radius),
+    minLongitude: Math.max(124, params.longitude - radius),
   };
 }
 
@@ -118,54 +154,9 @@ function multiplierFromSpeed(
   return Math.max(0.75, Math.min(2.35, expectedSpeedKph / averageSpeedKph));
 }
 
-export function kakaoTrafficSummary(
-  baseDurationSeconds: number,
-): TrafficSummary {
-  return {
-    averageSpeedKph: null,
-    baseDurationSeconds,
-    congestionLevel: "unknown",
-    durationMultiplier: 1,
-    message:
-      "카카오 Mobility TIME 우선 경로 결과를 실시간 도로 상황 반영 값으로 사용",
-    provider: "kakao",
-    sampleCount: 0,
-    status: "live",
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-export function unconfiguredTrafficSummary(
-  baseDurationSeconds: number,
-): TrafficSummary {
-  return {
-    averageSpeedKph: null,
-    baseDurationSeconds,
-    congestionLevel: "unknown",
-    durationMultiplier: 1,
-    message:
-      "국가교통정보 API 키가 없어 실시간 교통 보정 없이 기준 경로 시간을 사용",
-    provider: "none",
-    sampleCount: 0,
-    status: "unconfigured",
-    updatedAt: null,
-  };
-}
-
-export async function fetchItsTrafficSummary(params: {
-  baseDurationSeconds: number;
-  destination: Coordinate;
-  distanceMeters: number;
-  origin: Coordinate;
-}): Promise<TrafficSummary> {
-  const { itsOpenApiKey: apiKey } = await getIntegrationSettings();
-
-  if (!apiKey) {
-    return unconfiguredTrafficSummary(params.baseDurationSeconds);
-  }
-
-  const bounds = routeBounds(params.origin, params.destination);
+function buildItsTrafficUrl(apiKey: string, bounds: TrafficBounds) {
   const url = new URL(ITS_TRAFFIC_URL);
+
   url.searchParams.set("apiKey", apiKey);
   url.searchParams.set("type", "all");
   url.searchParams.set("minX", bounds.minLongitude.toFixed(6));
@@ -174,79 +165,251 @@ export async function fetchItsTrafficSummary(params: {
   url.searchParams.set("maxY", bounds.maxLatitude.toFixed(6));
   url.searchParams.set("getType", "json");
 
-  try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(4500),
-    });
+  return url;
+}
 
-    if (!response.ok) {
-      throw new Error(`ITS traffic request failed (${response.status}).`);
-    }
+async function fetchItsTrafficItems(bounds: TrafficBounds) {
+  const { itsOpenApiKey: apiKey } = await getIntegrationSettings();
 
-    const payload = (await response.json()) as unknown;
-    const items = collectTrafficItems(payload)
-      .map((item) => ({
+  if (!apiKey) {
+    return null;
+  }
+
+  const response = await fetch(buildItsTrafficUrl(apiKey, bounds), {
+    cache: "no-store",
+    signal: AbortSignal.timeout(4500),
+  });
+
+  if (!response.ok) {
+    throw new Error(`ITS traffic request failed (${response.status}).`);
+  }
+
+  const payload = (await response.json()) as unknown;
+
+  return collectTrafficItems(payload)
+    .map(
+      (item): NormalizedTrafficItem => ({
         createdDate: textValue(item.createdDate),
         roadName: textValue(item.roadName),
         speed: numberValue(item.speed),
         travelTime: numberValue(item.travelTime),
-      }))
-      .filter((item) => item.speed !== null && item.speed > 0);
-    const sampleCount = items.length;
+      }),
+    )
+    .filter((item) => item.speed !== null && item.speed > 0);
+}
 
-    if (sampleCount === 0) {
+function summarizeItems(params: {
+  baseDurationSeconds: number | null;
+  distanceMeters?: number;
+  items: NormalizedTrafficItem[];
+}) {
+  const sampleCount = params.items.length;
+
+  if (sampleCount === 0) {
+    return {
+      averageSpeedKph: null,
+      congestionLevel: "unknown" as const,
+      durationMultiplier: 1,
+      frequentRoads: [] as string[],
+      latestTimestamp: new Date().toISOString(),
+      sampleCount,
+    };
+  }
+
+  const averageSpeedKph =
+    params.items.reduce((sum, item) => sum + (item.speed ?? 0), 0) /
+    sampleCount;
+  const durationMultiplier =
+    params.baseDurationSeconds !== null && params.distanceMeters
+      ? multiplierFromSpeed(
+          params.baseDurationSeconds,
+          params.distanceMeters,
+          averageSpeedKph,
+        )
+      : 1;
+  const latestTimestamp =
+    params.items
+      .map((item) => item.createdDate)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1) ?? new Date().toISOString();
+  const frequentRoads = params.items
+    .map((item) => item.roadName)
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 3);
+
+  return {
+    averageSpeedKph,
+    congestionLevel: congestionLevel(averageSpeedKph),
+    durationMultiplier,
+    frequentRoads,
+    latestTimestamp,
+    sampleCount,
+  };
+}
+
+function liveTrafficSummary(params: {
+  baseDurationSeconds: number | null;
+  durationMultiplier: number;
+  frequentRoads: string[];
+  speed: number;
+  sampleCount: number;
+  updatedAt: string;
+}): TrafficSummary {
+  return {
+    averageSpeedKph: Number(params.speed.toFixed(1)),
+    baseDurationSeconds: params.baseDurationSeconds,
+    congestionLevel: congestionLevel(params.speed),
+    durationMultiplier: Number(params.durationMultiplier.toFixed(2)),
+    message: `ITS traffic ${params.sampleCount} samples average ${params.speed.toFixed(
+      1,
+    )}km/h${
+      params.frequentRoads.length > 0
+        ? ` (${params.frequentRoads.join(", ")})`
+        : ""
+    }`,
+    provider: "its",
+    sampleCount: params.sampleCount,
+    status: "live",
+    updatedAt: params.updatedAt,
+  };
+}
+
+export function kakaoTrafficSummary(
+  baseDurationSeconds: number,
+): TrafficSummary {
+  return {
+    averageSpeedKph: null,
+    baseDurationSeconds,
+    congestionLevel: "unknown",
+    durationMultiplier: 1,
+    message: "Kakao Mobility route duration already reflects live traffic.",
+    provider: "kakao",
+    sampleCount: 0,
+    status: "live",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function unconfiguredTrafficSummary(
+  baseDurationSeconds: number | null,
+): TrafficSummary {
+  return {
+    averageSpeedKph: null,
+    baseDurationSeconds,
+    congestionLevel: "unknown",
+    durationMultiplier: 1,
+    message: "ITS traffic API key is not configured.",
+    provider: "none",
+    sampleCount: 0,
+    status: "unconfigured",
+    updatedAt: null,
+  };
+}
+
+export async function fetchItsTrafficAreaSummary(params: {
+  latitude: number;
+  longitude: number;
+  radiusDegrees?: number;
+}): Promise<TrafficSummary> {
+  try {
+    const items = await fetchItsTrafficItems(areaBounds(params));
+
+    if (items === null) {
+      return unconfiguredTrafficSummary(null);
+    }
+
+    const summary = summarizeItems({ baseDurationSeconds: null, items });
+
+    if (summary.averageSpeedKph === null) {
+      return {
+        averageSpeedKph: null,
+        baseDurationSeconds: null,
+        congestionLevel: "unknown",
+        durationMultiplier: 1,
+        message: "ITS traffic responded with no usable speed samples.",
+        provider: "its",
+        sampleCount: 0,
+        status: "unavailable",
+        updatedAt: summary.latestTimestamp,
+      };
+    }
+
+    return liveTrafficSummary({
+      baseDurationSeconds: null,
+      durationMultiplier: summary.durationMultiplier,
+      frequentRoads: summary.frequentRoads,
+      sampleCount: summary.sampleCount,
+      speed: summary.averageSpeedKph,
+      updatedAt: summary.latestTimestamp,
+    });
+  } catch (error) {
+    return {
+      averageSpeedKph: null,
+      baseDurationSeconds: null,
+      congestionLevel: "unknown",
+      durationMultiplier: 1,
+      message: `ITS traffic unavailable: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      provider: "its",
+      sampleCount: 0,
+      status: "unavailable",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+export async function fetchItsTrafficSummary(params: {
+  baseDurationSeconds: number;
+  destination: Coordinate;
+  distanceMeters: number;
+  origin: Coordinate;
+}): Promise<TrafficSummary> {
+  try {
+    const items = await fetchItsTrafficItems(
+      routeBounds(params.origin, params.destination),
+    );
+
+    if (items === null) {
+      return unconfiguredTrafficSummary(params.baseDurationSeconds);
+    }
+
+    const summary = summarizeItems({
+      baseDurationSeconds: params.baseDurationSeconds,
+      distanceMeters: params.distanceMeters,
+      items,
+    });
+
+    if (summary.averageSpeedKph === null) {
       return {
         averageSpeedKph: null,
         baseDurationSeconds: params.baseDurationSeconds,
         congestionLevel: "unknown",
         durationMultiplier: 1,
-        message: "ITS 교통소통정보 응답에 사용 가능한 속도 표본이 없음",
+        message: "ITS traffic responded with no usable speed samples.",
         provider: "its",
-        sampleCount,
+        sampleCount: 0,
         status: "unavailable",
-        updatedAt: new Date().toISOString(),
+        updatedAt: summary.latestTimestamp,
       };
     }
 
-    const averageSpeedKph =
-      items.reduce((sum, item) => sum + (item.speed ?? 0), 0) / sampleCount;
-    const durationMultiplier = multiplierFromSpeed(
-      params.baseDurationSeconds,
-      params.distanceMeters,
-      averageSpeedKph,
-    );
-    const latestTimestamp =
-      items
-        .map((item) => item.createdDate)
-        .filter((value): value is string => Boolean(value))
-        .sort()
-        .at(-1) ?? new Date().toISOString();
-    const frequentRoads = items
-      .map((item) => item.roadName)
-      .filter((value): value is string => Boolean(value))
-      .slice(0, 3);
-
-    return {
-      averageSpeedKph: Number(averageSpeedKph.toFixed(1)),
+    return liveTrafficSummary({
       baseDurationSeconds: params.baseDurationSeconds,
-      congestionLevel: congestionLevel(averageSpeedKph),
-      durationMultiplier: Number(durationMultiplier.toFixed(2)),
-      message: `ITS 교통소통정보 ${sampleCount}개 구간 평균 ${averageSpeedKph.toFixed(
-        1,
-      )}km/h${frequentRoads.length > 0 ? ` (${frequentRoads.join(", ")})` : ""}`,
-      provider: "its",
-      sampleCount,
-      status: "live",
-      updatedAt: latestTimestamp,
-    };
+      durationMultiplier: summary.durationMultiplier,
+      frequentRoads: summary.frequentRoads,
+      sampleCount: summary.sampleCount,
+      speed: summary.averageSpeedKph,
+      updatedAt: summary.latestTimestamp,
+    });
   } catch (error) {
     return {
       averageSpeedKph: null,
       baseDurationSeconds: params.baseDurationSeconds,
       congestionLevel: "unknown",
       durationMultiplier: 1,
-      message: `ITS 교통소통정보를 사용할 수 없어 기준 경로 시간을 사용: ${
+      message: `ITS traffic unavailable; using base route duration: ${
         error instanceof Error ? error.message : String(error)
       }`,
       provider: "its",

@@ -187,6 +187,7 @@ export const enUiOperations = {
     "External service connection values are encrypted in the database. Blank inputs keep their current values.",
   "integrationSettings.field.incidentWebhookUrls":
     "Incident webhook URLs (one per line)",
+  "integrationSettings.field.fireSafetyApiKey": "Fire Safety API key",
   "integrationSettings.field.itsOpenApiKey": "National traffic API key",
   "integrationSettings.field.kakaoMobilityRestApiKey": "Kakao Mobility API key",
   "integrationSettings.field.kakaoRestApiKey": "Kakao Local API key",
