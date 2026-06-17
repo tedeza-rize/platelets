@@ -34,8 +34,18 @@ push subscriptions, or schedules.
 | Path | Responsibility |
 | --- | --- |
 | `src/app/` | Pages and HTTP route handlers |
-| `src/components/` | Client UI, map controls, admin tools, and AI forms |
-| `src/components/disaster-dashboard/` | Presentational widgets for the disaster dashboard, with data and actions supplied by the dashboard controller |
+| `src/components/` | Client UI components, **grouped by feature folder** (never left flat — see Component Organization) |
+| `src/components/dashboard/` | Disaster dashboard controller, lazy loader, and presentational widgets |
+| `src/components/map/` | MapLibre shell, view, controls, map effects, and emergency routing panel |
+| `src/components/setup/` | First-run setup wizard (shell, steps, panels, controls, helpers) |
+| `src/components/admin/` | Sudo/admin management consoles, panels, user admin, logs, and dataset/integration tooling |
+| `src/components/ai/` | AI query and AI settings consoles |
+| `src/components/auth/` | Login console and sudo login form |
+| `src/components/field/` | Field worker console |
+| `src/components/settings/` | Operational/NTP/schedule forms and preference, notification, and secret-input controls |
+| `src/components/system/` | Service worker registration, time-skew guard, and offline asset helpers |
+| `src/components/feedback/` | Shared error/status page (`ErrorState`) |
+| `src/components/licenses/` | License browser |
 | `src/lib/points-db.ts` | Public database facade, shared domain types, settings, logs, and import persistence |
 | `src/lib/database/` | Database engine adapters, SQL dialect helpers, and shared schema initialization |
 | `src/lib/points-db-modules/` | Database connection ownership and focused point query repositories |
@@ -49,6 +59,28 @@ push subscriptions, or schedules.
 | `src/lib/ai-*.ts` | AI settings, provider validation, and summarized grounding |
 | `scripts/points-mcp.ts` | Read-only local MCP server |
 | `docs/` | Architecture, operational rules, sources, and design plans |
+
+## Component Organization And Styling
+
+`src/components/` is organized into **feature/domain folders**, not a flat
+directory. Each component lives in the folder for its feature
+(`map/`, `dashboard/`, `setup/`, `admin/`, `ai/`, `auth/`, `field/`,
+`settings/`, `system/`, `feedback/`, `licenses/`) together with its colocated
+styles and local helper modules. New components go into the matching feature
+folder; add a new folder when a genuinely new feature area appears rather than
+adding loose files at the `src/components/` root.
+
+Cross-feature imports use the `@/components/<feature>/<name>` alias. A small
+number of shared console styles (`admin/management-console.module.scss`,
+`admin/role-console.module.scss`) are reused by consumers in other folders and
+are imported through that alias rather than a relative path.
+
+**Styles use SCSS, not plain CSS.** All component and page styles are SCSS
+modules (`*.module.scss`) colocated with their component, plus the global
+stylesheet `src/app/globals.scss`. `globals.scss` holds the KRDS design tokens
+(see `DESIGN.md`); modules consume those tokens. Do not add new `.css` files —
+use `.module.scss`. Sass is a dev dependency and Next.js compiles `.scss`
+natively. The encoding check (`scripts/check-encoding.ts`) covers `.scss` too.
 
 ## Data Flow
 

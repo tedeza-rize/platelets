@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LoginConsole } from "@/components/login-console";
+import { LoginConsole } from "@/components/auth/login-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { homePathForRole } from "@/lib/role-routing";

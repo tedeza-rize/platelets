@@ -1,4 +1,4 @@
-import { UserAdminConsole } from "@/components/user-admin-console";
+import { UserAdminConsole } from "@/components/admin/user-admin-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { requirePageRole } from "@/lib/server-session";

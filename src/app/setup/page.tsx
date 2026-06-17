@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { SetupWizard } from "@/components/setup-wizard";
+import { SetupWizard } from "@/components/setup/setup-wizard";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import {
