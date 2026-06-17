@@ -400,8 +400,8 @@ textarea.textInput {
 }
 
 .table th {
-  background: var(--krds-bg-subtle);
-  color: var(--krds-text);
+  background: transparent;
+  color: var(--krds-fg-2);
   font-size: 15px;
   font-weight: 700;
   border-bottom: 1px solid var(--krds-table-head-rule);
