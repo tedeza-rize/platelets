@@ -10,10 +10,8 @@
   display: grid;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 90% 10%, rgb(143 114 255 / 18%), transparent 34%),
-    var(--dropdown-surface);
+  border-radius: var(--krds-radius-xlarge);
+  background: var(--dropdown-surface);
   padding: clamp(20px, 4vw, 34px);
 }
 
@@ -96,7 +94,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--krds-radius-xlarge);
   background: var(--notice-surface);
   padding: 10px;
   box-shadow: 0 10px 28px rgb(24 32 28 / 10%);
@@ -154,7 +152,7 @@
   display: grid;
   gap: 13px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--krds-radius-xlarge);
   background: var(--dropdown-surface);
   color: var(--text-strong);
   padding: 16px;
@@ -218,7 +216,7 @@
   min-width: 0;
   align-items: center;
   gap: 5px;
-  color: #225ea8;
+  color: var(--krds-fg-link);
   font-weight: 800;
 }
 
