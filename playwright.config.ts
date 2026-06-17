@@ -63,6 +63,7 @@ export default defineConfig({
     command: "npm run start -- --hostname 127.0.0.1 --port 3100",
     env: {
       ...process.env,
+      PLAYWRIGHT_TEST: "true",
       NODE_OPTIONS: [
         process.env.NODE_OPTIONS,
         "--import=./tests/register-e2e-data-dir.mjs",

@@ -301,3 +301,7 @@ a {
   color: #225ea8;
   font-weight: 700;
 }
+
+@view-transition {
+  navigation: auto;
+}
