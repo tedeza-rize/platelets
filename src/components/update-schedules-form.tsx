@@ -98,7 +98,7 @@ export function UpdateSchedulesForm({
               </label>
               <label className={styles.scheduleInterval}>
                 <input
-                  className={`${styles.textInput} ${styles.scheduleInput}`}
+                  className={`${styles.textInput}`}
                   max={365}
                   min={1}
                   onChange={(event) =>
@@ -110,6 +110,7 @@ export function UpdateSchedulesForm({
                       },
                     }))
                   }
+                  style={{ width: "72px" }}
                   type="number"
                   value={schedule.intervalDays}
                 />

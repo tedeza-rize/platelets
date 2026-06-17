@@ -1,16 +1,4 @@
 .page {
-  --krds-primary: #256ef4;
-  --krds-primary-strong: #0b50d0;
-  --krds-text: #1e2124;
-  --krds-text-muted: #58616a;
-  --krds-border: #b1b8be;
-  --krds-border-light: #d8dce0;
-  --krds-surface: #ffffff;
-  --krds-background: #f4f5f6;
-  --krds-danger: #de3412;
-  --krds-success: #228738;
-  --krds-focus: rgb(37 110 244 / 28%);
-
   background: var(--krds-background);
   color: var(--krds-text);
   font-family:
@@ -199,8 +187,19 @@
 .field input:focus-visible,
 .field select:focus-visible,
 .field textarea:focus-visible {
-  outline: 4px solid var(--krds-focus);
+  outline: 2px solid var(--krds-focus);
   outline-offset: 2px;
+}
+
+.identifierStrip {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: var(--krds-gray-100);
+  color: #ffffff;
+  font-size: 13px;
+  width: 100%;
 }
 
 .notice,
