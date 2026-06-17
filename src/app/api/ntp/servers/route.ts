@@ -15,10 +15,13 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const forbidden = await requireAccessRole(request, "sudo");
+  const [, accessError] = await requireAccessRole(request, "sudo");
 
-  if (forbidden) {
-    return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const payload = (await request.json().catch(() => null)) as {

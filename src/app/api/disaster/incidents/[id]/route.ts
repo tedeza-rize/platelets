@@ -86,11 +86,16 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const [session, forbidden] = await requireAccessSession(
+  const [session, accessError] = await requireAccessSession(
     request,
     "field_worker",
   );
-  if (forbidden) return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incident-status",
@@ -166,11 +171,16 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const [session, forbidden] = await requireAccessSession(
+  const [session, accessError] = await requireAccessSession(
     request,
     "field_worker",
   );
-  if (forbidden) return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incident-delete",

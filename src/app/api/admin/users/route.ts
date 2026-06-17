@@ -7,8 +7,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const [session, forbidden] = await requireAccessSession(request, "admin");
-  if (forbidden) return forbidden;
+  const [session, accessError] = await requireAccessSession(request, "admin");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   return noStoreJson({
     currentUserId: session.userId,
@@ -18,8 +23,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const [session, forbidden] = await requireAccessSession(request, "admin");
-  if (forbidden) return forbidden;
+  const [session, accessError] = await requireAccessSession(request, "admin");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const payload = (await request.json().catch(() => null)) as Record<
     string,

@@ -3,7 +3,6 @@ import { updateAllDatasets } from "@/lib/dataset-import";
 import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import {
-  AdminUpdateCooldownError,
   assertAdminUpdateAvailable,
   listDatasetStatuses,
   recordAdminUpdateUsed,
@@ -19,30 +18,22 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const forbidden = await requireAccessRole(request, "sudo");
+  const [, accessError] = await requireAccessRole(request, "sudo");
 
-  if (forbidden) {
-    return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const actions = Object.keys(DATASET_SOURCES).map(
     (source) => `dataset:${source}`,
   );
 
-  try {
-    for (const action of actions) {
-      await assertAdminUpdateAvailable(action);
-    }
-
-    const datasets = await updateAllDatasets();
-
-    for (const action of actions) {
-      await recordAdminUpdateUsed(action);
-    }
-
-    return noStoreJson({ datasets });
-  } catch (error) {
-    if (error instanceof AdminUpdateCooldownError) {
+  for (const action of actions) {
+    const [, error] = await assertAdminUpdateAvailable(action);
+    if (error !== null) {
       return noStoreJson(
         {
           cooldown: error.cooldown,
@@ -51,7 +42,13 @@ export async function POST(request: Request) {
         { status: 429 },
       );
     }
-
-    throw error;
   }
+
+  const datasets = await updateAllDatasets();
+
+  for (const action of actions) {
+    await recordAdminUpdateUsed(action);
+  }
+
+  return noStoreJson({ datasets });
 }

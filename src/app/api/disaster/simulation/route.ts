@@ -1,4 +1,4 @@
-import { requireAccessSession } from "@/lib/access-control";
+import { requireAccessRole } from "@/lib/access-control";
 import {
   type DisasterSimulationInput,
   generateDisasterSimulation,
@@ -14,12 +14,14 @@ function inputText(payload: Record<string, unknown>, key: string) {
 }
 
 export async function POST(request: Request) {
-  const [_session, forbidden] = await requireAccessSession(
-    request,
-    "dispatcher",
-  );
-  if (forbidden) return forbidden;
+  const [, accessError] = await requireAccessRole(request, "dispatcher");
 
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
   const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-simulation",
     limit: 8,

@@ -8,6 +8,7 @@ import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { getDatabase } from "@/lib/points-db-modules/connection";
 import { buildSqlPlaceholders } from "@/lib/points-db-modules/sql-utils";
 import type { AdminUpdateCooldown } from "@/lib/points-db-types";
+import { fail, type GoResult, ok } from "@/shared/result";
 
 export const ADMIN_UPDATE_COOLDOWN_MS = 5 * 60 * 1000;
 const DATASET_PROGRESS_SETTING_PREFIX = "dataset-update-progress:";
@@ -86,12 +87,16 @@ export async function getAdminUpdateCooldowns(
   );
 }
 
-export async function assertAdminUpdateAvailable(action: string) {
+export async function assertAdminUpdateAvailable(
+  action: string,
+): Promise<GoResult<void, AdminUpdateCooldownError>> {
   const [cooldown] = await getAdminUpdateCooldowns([action]);
 
   if (cooldown && !cooldown.available) {
-    throw new AdminUpdateCooldownError(cooldown);
+    return fail(new AdminUpdateCooldownError(cooldown));
   }
+
+  return ok(undefined);
 }
 
 export async function recordAdminUpdateUsed(action: string) {
