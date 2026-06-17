@@ -157,7 +157,11 @@ export function openDatabaseClient(config: DatabaseConfig): DatabaseClient {
 }
 
 export async function testDatabaseConfig(config: DatabaseConfig) {
-  const client = openDatabaseClient(normalizeDatabaseConfig(config));
+  const normalized = normalizeDatabaseConfig(config);
+  const client =
+    normalized.engine === "sqlite"
+      ? openSqliteClient(":memory:")
+      : openDatabaseClient(normalized);
 
   try {
     await client.get<{ ok: number }>("SELECT 1 AS ok");
