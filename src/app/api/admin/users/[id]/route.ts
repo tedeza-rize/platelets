@@ -13,8 +13,13 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const [session, forbidden] = await requireAccessSession(request, "admin");
-  if (forbidden) return forbidden;
+  const [session, accessError] = await requireAccessSession(request, "admin");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const payload = (await request.json().catch(() => null)) as Record<
     string,
@@ -51,8 +56,13 @@ export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const [session, forbidden] = await requireAccessSession(request, "admin");
-  if (forbidden) return forbidden;
+  const [session, accessError] = await requireAccessSession(request, "admin");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   if (
     !session.userId ||

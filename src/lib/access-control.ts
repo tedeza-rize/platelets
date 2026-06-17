@@ -3,7 +3,6 @@ import {
   getAccessSession,
   SESSION_COOKIE_NAME,
 } from "@/lib/auth-sessions";
-import { noStoreJson } from "@/lib/http";
 import { fail, type GoResult, ok } from "@/shared/result";
 
 export type AccessRole = "admin" | "dispatcher" | "field_worker" | "sudo";
@@ -67,33 +66,34 @@ export function canAccessRole(
   );
 }
 
+export type AccessControlErrorCode = "unauthorized" | "forbidden";
+export type AccessControlError = {
+  code: AccessControlErrorCode;
+  message: string;
+};
+
 export async function requireAccessRole(
   request: Request,
   requiredRole: AccessRole,
-) {
-  const [_session, forbidden] = await requireAccessSession(
-    request,
-    requiredRole,
-  );
-  return forbidden;
+): Promise<GoResult<AccessSession, AccessControlError>> {
+  return requireAccessSession(request, requiredRole);
 }
 
 export async function requireAccessSession(
   request: Request,
   requiredRole: AccessRole,
-): Promise<GoResult<AccessSession, Response>> {
+): Promise<GoResult<AccessSession, AccessControlError>> {
   const session = await getRequestAccessSession(request);
 
   if (!session) {
-    return fail(
-      noStoreJson({ error: "Authentication is required." }, { status: 401 }),
-    );
+    return fail({
+      code: "unauthorized",
+      message: "Authentication is required.",
+    });
   }
 
   if (!canAccessRole(session.role, requiredRole)) {
-    return fail(
-      noStoreJson({ error: "Insufficient permissions." }, { status: 403 }),
-    );
+    return fail({ code: "forbidden", message: "Insufficient permissions." });
   }
 
   return ok(session);

@@ -110,10 +110,13 @@ export async function GET(request: NextRequest) {
   }
 
   if (includeRaw || detail === "raw") {
-    const forbidden = await requireAccessRole(request, "sudo");
+    const [, accessError] = await requireAccessRole(request, "sudo");
 
-    if (forbidden) {
-      return forbidden;
+    if (accessError !== null) {
+      return noStoreJson(
+        { error: accessError.message },
+        { status: accessError.code === "unauthorized" ? 401 : 403 },
+      );
     }
   }
 
