@@ -4,13 +4,13 @@ import {
 } from "@/lib/database/query";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { encodeListingCursor, readCursorRecord } from "@/lib/listing-cursors";
+import { getDatabase } from "@/lib/points-db-modules/connection";
 import type {
   EmergencyPoint,
   EmergencyPointMarker,
   EmergencyPointSummary,
   PointSearchOptions,
-} from "@/lib/points-db";
-import { getDatabase } from "@/lib/points-db-modules/connection";
+} from "@/lib/points-db-types";
 
 export type PointListCursor = {
   id: number;
