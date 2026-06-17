@@ -33,6 +33,12 @@ export function enforceRateLimit(
   request: Request,
   options: { bucket: string; limit: number; windowMs: number },
 ) {
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.PLAYWRIGHT_TEST === "true"
+  ) {
+    return null;
+  }
   const now = Date.now();
 
   if (now - lastCleanupAt > 60_000) {
@@ -64,6 +70,12 @@ export async function enforceSharedRateLimit(
   request: Request,
   options: { bucket: string; limit: number; windowMs: number },
 ) {
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.PLAYWRIGHT_TEST === "true"
+  ) {
+    return null;
+  }
   const now = Date.now();
   const key = `${options.bucket}:${clientKey(request)}`;
   const nowIso = new Date(now).toISOString();

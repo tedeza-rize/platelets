@@ -6,7 +6,13 @@ import { useEffect, useId, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./role-console.module.css";
 
-export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
+export function LoginConsole({
+  dictionary,
+  next = "",
+}: {
+  dictionary: AppDictionary;
+  next?: string;
+}) {
   const router = useRouter();
   const errorId = useId();
   const t = (key: string) => uiText(dictionary, key);
@@ -48,12 +54,12 @@ export function LoginConsole({ dictionary }: { dictionary: AppDictionary }) {
       return;
     }
 
-    router.replace(payload?.homePath ?? "/dashboard");
+    router.replace(next || payload?.homePath || "/dashboard");
   }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.narrowShell}>
+    <main className={styles.pageCentered}>
+      <section className={styles.narrowShell} style={{ width: "100%" }}>
         <header className={styles.header}>
           <div>
             <h1>{t("Staff login")}</h1>
