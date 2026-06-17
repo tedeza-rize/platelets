@@ -1,44 +1,9 @@
 :root {
   color-scheme: light;
   --navbar-height: 72px;
-  --background: #ffffff;
-  --foreground: #18201c;
-  --border: #d8e0d9;
-  --brand-mark: #1f8f57;
-  --brand-mark-halo: #dff3e8;
-  --brand-gradient: linear-gradient(135deg, #e11d48 0%, #7c3aed 100%);
-  --control-border: #ccd8cf;
-  --control-selected: #ffffff;
-  --control-shadow: 0 2px 8px rgb(24 32 28 / 12%);
-  --control-surface: #edf3ef;
-  --dropdown-border: #cfdad2;
-  --dropdown-hover: #edf3ef;
-  --dropdown-shadow: 0 12px 28px rgb(24 32 28 / 18%);
-  --dropdown-surface: #ffffff;
-  --focus-ring: #2a7ee4;
-  --map-fallback: #dce7df;
-  --nav-action-active: rgb(255 255 255 / 18%);
-  --nav-border: rgb(255 255 255 / 24%);
-  --nav-focus-ring: rgb(255 255 255 / 78%);
-  --nav-gradient: linear-gradient(90deg, #4f86d7 0%, #5a88d2 48%, #6740c7 100%);
-  --nav-surface: rgb(255 255 255 / 82%);
-  --nav-text: rgb(255 255 255 / 86%);
-  --nav-text-strong: #ffffff;
-  --notice-border: #cad7ce;
-  --notice-shadow: 0 12px 32px rgb(24 32 28 / 16%);
-  --notice-surface: rgb(255 255 255 / 94%);
-  --page-glow: #eef7f1;
-  --premium-glass-border: rgb(255 255 255 / 62%);
-  --premium-glass-shadow: 0 22px 70px rgb(15 23 42 / 18%);
-  --premium-glass-surface: rgb(255 255 255 / 78%);
-  --premium-panel-glow: radial-gradient(
-    circle at top left,
-    rgb(225 29 72 / 18%),
-    transparent 36%
-  );
-  --text-muted: #617067;
-  --text-strong: #18201c;
 
+  /* KRDS color scale — theme-independent (DESIGN.md Colors) */
+  --krds-gray-5: oklch(0.985 0 0);
   --krds-gray-10: oklch(0.965 0.002 247);
   --krds-gray-20: oklch(0.92 0.003 247);
   --krds-gray-30: oklch(0.84 0.005 247);
@@ -51,7 +16,10 @@
   --krds-gray-95: oklch(0.21 0.005 264);
   --krds-gray-100: oklch(0.16 0.003 264);
 
+  --krds-primary-5: oklch(0.98 0.01 256);
   --krds-primary-10: oklch(0.955 0.018 254);
+  --krds-primary-20: oklch(0.91 0.035 252);
+  --krds-primary-30: oklch(0.79 0.085 251);
   --krds-primary-40: oklch(0.665 0.155 254);
   --krds-primary-50: oklch(0.575 0.205 257);
   --krds-primary-60: oklch(0.475 0.21 261);
@@ -59,131 +27,197 @@
   --krds-primary-80: oklch(0.275 0.092 258);
   --krds-primary-90: oklch(0.225 0.082 263);
   --krds-primary-95: oklch(0.175 0.06 264);
+  --krds-primary-100: oklch(0.13 0.035 265);
 
   --krds-secondary-10: oklch(0.945 0.011 248);
+  --krds-secondary-20: oklch(0.885 0.019 247);
+  --krds-secondary-30: oklch(0.715 0.038 252);
+  --krds-secondary-40: oklch(0.575 0.045 254);
+  --krds-secondary-50: oklch(0.395 0.045 257);
+  --krds-secondary-60: oklch(0.31 0.05 258);
   --krds-secondary-70: oklch(0.275 0.092 258);
   --krds-secondary-80: oklch(0.215 0.07 263);
   --krds-secondary-90: oklch(0.155 0.045 264);
 
-  --krds-danger: oklch(0.555 0.205 28);
+  --krds-accent-10: oklch(0.945 0.022 17);
+  --krds-accent-30: oklch(0.755 0.115 17);
+  --krds-accent-50: oklch(0.605 0.205 25);
+  --krds-accent-60: oklch(0.515 0.205 27);
+  --krds-accent-70: oklch(0.395 0.16 28);
+
+  --krds-info: oklch(0.555 0.155 245);
   --krds-success: oklch(0.49 0.11 153);
   --krds-warning: oklch(0.555 0.135 55);
+  --krds-danger: oklch(0.555 0.205 28);
 
-  --krds-background: var(--krds-gray-10);
-  --krds-surface: #ffffff;
-  --krds-text: var(--krds-gray-100);
-  --krds-text-muted: var(--krds-gray-60);
-  --krds-border: var(--krds-gray-40);
-  --krds-border-light: var(--krds-gray-30);
+  /* KRDS spacing — 4-pt grid */
+  --krds-space-1: 4px;
+  --krds-space-2: 8px;
+  --krds-space-3: 12px;
+  --krds-space-4: 16px;
+  --krds-space-5: 20px;
+  --krds-space-6: 24px;
+  --krds-space-8: 32px;
+  --krds-space-10: 40px;
+  --krds-space-12: 48px;
+  --krds-space-16: 64px;
+  --krds-space-20: 80px;
+
+  /* KRDS radius — conservative, 12px cap (pill exempt) */
+  --krds-radius-xsmall: 4px;
+  --krds-radius-small: 6px;
+  --krds-radius-medium: 8px;
+  --krds-radius-large: 10px;
+  --krds-radius-xlarge: 12px;
+  --krds-radius-pill: 999px;
+
+  /* KRDS elevation */
+  --krds-shadow-1:
+    0 1px 2px oklch(0.16 0.003 264 / 0.06),
+    0 1px 1px oklch(0.16 0.003 264 / 0.04);
+  --krds-shadow-2:
+    0 2px 6px oklch(0.16 0.003 264 / 0.08),
+    0 1px 2px oklch(0.16 0.003 264 / 0.04);
+  --krds-shadow-3:
+    0 6px 16px oklch(0.16 0.003 264 / 0.1),
+    0 2px 4px oklch(0.16 0.003 264 / 0.05);
+  --krds-shadow-4:
+    0 12px 28px oklch(0.16 0.003 264 / 0.14),
+    0 4px 8px oklch(0.16 0.003 264 / 0.06);
+
+  /* KRDS line heights */
+  --krds-leading-tight: 1.3;
+  --krds-leading-normal: 1.5;
+  --krds-leading-loose: 1.7;
+
+  /* KRDS font stack (Pretendard GOV -> Pretendard -> system) */
+  --krds-font-sans:
+    "Pretendard GOV", "Pretendard", -apple-system, BlinkMacSystemFont,
+    "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+
+  /* KRDS semantic role tokens — flip per theme (light defaults) */
+  --krds-fg-1: var(--krds-gray-100);
+  --krds-fg-2: var(--krds-gray-80);
+  --krds-fg-3: var(--krds-gray-60);
+  --krds-fg-4: var(--krds-gray-50);
+  --krds-fg-on-primary: #ffffff;
+  --krds-fg-link: var(--krds-primary-60);
+  --krds-bg-canvas: #ffffff;
+  --krds-bg-subtle: var(--krds-gray-10);
+  --krds-bg-muted: var(--krds-secondary-10);
+  --krds-bg-inverse: var(--krds-gray-100);
+  --krds-border-default: var(--krds-gray-30);
+  --krds-border-strong: var(--krds-gray-50);
+  --krds-border-focus: var(--krds-primary-50);
+  --krds-divider: var(--krds-gray-20);
+  --krds-table-head-rule: var(--krds-secondary-70);
   --krds-primary: var(--krds-primary-50);
   --krds-primary-strong: var(--krds-primary-60);
-  --krds-focus: var(--krds-primary-40);
-}
+  --krds-focus: var(--krds-primary-50);
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --background: #111512;
-  --foreground: #edf4ef;
-  --border: #2b352f;
-  --brand-mark: #61d394;
-  --brand-mark-halo: #183624;
-  --control-border: #344139;
-  --control-selected: #223027;
-  --control-shadow: 0 2px 8px rgb(0 0 0 / 32%);
-  --control-surface: #171e1a;
-  --dropdown-border: #38453d;
-  --dropdown-hover: #223027;
-  --dropdown-shadow: 0 12px 28px rgb(0 0 0 / 42%);
-  --dropdown-surface: #161d18;
-  --focus-ring: #7db7ff;
-  --map-fallback: #202820;
-  --nav-action-active: rgb(255 255 255 / 16%);
-  --nav-border: rgb(255 255 255 / 18%);
-  --nav-focus-ring: rgb(255 255 255 / 76%);
-  --nav-gradient: linear-gradient(90deg, #285899 0%, #365d9b 48%, #4a2d92 100%);
-  --nav-surface: rgb(17 21 18 / 84%);
+  /* Compatibility role tokens already consumed by console tables */
+  --krds-background: var(--krds-gray-10);
+  --krds-surface: #ffffff;
+  --krds-text: var(--krds-fg-1);
+  --krds-text-muted: var(--krds-fg-3);
+  --krds-border: var(--krds-border-default);
+  --krds-border-light: var(--krds-border-default);
+
+  /* Legacy variables — aliased to KRDS role tokens so every consuming module
+     adopts the KRDS palette. These reference role tokens, so they flip with
+     the theme automatically and do not need redefining in the dark blocks. */
+  --background: var(--krds-bg-canvas);
+  --foreground: var(--krds-fg-1);
+  --border: var(--krds-border-default);
+  --text-strong: var(--krds-fg-1);
+  --text-muted: var(--krds-fg-2);
+  --brand-mark: var(--krds-primary);
+  --brand-mark-halo: var(--krds-primary-10);
+  --brand-gradient: var(--krds-primary);
+  --control-border: var(--krds-border-default);
+  --control-selected: var(--krds-bg-canvas);
+  --control-shadow: var(--krds-shadow-2);
+  --control-surface: var(--krds-bg-subtle);
+  --dropdown-border: var(--krds-border-default);
+  --dropdown-hover: var(--krds-bg-subtle);
+  --dropdown-shadow: var(--krds-shadow-3);
+  --dropdown-surface: var(--krds-bg-canvas);
+  --focus-ring: var(--krds-border-focus);
+  --map-fallback: var(--krds-bg-muted);
+  --notice-border: var(--krds-border-default);
+  --notice-shadow: var(--krds-shadow-3);
+  --notice-surface: var(--krds-bg-canvas);
+  --notice-bg: var(--krds-bg-canvas);
+  --page-glow: transparent;
+  --premium-glass-border: var(--krds-border-default);
+  --premium-glass-shadow: var(--krds-shadow-3);
+  --premium-glass-surface: var(--krds-bg-canvas);
+  --premium-panel-glow: transparent;
+
+  /* Header chrome — solid KRDS navy (no decorative gradient) */
+  --nav-gradient: var(--krds-secondary-70);
+  --nav-surface: var(--krds-secondary-70);
+  --nav-action-active: rgb(255 255 255 / 18%);
+  --nav-border: rgb(255 255 255 / 24%);
+  --nav-focus-ring: rgb(255 255 255 / 78%);
   --nav-text: rgb(255 255 255 / 86%);
   --nav-text-strong: #ffffff;
-  --notice-border: #3a463f;
-  --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
-  --notice-surface: rgb(22 29 24 / 94%);
-  --page-glow: #16251c;
-  --premium-glass-border: rgb(255 255 255 / 14%);
-  --premium-glass-shadow: 0 26px 80px rgb(0 0 0 / 42%);
-  --premium-glass-surface: rgb(22 29 24 / 78%);
-  --premium-panel-glow: radial-gradient(
-    circle at top left,
-    rgb(225 29 72 / 20%),
-    transparent 38%
-  );
-  --text-muted: #a7b5ac;
-  --text-strong: #f3f8f4;
+}
 
-  --krds-background: var(--krds-gray-100);
-  --krds-surface: var(--krds-gray-95);
-  --krds-text: var(--krds-gray-10);
-  --krds-text-muted: var(--krds-gray-40);
-  --krds-border: var(--krds-gray-70);
-  --krds-border-light: var(--krds-gray-80);
+/* High-contrast (선명한 화면 모드): near-black surface ladder, lifted primary.
+   Only the theme-dependent role tokens are overridden; legacy aliases above
+   reference these and flip automatically. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --krds-fg-1: var(--krds-gray-10);
+  --krds-fg-2: var(--krds-gray-30);
+  --krds-fg-3: var(--krds-gray-40);
+  --krds-fg-4: var(--krds-gray-50);
+  --krds-fg-link: var(--krds-primary-40);
+  --krds-bg-canvas: var(--krds-gray-100);
+  --krds-bg-subtle: var(--krds-gray-95);
+  --krds-bg-muted: var(--krds-gray-90);
+  --krds-bg-inverse: var(--krds-gray-10);
+  --krds-border-default: var(--krds-gray-70);
+  --krds-border-strong: var(--krds-gray-50);
+  --krds-border-focus: var(--krds-primary-40);
+  --krds-divider: var(--krds-gray-80);
+  --krds-table-head-rule: var(--krds-primary-40);
   --krds-primary: var(--krds-primary-40);
   --krds-primary-strong: var(--krds-primary-50);
   --krds-focus: var(--krds-primary-40);
+
+  --krds-background: var(--krds-gray-100);
+  --krds-surface: var(--krds-gray-95);
+  --krds-border-light: var(--krds-border-default);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
-    --background: #111512;
-    --foreground: #edf4ef;
-    --border: #2b352f;
-    --brand-mark: #61d394;
-    --brand-mark-halo: #183624;
-    --control-border: #344139;
-    --control-selected: #223027;
-    --control-shadow: 0 2px 8px rgb(0 0 0 / 32%);
-    --control-surface: #171e1a;
-    --dropdown-border: #38453d;
-    --dropdown-hover: #223027;
-    --dropdown-shadow: 0 12px 28px rgb(0 0 0 / 42%);
-    --dropdown-surface: #161d18;
-    --focus-ring: #7db7ff;
-    --map-fallback: #202820;
-    --nav-action-active: rgb(255 255 255 / 16%);
-    --nav-border: rgb(255 255 255 / 18%);
-    --nav-focus-ring: rgb(255 255 255 / 76%);
-    --nav-gradient: linear-gradient(
-      90deg,
-      #285899 0%,
-      #365d9b 48%,
-      #4a2d92 100%
-    );
-    --nav-surface: rgb(17 21 18 / 84%);
-    --nav-text: rgb(255 255 255 / 86%);
-    --nav-text-strong: #ffffff;
-    --notice-border: #3a463f;
-    --notice-shadow: 0 12px 32px rgb(0 0 0 / 36%);
-    --notice-surface: rgb(22 29 24 / 94%);
-    --page-glow: #16251c;
-    --premium-glass-border: rgb(255 255 255 / 14%);
-    --premium-glass-shadow: 0 26px 80px rgb(0 0 0 / 42%);
-    --premium-glass-surface: rgb(22 29 24 / 78%);
-    --premium-panel-glow: radial-gradient(
-      circle at top left,
-      rgb(225 29 72 / 20%),
-      transparent 38%
-    );
-    --text-muted: #a7b5ac;
-    --text-strong: #f3f8f4;
 
-    --krds-background: var(--krds-gray-100);
-    --krds-surface: var(--krds-gray-95);
-    --krds-text: var(--krds-gray-10);
-    --krds-text-muted: var(--krds-gray-40);
-    --krds-border: var(--krds-gray-70);
-    --krds-border-light: var(--krds-gray-80);
+    --krds-fg-1: var(--krds-gray-10);
+    --krds-fg-2: var(--krds-gray-30);
+    --krds-fg-3: var(--krds-gray-40);
+    --krds-fg-4: var(--krds-gray-50);
+    --krds-fg-link: var(--krds-primary-40);
+    --krds-bg-canvas: var(--krds-gray-100);
+    --krds-bg-subtle: var(--krds-gray-95);
+    --krds-bg-muted: var(--krds-gray-90);
+    --krds-bg-inverse: var(--krds-gray-10);
+    --krds-border-default: var(--krds-gray-70);
+    --krds-border-strong: var(--krds-gray-50);
+    --krds-border-focus: var(--krds-primary-40);
+    --krds-divider: var(--krds-gray-80);
+    --krds-table-head-rule: var(--krds-primary-40);
     --krds-primary: var(--krds-primary-40);
     --krds-primary-strong: var(--krds-primary-50);
     --krds-focus: var(--krds-primary-40);
+
+    --krds-background: var(--krds-gray-100);
+    --krds-surface: var(--krds-gray-95);
+    --krds-border-light: var(--krds-border-default);
   }
 }
 
@@ -203,7 +237,10 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--krds-font-sans);
+  font-size: 17px;
+  line-height: var(--krds-leading-normal);
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -224,6 +261,19 @@ textarea {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* KRDS focus state — always-visible 2px primary outline with 2px offset.
+   outline:none must never be used to remove it. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--krds-border-focus);
+  outline-offset: 2px;
 }
 
 .maplibregl-popup {
