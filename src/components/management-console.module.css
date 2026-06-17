@@ -1,8 +1,28 @@
 .page {
+  --background: #f4f5f6; /* Surface Gray */
+  --foreground: #1e2124; /* Text Basic */
+  --border: #b1b8be; /* Border Subtle */
+  --control-border: #58616a; /* Border Strong */
+  --control-surface: #ffffff; /* Input background */
+  --control-selected: #ecf2fe; /* Selected background */
+  --focus-ring: #256ef4; /* Government Blue */
+  --text-muted: #464c53; /* Text Subtle */
+  --text-strong: #1e2124; /* Text Basic */
+  --nav-gradient: linear-gradient(
+    90deg,
+    #256ef4 0%,
+    #0b50d0 100%
+  ); /* Gov Blue to Hover Blue */
+  --dropdown-surface: #ffffff; /* Card background */
+  --dropdown-shadow: none;
+  --control-shadow: none;
+
   min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans);
+  font-family:
+    "Pretendard GOV", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
 }
 
 .header {
@@ -66,49 +86,63 @@
 .tabList {
   display: flex;
   min-width: 0;
-  gap: 6px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
+  gap: 24px;
+  padding-bottom: 0;
 }
 
 .tabButton {
-  min-height: 36px;
+  min-height: 48px;
   flex: 0 0 auto;
-  border: 1px solid var(--control-border);
-  border-radius: 8px;
-  background: var(--control-surface);
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 400;
   letter-spacing: 0;
-  padding: 0 12px;
+  padding: 12px 4px;
+  position: relative;
+}
+
+.tabButton::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.tabButton[aria-selected="true"]::after {
+  background: var(--focus-ring);
+  view-transition-name: active-tab-indicator;
 }
 
 .tabButton[aria-selected="true"] {
-  border-color: var(--focus-ring);
-  background: var(--control-selected);
-  color: var(--text-strong);
+  background: transparent;
+  color: var(--focus-ring);
+  font-weight: 700;
 }
 
 .tabButton:hover,
 .tabButton:focus-visible {
-  border-color: var(--focus-ring);
-  color: var(--text-strong);
+  color: var(--focus-ring);
   outline: 0;
 }
 
 .card {
   display: grid;
-  gap: 10px;
+  gap: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--dropdown-surface);
   color: var(--text-strong);
-  padding: 14px;
-  box-shadow: var(--control-shadow);
+  padding: 24px;
+  box-shadow: none;
 }
 
 .cardHeader {
@@ -351,36 +385,44 @@ textarea.textInput {
   width: 100%;
   min-width: 720px;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  border: 1px solid var(--border);
+  background: var(--dropdown-surface);
 }
 
 .table th,
 .table td {
   border-bottom: 1px solid var(--border);
-  padding: 9px 8px;
+  padding: 12px 10px;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .table th {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
+  background: var(--background);
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border);
+}
+
+.table td {
+  color: var(--foreground);
+  font-size: 0.88rem;
 }
 
 .statusSuccess {
-  color: #15803d;
-  font-weight: 800;
+  color: #228738;
+  font-weight: 700;
 }
 
 .statusFailure {
-  color: #b91c1c;
-  font-weight: 800;
+  color: #de3412;
+  font-weight: 700;
 }
 
 .statusSkipped {
-  color: #a16207;
-  font-weight: 800;
+  color: #9e6a00;
+  font-weight: 700;
 }
 
 .logMessage {

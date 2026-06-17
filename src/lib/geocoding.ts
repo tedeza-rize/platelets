@@ -92,7 +92,7 @@ export async function searchKakaoLocalCoordinates(params: {
   kind?: KakaoLocalSearchKind;
   query: string;
 }): Promise<KakaoLocalCoordinateResult | null> {
-  const query = params.query.trim();
+  const query = params.query.replace(/"/g, "").trim();
   const kind = params.kind ?? "address";
   const action = params.action ?? "geocode";
   const restApiKey = await getKakaoRestApiKey();

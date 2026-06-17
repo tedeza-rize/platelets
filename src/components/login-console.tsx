@@ -58,8 +58,8 @@ export function LoginConsole({
   }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.narrowShell}>
+    <main className={styles.pageCentered}>
+      <section className={styles.narrowShell} style={{ width: "100%" }}>
         <header className={styles.header}>
           <div>
             <h1>{t("Staff login")}</h1>

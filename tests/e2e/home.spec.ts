@@ -4,6 +4,7 @@ import {
   E2E_VAPID_KEYS,
   ensureSetupComplete,
   SEOUL_COORDINATES,
+  signInAsStaff,
   showEnglishSetup,
 } from "./home-helpers";
 
@@ -26,6 +27,14 @@ async function expectMapCanvasOrFallback(page: Page) {
   });
 
   return await canvas.isVisible();
+}
+
+async function loginAsAdmin(page: Page) {
+  await page.goto("/login?next=/", { waitUntil: "domcontentloaded" });
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page.getByLabel("Password", { exact: true }).fill("StrongAdminPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/$/);
 }
 
 test("redirects protected pages to setup before installation", async ({
@@ -122,6 +131,10 @@ test("redirects first-run deployments to the setup wizard", async ({
     page.getByRole("heading", { name: "Create database" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Install" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel("Username", { exact: true }).fill("admin");
+  await page.getByLabel("Password", { exact: true }).fill("StrongAdminPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole("link", { name: "Platelets integrated disaster map" }),
@@ -134,7 +147,7 @@ test("loads the integrated disaster response map", async ({
   request,
 }) => {
   await ensureSetupComplete(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   await expect(
     page.getByRole("link", { name: "Platelets integrated disaster map" }),
@@ -267,7 +280,7 @@ test("shows a mobile bottom sheet for map selections", async ({
     accuracy: 25,
     ...SEOUL_COORDINATES,
   });
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   const hasMapCanvas = await expectMapCanvasOrFallback(page);
   if (!hasMapCanvas) {
@@ -291,7 +304,7 @@ test("opens map context actions from a desktop right click", async ({
   request,
 }) => {
   await ensureSetupComplete(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   const hasMapCanvas = await expectMapCanvasOrFallback(page);
   if (!hasMapCanvas) {
@@ -325,7 +338,7 @@ test("registers the push service worker when notifications are configured", asyn
   request,
 }) => {
   await ensureSetupComplete(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   await expect(page.getByTestId("notification-control")).toBeVisible({
     timeout: 10_000,
@@ -357,7 +370,7 @@ test("exposes a PWA manifest and offline navigation fallback", async ({
     true,
   );
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
   await expect
     .poll(() =>
       page.evaluate(async () => {
@@ -402,7 +415,7 @@ test("shows BigData119 operational evidence and resource recommendations", async
   request,
 }) => {
   await ensureSetupComplete(request);
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   await expect(page.getByText("119 call and dispatch data")).toBeVisible({
     timeout: 15_000,
@@ -449,7 +462,7 @@ test("renders a dispatch road route when the route API succeeds", async ({
     });
   });
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await loginAsAdmin(page);
 
   await expect(page.getByText("Fire station recommendation")).toBeVisible({
     timeout: 15_000,
