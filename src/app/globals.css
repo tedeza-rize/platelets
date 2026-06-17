@@ -68,6 +68,16 @@
   --krds-danger: oklch(0.555 0.205 28);
   --krds-success: oklch(0.49 0.11 153);
   --krds-warning: oklch(0.555 0.135 55);
+
+  --krds-background: var(--krds-gray-10);
+  --krds-surface: #ffffff;
+  --krds-text: var(--krds-gray-100);
+  --krds-text-muted: var(--krds-gray-60);
+  --krds-border: var(--krds-gray-40);
+  --krds-border-light: var(--krds-gray-30);
+  --krds-primary: var(--krds-primary-50);
+  --krds-primary-strong: var(--krds-primary-60);
+  --krds-focus: var(--krds-primary-40);
 }
 
 :root[data-theme="dark"] {
