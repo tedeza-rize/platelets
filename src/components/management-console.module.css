@@ -420,24 +420,25 @@ textarea.textInput {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
   border-radius: 4px;
+  background: transparent;
   font-size: 13px;
   font-weight: 700;
-  line-height: 1;
-  color: #fff;
+  line-height: 1.4;
 }
 
 .statusSuccess {
-  background: var(--krds-success);
+  color: var(--krds-success);
 }
 
 .statusFailure {
-  background: var(--krds-danger);
+  color: var(--krds-danger);
 }
 
 .statusSkipped {
-  background: var(--krds-warning);
+  color: var(--krds-warning);
 }
 
 .logMessage {
