@@ -6,10 +6,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const forbidden = await requireAccessRole(request, "sudo");
+  const [, accessError] = await requireAccessRole(request, "admin");
 
-  if (forbidden) {
-    return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const quota = await getKmaEarthquakeUsage();
