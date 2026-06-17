@@ -14,11 +14,7 @@ export default async function SudoPage() {
   const dictionary = getDictionary(await getRequestLocale());
   const session = await getCurrentAccessSession();
 
-  if (!session) {
-    redirect("/login");
-  }
-
-  if (session.role !== "sudo") {
+  if (session?.role !== "sudo") {
     redirect("/forbidden");
   }
 
