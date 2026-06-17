@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ManagementConsole } from "@/components/management-console";
+import { ManagementConsole } from "@/components/admin/management-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { getCurrentAccessSession } from "@/lib/server-session";

@@ -2,7 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const ROOT = process.cwd();
-const CHECK_EXTENSIONS = new Set([".css", ".json", ".md", ".ts", ".tsx"]);
+const CHECK_EXTENSIONS = new Set([
+  ".css",
+  ".scss",
+  ".json",
+  ".md",
+  ".ts",
+  ".tsx",
+]);
 const SKIP_DIRECTORIES = new Set([".git", ".next", "data", "node_modules"]);
 const MOJIBAKE_PATTERNS = [
   /\uFFFD/u,

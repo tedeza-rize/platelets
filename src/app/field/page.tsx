@@ -1,4 +1,4 @@
-import { FieldConsole } from "@/components/field-console";
+import { FieldConsole } from "@/components/field/field-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { requirePageRole } from "@/lib/server-session";
