@@ -1,31 +1,25 @@
 .page {
-  --background: #07110f;
-  --border: #273d34;
-  --control-border: rgb(132 204 172 / 26%);
-  --control-selected: rgb(19 43 35 / 88%);
-  --control-shadow:
-    0 0 0 1px rgb(52 211 153 / 18%), 0 14px 36px rgb(0 0 0 / 34%);
-  --control-surface: rgb(12 30 25 / 86%);
-  --focus-ring: #5eead4;
-  --foreground: #eafbf4;
-  --map-fallback: #12211b;
-  --premium-glass-border: rgb(153 246 228 / 18%);
-  --premium-glass-shadow:
-    0 26px 82px rgb(0 0 0 / 46%), 0 0 32px rgb(20 184 166 / 10%);
-  --premium-glass-surface: rgb(8 20 17 / 76%);
-  --text-muted: #a6c8ba;
-  --text-strong: #f2fff9;
+  --background: var(--krds-bg-subtle);
+  --border: var(--krds-border-default);
+  --control-border: var(--krds-border-default);
+  --control-selected: var(--krds-bg-subtle);
+  --control-shadow: var(--krds-shadow-2);
+  --control-surface: var(--krds-bg-subtle);
+  --focus-ring: var(--krds-border-focus);
+  --foreground: var(--krds-fg-1);
+  --map-fallback: var(--krds-bg-muted);
+  --premium-glass-border: var(--krds-border-default);
+  --premium-glass-shadow: var(--krds-shadow-2);
+  --premium-glass-surface: var(--krds-surface);
+  --text-muted: var(--krds-fg-2);
+  --text-strong: var(--krds-fg-1);
 
   display: grid;
   height: 100dvh;
   min-height: 100dvh;
   grid-template-rows: 62px minmax(0, 1fr);
-  background:
-    radial-gradient(circle at 10% 0%, rgb(244 63 94 / 18%), transparent 28%),
-    radial-gradient(circle at 88% 10%, rgb(20 184 166 / 16%), transparent 30%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans);
   overflow: hidden;
 }
 
@@ -36,10 +30,9 @@
   align-items: center;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 16px;
-  border-bottom: 1px solid var(--premium-glass-border);
-  background: var(--premium-glass-surface);
-  backdrop-filter: blur(20px) saturate(1.18);
-  box-shadow: 0 12px 34px rgb(24 32 28 / 10%);
+  border-bottom: 1px solid var(--border);
+  background: var(--krds-surface);
+  box-shadow: var(--krds-shadow-1);
   padding: 0 20px;
 }
 
@@ -57,10 +50,9 @@
   width: 34px;
   height: 34px;
   place-items: center;
-  border-radius: 10px;
-  background: var(--brand-gradient);
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgb(225 29 72 / 26%);
+  border-radius: var(--krds-radius-large);
+  background: var(--krds-primary);
+  color: var(--krds-fg-on-primary);
 }
 
 .nav {
@@ -106,8 +98,6 @@
 .navButton:focus-visible {
   background: var(--control-surface);
   color: var(--text-strong);
-  outline: 0;
-  transform: translateY(-1px);
 }
 
 .refreshButton {
@@ -120,8 +110,6 @@
 .refreshButton:focus-visible {
   border-color: var(--focus-ring);
   box-shadow: var(--control-shadow);
-  outline: 0;
-  transform: translateY(-1px);
 }
 
 .refreshButton:disabled {
@@ -142,10 +130,8 @@
   min-height: 0;
   align-content: start;
   gap: 12px;
-  border-left: 1px solid var(--premium-glass-border);
-  background:
-    var(--premium-panel-glow),
-    linear-gradient(180deg, var(--premium-glass-surface), var(--background));
+  border-left: 1px solid var(--border);
+  background: var(--krds-bg-subtle);
   overscroll-behavior: contain;
   overflow-y: auto;
   padding: 14px;
@@ -153,10 +139,9 @@
 }
 
 .section {
-  border: 1px solid var(--premium-glass-border);
-  border-radius: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--krds-radius-xlarge);
   background: var(--premium-glass-surface);
-  backdrop-filter: blur(18px) saturate(1.12);
   color: var(--text-strong);
   box-shadow: var(--premium-glass-shadow);
 }
@@ -310,16 +295,15 @@
 }
 
 .primaryButton {
-  border-color: #b91c1c;
-  background: #dc2626;
-  color: #ffffff;
+  border-color: var(--krds-primary);
+  background: var(--krds-primary);
+  color: var(--krds-fg-on-primary);
 }
 
 .primaryButton:hover,
 .primaryButton:focus-visible {
-  background: #b91c1c;
-  outline: 0;
-  transform: translateY(-1px);
+  border-color: var(--krds-primary-strong);
+  background: var(--krds-primary-strong);
 }
 
 .primaryButton:disabled,
@@ -338,21 +322,18 @@
 .secondaryButton:hover,
 .secondaryButton:focus-visible {
   border-color: var(--focus-ring);
-  outline: 0;
-  transform: translateY(-1px);
 }
 
 .dangerButton {
-  border-color: #fca5a5;
-  background: #fff1f2;
-  color: #be123c;
+  border-color: var(--krds-danger);
+  background: var(--krds-surface);
+  color: var(--krds-danger);
 }
 
 .dangerButton:hover,
 .dangerButton:focus-visible {
-  border-color: #be123c;
-  outline: 0;
-  transform: translateY(-1px);
+  border-color: var(--krds-danger);
+  background: var(--krds-bg-subtle);
 }
 
 @media (max-width: 980px) {

@@ -3,7 +3,7 @@
   min-width: 250px;
   max-width: 340px;
   gap: 10px;
-  color: #18201c;
+  color: var(--krds-fg-1);
 }
 
 .popupHeader {
@@ -13,7 +13,7 @@
 }
 
 .popupHeader strong {
-  color: #102018;
+  color: var(--krds-fg-1);
   font-size: 0.95rem;
   line-height: 1.25;
 }
@@ -21,7 +21,7 @@
 .popupHeader span,
 .popupSafety p,
 .popupRow dt {
-  color: #526158;
+  color: var(--krds-fg-2);
 }
 
 .popupDetails {
@@ -32,12 +32,12 @@
 .popupSafety {
   display: grid;
   gap: 7px;
-  border-top: 1px solid #dbe3df;
+  border-top: 1px solid var(--krds-border-default);
   padding-top: 9px;
 }
 
 .popupSafety strong {
-  color: #102018;
+  color: var(--krds-fg-1);
   font-size: 0.84rem;
 }
 
@@ -59,7 +59,7 @@
 }
 
 .popupRow dd {
-  color: #1f2a24;
+  color: var(--krds-fg-1);
   font-weight: 750;
   overflow-wrap: anywhere;
 }
@@ -77,7 +77,7 @@
   align-items: center;
   border: 0;
   border-radius: 6px;
-  background: #2563eb;
+  background: var(--krds-primary);
   color: #ffffff;
   cursor: pointer;
   font: inherit;
@@ -87,7 +87,7 @@
 }
 
 .popupActions button {
-  background: #dc2626;
+  background: var(--krds-danger);
 }
 
 .mobileBottomSheet {
@@ -99,9 +99,8 @@
   display: none;
   max-height: min(58dvh, 460px);
   border: 1px solid var(--premium-glass-border);
-  border-radius: 24px 24px 18px 18px;
+  border-radius: 16px 16px 0 0;
   background: var(--premium-glass-surface);
-  backdrop-filter: blur(24px) saturate(1.18);
   box-shadow: var(--premium-glass-shadow);
   color: var(--text-strong);
   overflow: hidden;
@@ -211,7 +210,7 @@
   min-height: 34px;
   align-items: center;
   border-radius: 999px;
-  background: #2563eb;
+  background: var(--krds-primary);
   color: #ffffff;
   font-size: 0.8rem;
   font-weight: 850;
@@ -224,9 +223,8 @@
   z-index: 990;
   width: min(312px, calc(100% - 24px));
   border: 1px solid var(--premium-glass-border);
-  border-radius: 18px;
+  border-radius: var(--krds-radius-xlarge);
   background: var(--premium-glass-surface);
-  backdrop-filter: blur(24px) saturate(1.18);
   box-shadow: var(--premium-glass-shadow);
   color: var(--text-strong);
   padding: 14px;
@@ -237,7 +235,7 @@
   bottom: 12px;
   left: 12px;
   width: auto;
-  border-radius: 24px 24px 18px 18px;
+  border-radius: 16px 16px 0 0;
 }
 
 .mapContextHeader {
