@@ -1,16 +1,4 @@
 .page {
-  --krds-primary: #256ef4;
-  --krds-primary-strong: #0b50d0;
-  --krds-text: #1e2124;
-  --krds-text-muted: #58616a;
-  --krds-border: #b1b8be;
-  --krds-border-light: #d8dce0;
-  --krds-surface: #ffffff;
-  --krds-background: #f4f5f6;
-  --krds-danger: #de3412;
-  --krds-success: #228738;
-  --krds-focus: rgb(37 110 244 / 28%);
-
   background: var(--krds-background);
   color: var(--krds-text);
   font-family:
@@ -84,7 +72,7 @@
 .field input,
 .field select,
 .field textarea {
-  background: #ffffff;
+  background: var(--krds-surface);
   border: 1px solid var(--krds-border);
   border-radius: 6px;
   color: var(--krds-text);
@@ -95,7 +83,7 @@
 }
 
 .field input[readonly] {
-  background: #f0f1f2;
+  background: var(--krds-gray-20);
   color: var(--krds-text-muted);
 }
 
@@ -150,35 +138,45 @@
   background: var(--krds-primary-strong);
 }
 
+.primary:active {
+  background: var(--krds-focus);
+}
+
 .secondary {
-  background: #ffffff;
-  border-color: var(--krds-border);
-  color: var(--krds-text);
+  background: transparent;
+  border-color: var(--krds-primary);
+  color: var(--krds-primary);
 }
 
 .secondary:hover {
-  background: #ecf2fe;
-  border-color: var(--krds-primary);
+  background: var(--krds-border-light);
+  border-color: var(--krds-primary-strong);
   color: var(--krds-primary-strong);
 }
 
+.secondary:active {
+  background: var(--krds-border);
+  border-color: var(--krds-focus);
+  color: var(--krds-focus);
+}
+
 .danger {
-  background: #ffffff;
+  background: var(--krds-surface);
   border-color: var(--krds-danger);
   color: var(--krds-danger);
 }
 
 .danger:hover {
-  background: #fff2f0;
+  background: var(--krds-border-light);
 }
 
 .primary:disabled,
 .secondary:disabled,
 .danger:disabled,
 .tabbar button:disabled {
-  background: #cdd1d5;
-  border-color: #b1b8be;
-  color: #6d7882;
+  background: var(--krds-border-light);
+  border-color: var(--krds-border);
+  color: var(--krds-text-muted);
   cursor: not-allowed;
 }
 
@@ -189,8 +187,19 @@
 .field input:focus-visible,
 .field select:focus-visible,
 .field textarea:focus-visible {
-  outline: 4px solid var(--krds-focus);
+  outline: 2px solid var(--krds-focus);
   outline-offset: 2px;
+}
+
+.identifierStrip {
+  display: flex;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: var(--krds-gray-100);
+  color: #ffffff;
+  font-size: 13px;
+  width: 100%;
 }
 
 .notice,
@@ -294,7 +303,7 @@
 }
 
 .tabbar {
-  background: #ffffff;
+  background: var(--krds-surface);
   border-top: 1px solid var(--krds-border-light);
   bottom: 0;
   display: grid;
@@ -439,4 +448,20 @@
   .field textarea:focus-visible {
     outline: 3px solid Highlight;
   }
+}
+
+.pageCentered {
+  background: var(--krds-background);
+  color: var(--krds-text);
+  font-family:
+    "Pretendard GOV", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px calc(32px + env(safe-area-inset-bottom));
 }

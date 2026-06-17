@@ -38,6 +38,46 @@
   );
   --text-muted: #617067;
   --text-strong: #18201c;
+
+  --krds-gray-10: oklch(0.965 0.002 247);
+  --krds-gray-20: oklch(0.92 0.003 247);
+  --krds-gray-30: oklch(0.84 0.005 247);
+  --krds-gray-40: oklch(0.755 0.008 240);
+  --krds-gray-50: oklch(0.625 0.013 246);
+  --krds-gray-60: oklch(0.525 0.014 246);
+  --krds-gray-70: oklch(0.445 0.013 247);
+  --krds-gray-80: oklch(0.37 0.011 250);
+  --krds-gray-90: oklch(0.295 0.011 268);
+  --krds-gray-95: oklch(0.21 0.005 264);
+  --krds-gray-100: oklch(0.16 0.003 264);
+
+  --krds-primary-10: oklch(0.955 0.018 254);
+  --krds-primary-40: oklch(0.665 0.155 254);
+  --krds-primary-50: oklch(0.575 0.205 257);
+  --krds-primary-60: oklch(0.475 0.21 261);
+  --krds-primary-70: oklch(0.345 0.115 257);
+  --krds-primary-80: oklch(0.275 0.092 258);
+  --krds-primary-90: oklch(0.225 0.082 263);
+  --krds-primary-95: oklch(0.175 0.06 264);
+
+  --krds-secondary-10: oklch(0.945 0.011 248);
+  --krds-secondary-70: oklch(0.275 0.092 258);
+  --krds-secondary-80: oklch(0.215 0.07 263);
+  --krds-secondary-90: oklch(0.155 0.045 264);
+
+  --krds-danger: oklch(0.555 0.205 28);
+  --krds-success: oklch(0.49 0.11 153);
+  --krds-warning: oklch(0.555 0.135 55);
+
+  --krds-background: var(--krds-gray-10);
+  --krds-surface: #ffffff;
+  --krds-text: var(--krds-gray-100);
+  --krds-text-muted: var(--krds-gray-60);
+  --krds-border: var(--krds-gray-40);
+  --krds-border-light: var(--krds-gray-30);
+  --krds-primary: var(--krds-primary-50);
+  --krds-primary-strong: var(--krds-primary-60);
+  --krds-focus: var(--krds-primary-40);
 }
 
 :root[data-theme="dark"] {
@@ -78,6 +118,16 @@
   );
   --text-muted: #a7b5ac;
   --text-strong: #f3f8f4;
+
+  --krds-background: var(--krds-gray-100);
+  --krds-surface: var(--krds-gray-95);
+  --krds-text: var(--krds-gray-10);
+  --krds-text-muted: var(--krds-gray-40);
+  --krds-border: var(--krds-gray-70);
+  --krds-border-light: var(--krds-gray-80);
+  --krds-primary: var(--krds-primary-40);
+  --krds-primary-strong: var(--krds-primary-50);
+  --krds-focus: var(--krds-primary-40);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -124,6 +174,16 @@
     );
     --text-muted: #a7b5ac;
     --text-strong: #f3f8f4;
+
+    --krds-background: var(--krds-gray-100);
+    --krds-surface: var(--krds-gray-95);
+    --krds-text: var(--krds-gray-10);
+    --krds-text-muted: var(--krds-gray-40);
+    --krds-border: var(--krds-gray-70);
+    --krds-border-light: var(--krds-gray-80);
+    --krds-primary: var(--krds-primary-40);
+    --krds-primary-strong: var(--krds-primary-50);
+    --krds-focus: var(--krds-primary-40);
   }
 }
 
@@ -300,4 +360,21 @@ a {
 .licenseCard dd a {
   color: #225ea8;
   font-weight: 700;
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@view-transition {
+  navigation: auto;
 }

@@ -8,12 +8,19 @@ import { requireSetupComplete } from "@/lib/setup-redirect";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
+
+export default async function LoginPage(props: { searchParams: SearchParams }) {
   await requireSetupComplete();
+  const searchParams = await props.searchParams;
+  const next = typeof searchParams.next === "string" ? searchParams.next : "";
+
   const session = await getCurrentAccessSession();
-  if (session) redirect(homePathForRole(session.role));
+  if (session) {
+    redirect(next || homePathForRole(session.role));
+  }
 
   const dictionary = getDictionary(await getRequestLocale());
 
-  return <LoginConsole dictionary={dictionary} />;
+  return <LoginConsole dictionary={dictionary} next={next} />;
 }

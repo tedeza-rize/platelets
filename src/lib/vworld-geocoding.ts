@@ -123,7 +123,7 @@ export async function searchVworldAddressCoordinates(params: {
   query: string;
   type?: VworldAddressType;
 }): Promise<MapCoordinateResult | null> {
-  const query = params.query.trim();
+  const query = params.query.replace(/"/g, "").trim();
   const type = params.type ?? "road";
   const action = params.action ?? "geocode";
   const apiKey = await getVworldApiKey();
@@ -332,7 +332,7 @@ export async function searchVworldLocations(params: {
   query: string;
   searchMode?: MapSearchMode;
 }): Promise<MapSearchResult[]> {
-  const query = params.query.trim();
+  const query = params.query.replace(/"/g, "").trim();
   const action = params.action ?? "map-search";
   const apiKey = await getVworldApiKey();
   const limit = Math.min(Math.max(params.limit ?? 5, 1), 20);
