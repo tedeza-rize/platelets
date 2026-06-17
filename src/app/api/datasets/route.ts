@@ -3,7 +3,6 @@ import { updateAllDatasets } from "@/lib/dataset-import";
 import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import { noStoreJson } from "@/lib/http";
 import {
-  AdminUpdateCooldownError,
   assertAdminUpdateAvailable,
   listDatasetStatuses,
   recordAdminUpdateUsed,
@@ -32,28 +31,24 @@ export async function POST(request: Request) {
     (source) => `dataset:${source}`,
   );
 
-  try {
-    for (const action of actions) {
-      const [, error] = await assertAdminUpdateAvailable(action);
-      if (error !== null) {
-        return noStoreJson(
-          {
-            cooldown: error.cooldown,
-            error: "Update cooldown is active.",
-          },
-          { status: 429 },
-        );
-      }
+  for (const action of actions) {
+    const [, error] = await assertAdminUpdateAvailable(action);
+    if (error !== null) {
+      return noStoreJson(
+        {
+          cooldown: error.cooldown,
+          error: "Update cooldown is active.",
+        },
+        { status: 429 },
+      );
     }
-
-    const datasets = await updateAllDatasets();
-
-    for (const action of actions) {
-      await recordAdminUpdateUsed(action);
-    }
-
-    return noStoreJson({ datasets });
-  } catch (error) {
-    throw error;
   }
+
+  const datasets = await updateAllDatasets();
+
+  for (const action of actions) {
+    await recordAdminUpdateUsed(action);
+  }
+
+  return noStoreJson({ datasets });
 }

@@ -1,4 +1,4 @@
-import { requireAccessRole, requireAccessSession } from "@/lib/access-control";
+import { requireAccessRole } from "@/lib/access-control";
 import {
   type DisasterSimulationInput,
   generateDisasterSimulation,
