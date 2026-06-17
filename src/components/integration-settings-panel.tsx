@@ -1,7 +1,7 @@
 "use client";
 
 import { KeyRound, LoaderCircle, RefreshCw, Save } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.css";
 
@@ -101,17 +101,93 @@ function SecretInput({
 export function IntegrationSettingsPanel({
   dictionary,
   ensureSudoSession,
+  isSudoActive,
 }: {
   dictionary: AppDictionary;
   ensureSudoSession: () => Promise<void>;
+  isSudoActive?: boolean;
 }) {
-  const t = (key: string) => uiText(dictionary, key);
+  const t = useCallback((key: string) => uiText(dictionary, key), [dictionary]);
   const [summary, setSummary] = useState<SettingsSummary | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [clearFields, setClearFields] = useState<Set<SecretField>>(new Set());
   const [busy, setBusy] = useState<"load" | "save" | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  const request = useCallback(
+    async (action: "load" | "save") => {
+      setBusy(action);
+      setNotice("");
+      setError("");
+
+      try {
+        await ensureSudoSession();
+        const response = await fetch("/api/admin/integrations", {
+          body:
+            action === "save"
+              ? JSON.stringify({
+                  apiKeys: {
+                    ...Object.fromEntries(
+                      API_KEY_FIELDS.map((field) => [field, draft[field]]),
+                    ),
+                  },
+                  clearApiKeys: API_KEY_FIELDS.filter((field) =>
+                    clearFields.has(field),
+                  ),
+                  integrations: {
+                    ...Object.fromEntries(
+                      INTEGRATION_FIELDS.map((field) => [field, draft[field]]),
+                    ),
+                    clear: INTEGRATION_FIELDS.filter((field) =>
+                      clearFields.has(field),
+                    ),
+                  },
+                })
+              : undefined,
+          headers: { "Content-Type": "application/json" },
+          method: action === "save" ? "PUT" : "GET",
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | (SettingsSummary & { errorKey?: string })
+          | null;
+
+        if (!(response.ok && payload?.apiKeys && payload.integrations)) {
+          throw new Error(
+            payload?.errorKey
+              ? t(payload.errorKey)
+              : t("integrationSettings.loadFailed"),
+          );
+        }
+
+        setSummary(payload);
+        setDraft(emptyDraft());
+        setClearFields(new Set());
+        setNotice(
+          t(
+            action === "save"
+              ? "integrationSettings.saved"
+              : "integrationSettings.loaded",
+          ),
+        );
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : t("integrationSettings.loadFailed"),
+        );
+      } finally {
+        setBusy(null);
+      }
+    },
+    [ensureSudoSession, draft, clearFields, t],
+  );
+
+  useEffect(() => {
+    if (isSudoActive) {
+      void request("load");
+    }
+  }, [isSudoActive, request]);
 
   function configured(field: SecretField) {
     if (!summary) return false;
@@ -136,71 +212,6 @@ export function IntegrationSettingsPanel({
     });
   }
 
-  async function request(action: "load" | "save") {
-    setBusy(action);
-    setNotice("");
-    setError("");
-
-    try {
-      await ensureSudoSession();
-      const response = await fetch("/api/admin/integrations", {
-        body:
-          action === "save"
-            ? JSON.stringify({
-                apiKeys: {
-                  ...Object.fromEntries(
-                    API_KEY_FIELDS.map((field) => [field, draft[field]]),
-                  ),
-                },
-                clearApiKeys: API_KEY_FIELDS.filter((field) =>
-                  clearFields.has(field),
-                ),
-                integrations: {
-                  ...Object.fromEntries(
-                    INTEGRATION_FIELDS.map((field) => [field, draft[field]]),
-                  ),
-                  clear: INTEGRATION_FIELDS.filter((field) =>
-                    clearFields.has(field),
-                  ),
-                },
-              })
-            : undefined,
-        headers: { "Content-Type": "application/json" },
-        method: action === "save" ? "PUT" : "GET",
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | (SettingsSummary & { errorKey?: string })
-        | null;
-
-      if (!(response.ok && payload?.apiKeys && payload.integrations)) {
-        throw new Error(
-          payload?.errorKey
-            ? t(payload.errorKey)
-            : t("integrationSettings.loadFailed"),
-        );
-      }
-
-      setSummary(payload);
-      setDraft(emptyDraft());
-      setClearFields(new Set());
-      setNotice(
-        t(
-          action === "save"
-            ? "integrationSettings.saved"
-            : "integrationSettings.loaded",
-        ),
-      );
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : t("integrationSettings.loadFailed"),
-      );
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <section className={styles.card}>
       <div className={styles.cardHeader}>
@@ -208,19 +219,21 @@ export function IntegrationSettingsPanel({
           <KeyRound aria-hidden="true" size={18} strokeWidth={2.4} />
           {t("integrationSettings.title")}
         </span>
-        <button
-          className={styles.actionButton}
-          disabled={Boolean(busy)}
-          onClick={() => void request("load")}
-          type="button"
-        >
-          {busy === "load" ? (
-            <LoaderCircle className={styles.spinning} size={16} />
-          ) : (
-            <RefreshCw aria-hidden="true" size={16} />
-          )}
-          {t("integrationSettings.load")}
-        </button>
+        {Boolean(isSudoActive) && (
+          <button
+            className={styles.actionButton}
+            disabled={Boolean(busy)}
+            onClick={() => void request("load")}
+            type="button"
+          >
+            {busy === "load" ? (
+              <LoaderCircle className={styles.spinning} size={16} />
+            ) : (
+              <RefreshCw aria-hidden="true" size={16} />
+            )}
+            {summary ? t("새로고침") : t("integrationSettings.load")}
+          </button>
+        )}
       </div>
       <p className={styles.muted}>{t("integrationSettings.description")}</p>
       {summary ? (

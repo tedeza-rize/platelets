@@ -150,6 +150,9 @@ export const enUiOperations = {
   "비밀번호는 저장되지 않고 세션 쿠키만 발급됩니다.":
     "The password is not stored; only a session cookie is issued.",
   "세션 필요": "Session required",
+  "세션 활성화됨": "Session active",
+  "세션 활성화 완료": "Session activated",
+  인증: "Authenticate",
   "Overpass API URL": "Overpass API URL",
   "데이터셋 자동 갱신": "Automatic dataset updates",
   "사설망 AI Base URL 허용": "Allow private AI Base URL",

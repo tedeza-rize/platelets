@@ -122,6 +122,7 @@ type ManagementConsoleProps = {
   currentDatabaseEngine?: DatabaseEngine;
   dictionary: AppDictionary;
   mode: "admin" | "sudo";
+  hasSudoSession?: boolean;
 };
 
 type ManagementTab =
@@ -252,6 +253,7 @@ export function ManagementConsole({
   currentDatabaseEngine,
   dictionary,
   mode,
+  hasSudoSession = false,
 }: ManagementConsoleProps) {
   const progressTitleId = useId();
   const t = useCallback(
@@ -283,6 +285,8 @@ export function ManagementConsole({
   const [clockTick, setClockTick] = useState(0);
   const [sudoPassword, setSudoPassword] = useState("");
   const [activeTab, setActiveTab] = useState<ManagementTab>("overview");
+  const [isSudoActive, setIsSudoActive] = useState(hasSudoSession);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   const title =
     mode === "sudo" ? t("개발자 총 권한 페이지") : t("관리자 페이지");
@@ -304,6 +308,7 @@ export function ManagementConsole({
     }
 
     setSudoPassword("");
+    setIsSudoActive(true);
   }, [sudoPassword, t]);
   const quotaPercent = useMemo(() => {
     if (!quota || quota.monthlyLimit === 0) {
@@ -440,7 +445,7 @@ export function ManagementConsole({
     setTimeStatus(nextTimeStatus);
     setNtpServersDraft(nextTimeStatus.ntpServers.join("\n"));
 
-    if (mode !== "sudo") {
+    if (mode !== "sudo" || !isSudoActive) {
       setQuota(null);
       setKmaQuota(null);
       setLogs([]);
@@ -479,7 +484,40 @@ export function ManagementConsole({
     setKmaQuota((await kmaQuotaResponse.json()).quota);
     setLogs((await logsResponse.json()).logs);
     setCooldowns((await cooldownsResponse.json()).cooldowns);
-  }, [mode, t]);
+  }, [mode, isSudoActive, t]);
+
+  async function handleSudoLogin(event?: React.FormEvent) {
+    if (event) {
+      event.preventDefault();
+    }
+    const password = sudoPassword.trim();
+    if (!password) return;
+
+    setLoggingIn(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/auth/login", {
+        body: JSON.stringify({ password }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? t("로그인에 실패했습니다."));
+      }
+
+      setSudoPassword("");
+      setIsSudoActive(true);
+      setNotice(t("세션 활성화 완료"));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoggingIn(false);
+    }
+  }
 
   async function requestDatasetUpdate(
     source: DatasetSourceId,
@@ -765,21 +803,23 @@ export function ManagementConsole({
     () =>
       [
         { id: "overview", label: t("adminTabs.overview") },
-        mode === "sudo"
+        mode === "sudo" && isSudoActive
           ? { id: "integrations", label: t("adminTabs.integrations") }
           : null,
-        mode === "sudo"
+        mode === "sudo" && isSudoActive
           ? { id: "settings", label: t("adminTabs.settings") }
           : null,
-        mode === "sudo"
+        mode === "sudo" && isSudoActive
           ? { id: "updates", label: t("adminTabs.updates") }
           : null,
         { id: "status", label: t("adminTabs.status") },
-        mode === "sudo" ? { id: "logs", label: t("adminTabs.logs") } : null,
+        mode === "sudo" && isSudoActive
+          ? { id: "logs", label: t("adminTabs.logs") }
+          : null,
       ].filter((tab): tab is { id: ManagementTab; label: string } =>
         Boolean(tab),
       ),
-    [mode, t],
+    [mode, isSudoActive, t],
   );
 
   useEffect(() => {
@@ -936,24 +976,44 @@ export function ManagementConsole({
           </section>
         ) : null}
 
-        {mode === "sudo" && activeTab === "overview" ? (
+        {mode === "sudo" && activeTab === "overview" && !isSudoActive ? (
           <section className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>{t("개발자 권한")}</span>
-              <span className={styles.muted}>
-                {sudoPassword ? t("비밀번호 입력됨") : t("세션 필요")}
-              </span>
-            </div>
-            <label className={styles.fieldLabel}>
-              {t("sudo 비밀번호")}
-              <input
-                autoComplete="current-password"
-                className={styles.textInput}
-                onChange={(event) => setSudoPassword(event.target.value)}
-                type="password"
-                value={sudoPassword}
-              />
-            </label>
+            <form
+              onSubmit={handleSudoLogin}
+              className={styles.settingsGrid}
+              style={{ gridTemplateColumns: "1fr" }}
+            >
+              <div className={styles.cardHeader}>
+                <span className={styles.cardTitle}>{t("개발자 권한")}</span>
+                <span className={styles.muted}>{t("세션 필요")}</span>
+              </div>
+              <label className={styles.fieldLabel}>
+                {t("sudo 비밀번호")}
+                <input
+                  autoComplete="current-password"
+                  className={styles.textInput}
+                  onChange={(event) => setSudoPassword(event.target.value)}
+                  type="password"
+                  value={sudoPassword}
+                />
+              </label>
+              <button
+                className={styles.actionButton}
+                disabled={loggingIn || !sudoPassword.trim()}
+                type="submit"
+                style={{ justifySelf: "start", marginTop: "10px" }}
+              >
+                {loggingIn ? (
+                  <RefreshCw
+                    aria-hidden="true"
+                    className={styles.spinning}
+                    size={16}
+                    strokeWidth={2.4}
+                  />
+                ) : null}
+                {t("인증")}
+              </button>
+            </form>
           </section>
         ) : null}
 
@@ -971,6 +1031,7 @@ export function ManagementConsole({
           <IntegrationSettingsPanel
             dictionary={dictionary}
             ensureSudoSession={loginIfNeeded}
+            isSudoActive={isSudoActive}
           />
         ) : null}
 
