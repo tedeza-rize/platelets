@@ -1,12 +1,14 @@
 import { requireAccessRole } from "@/lib/access-control";
 import { noStoreJson } from "@/lib/http";
 import {
+  getIntegrationSettings,
   getIntegrationSettingsSummary,
   type IntegrationSettingsUpdate,
   saveIntegrationSettings,
 } from "@/lib/integration-settings";
 import {
   getApiKeyConfigurationSummary,
+  getConfiguredApiKeys,
   type SetupApiKeys,
   saveConfiguredApiKeys,
 } from "@/lib/setup-state";
@@ -23,9 +25,24 @@ export async function GET(request: Request) {
     );
   }
 
+  const rawApiKeys = await getConfiguredApiKeys();
+  const rawIntegrations = await getIntegrationSettings();
+
   return noStoreJson({
-    apiKeys: await getApiKeyConfigurationSummary(),
-    integrations: await getIntegrationSettingsSummary(),
+    apiKeys: {
+      ...(await getApiKeyConfigurationSummary()),
+      raw: rawApiKeys,
+    },
+    integrations: {
+      ...(await getIntegrationSettingsSummary()),
+      raw: {
+        itsOpenApiKey: rawIntegrations.itsOpenApiKey,
+        incidentWebhookUrls: rawIntegrations.incidentWebhookUrls.join("\n"),
+        webPushPublicKey: rawIntegrations.webPushPublicKey,
+        webPushPrivateKey: rawIntegrations.webPushPrivateKey,
+        webPushContact: rawIntegrations.webPushContact,
+      },
+    },
   });
 }
 
