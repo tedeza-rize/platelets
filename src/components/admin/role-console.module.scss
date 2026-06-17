@@ -251,8 +251,8 @@
 }
 
 .table th {
-  background: var(--krds-bg-subtle);
-  color: var(--krds-text);
+  background: transparent;
+  color: var(--krds-fg-2);
   font-size: 15px;
   font-weight: 700;
   border-bottom: 1px solid var(--krds-table-head-rule);
@@ -279,7 +279,6 @@
 .incident {
   background: var(--krds-surface);
   border: 1px solid var(--krds-border-light);
-  border-left: 4px solid var(--krds-primary);
   border-radius: 8px;
   padding: 18px 20px;
 }
