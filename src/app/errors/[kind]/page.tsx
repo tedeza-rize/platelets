@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { type ErrorKind, ErrorState } from "@/components/error-state";
+import { type ErrorKind, ErrorState } from "@/components/feedback/error-state";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { LazyDisasterDashboard } from "@/components/lazy-disaster-dashboard";
+import { LazyDisasterDashboard } from "@/components/dashboard/lazy-disaster-dashboard";
 import { getDisasterDashboardConfig } from "@/lib/disaster-dashboard-config";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";

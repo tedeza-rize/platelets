@@ -1,4 +1,4 @@
-import { LogConsole } from "@/components/log-console";
+import { LogConsole } from "@/components/admin/log-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { requireSetupComplete } from "@/lib/setup-redirect";

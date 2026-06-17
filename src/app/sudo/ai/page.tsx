@@ -1,4 +1,4 @@
-import { AiSettingsConsole } from "@/components/ai-console";
+import { AiSettingsConsole } from "@/components/ai/ai-console";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 import { requireSetupComplete } from "@/lib/setup-redirect";
