@@ -43,7 +43,7 @@
   place-items: center;
   color: #ffffff;
   background: var(--setup-accent);
-  border-radius: 14px;
+  border-radius: var(--krds-radius-xlarge);
   box-shadow: 0 8px 18px
     color-mix(in srgb, var(--setup-accent) 35%, transparent);
 }
