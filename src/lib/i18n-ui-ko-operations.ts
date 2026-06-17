@@ -181,6 +181,7 @@ export const koUiOperations = {
     "외부 서비스 연결값은 암호화해 DB에 저장합니다. 빈 입력은 기존 값을 유지합니다.",
   "integrationSettings.field.incidentWebhookUrls":
     "사고 알림 웹훅 주소 (줄마다 하나)",
+  "integrationSettings.field.fireSafetyApiKey": "소방안전 API 키",
   "integrationSettings.field.itsOpenApiKey": "국가교통정보 API 키",
   "integrationSettings.field.kakaoMobilityRestApiKey": "카카오모빌리티 API 키",
   "integrationSettings.field.kakaoRestApiKey": "카카오 로컬 API 키",

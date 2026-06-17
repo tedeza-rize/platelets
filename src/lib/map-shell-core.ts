@@ -103,6 +103,10 @@ export const EMERGENCY_ROUTE_SOURCE_ID = "emergency-route";
 export const EMERGENCY_ROUTE_LAYER_ID = "emergency-route-line";
 export const HAZARD_POLL_INTERVAL_MS = 60_000;
 export const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
+export const DEFAULT_VISIBLE_SOURCES = new Set<DatasetSourceId>([
+  "fire-stations",
+  "police-stations",
+]);
 export const DEFAULT_VISIBLE_SOURCE: DatasetSourceId = "fire-stations";
 export const VIEWPORT_POINTS_PADDING_RATIO = 0.16;
 export const POINT_HALO_RADIUS: PropertyValueSpecification<number> = [
@@ -1141,7 +1145,11 @@ export function isSourceVisible(
   visibleSources: Partial<Record<DatasetSourceId, boolean>>,
   source: DatasetSourceId,
 ) {
-  return visibleSources[source] ?? source === DEFAULT_VISIBLE_SOURCE;
+  return visibleSources[source] ?? DEFAULT_VISIBLE_SOURCES.has(source);
+}
+
+export function isDefaultVisibleSource(source: DatasetSourceId) {
+  return DEFAULT_VISIBLE_SOURCES.has(source);
 }
 
 export function getPointLimitForZoom(zoom: number) {
@@ -1185,6 +1193,21 @@ export function getViewportFromMap(map: MapLibreMap): PointViewport {
     minLatitude: Math.max(south - latitudePadding, -90),
     minLongitude: Math.max(west - longitudePadding, -180),
     zoom: map.getZoom(),
+  };
+}
+
+export function getViewportAroundCenter(
+  center: { latitude: number; longitude: number },
+  zoom: number,
+): PointViewport {
+  const radiusDegrees = Math.max(0.01, 180 / 2 ** Math.max(zoom, 1));
+
+  return {
+    maxLatitude: Math.min(center.latitude + radiusDegrees, 90),
+    maxLongitude: Math.min(center.longitude + radiusDegrees, 180),
+    minLatitude: Math.max(center.latitude - radiusDegrees, -90),
+    minLongitude: Math.max(center.longitude - radiusDegrees, -180),
+    zoom,
   };
 }
 

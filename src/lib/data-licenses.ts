@@ -112,6 +112,16 @@ export const DATA_LICENSE_ENTRIES = [
     usage: "자체 A* 출동 경로의 실시간 교통 속도 표본 기반 ETA 보정",
   },
   {
+    id: "bigdata119-fire-safety-api",
+    license: "소방안전 빅데이터 플랫폼 API 서비스 이용조건 준수",
+    notes:
+      "승인키는 암호화된 sudo 통합 설정에만 보관한다. 공개 화면과 MCP/AI 컨텍스트에는 승인키와 원문 제공 레코드를 노출하지 않고, API 상세 엔드포인트는 승인 계정 문서 기준으로 검증한 뒤 연결한다.",
+    provider: "소방청 / 소방안전 빅데이터 플랫폼",
+    sourceName: "소방안전 빅데이터 플랫폼 API 서비스",
+    sourceUrl: "https://bigdata-119.kr/service/apiService",
+    usage: "LLM/MCP에 소방 DW API 승인 상태와 제공 데이터군 요약 제공",
+  },
+  {
     id: "openai-responses",
     license: "OpenAI 서비스 약관·API 데이터 정책 또는 호환 제공자의 약관 준수",
     notes:

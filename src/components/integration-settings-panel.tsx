@@ -14,6 +14,7 @@ const API_KEY_FIELDS = [
   "openaiApiKey",
 ] as const;
 const INTEGRATION_FIELDS = [
+  "fireSafetyApiKey",
   "itsOpenApiKey",
   "incidentWebhookUrls",
   "webPushPublicKey",
@@ -29,6 +30,7 @@ type SettingsSummary = {
     configured: Record<ApiKeyField, boolean>;
   };
   integrations: {
+    fireSafetyApiKeyConfigured: boolean;
     incidentWebhookCount: number;
     itsOpenApiKeyConfigured: boolean;
     webPushConfigured: boolean;
@@ -117,6 +119,9 @@ export function IntegrationSettingsPanel({
     if (!summary) return false;
     if (field === "itsOpenApiKey") {
       return summary.integrations.itsOpenApiKeyConfigured;
+    }
+    if (field === "fireSafetyApiKey") {
+      return summary.integrations.fireSafetyApiKeyConfigured;
     }
     if (field === "incidentWebhookUrls") {
       return summary.integrations.incidentWebhookCount > 0;

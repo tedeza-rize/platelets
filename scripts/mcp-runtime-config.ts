@@ -18,6 +18,11 @@ type StoredSetupState = {
   };
 };
 
+type StoredIntegrationSettings = {
+  fireSafetyApiKey?: SecretBox | string;
+  itsOpenApiKey?: SecretBox | string;
+};
+
 function isSecretBox(value: unknown): value is SecretBox {
   return (
     typeof value === "object" &&
@@ -68,12 +73,20 @@ export function loadMcpRuntimeApiKeys(
     const state = row?.value_json
       ? (JSON.parse(row.value_json) as StoredSetupState)
       : null;
+    const integrationRow = database
+      .prepare("SELECT value_json FROM app_settings WHERE key = ?")
+      .get("integration-settings") as { value_json?: string } | undefined;
+    const integrations = integrationRow?.value_json
+      ? (JSON.parse(integrationRow.value_json) as StoredIntegrationSettings)
+      : null;
     const secret = readFileSync(
       path.join(dataDirectory, ".platelets-secret-key"),
       "utf8",
     ).trim();
 
     return {
+      fireSafetyApiKey: revealSecret(integrations?.fireSafetyApiKey, secret),
+      itsOpenApiKey: revealSecret(integrations?.itsOpenApiKey, secret),
       kakaoRestApiKey: revealSecret(state?.apiKeys?.kakaoRestApiKey, secret),
       vworldApiKey: revealSecret(state?.apiKeys?.vworldApiKey, secret),
     };
