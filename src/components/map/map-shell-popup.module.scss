@@ -2,13 +2,13 @@
   display: grid;
   min-width: 220px;
   gap: 10px;
-  color: #18201c;
+  color: var(--krds-fg-1);
   font-family: var(--font-geist-sans);
 }
 
 .popup ::selection {
-  background: #dbeafe;
-  color: #0f172a;
+  background: var(--krds-primary-10);
+  color: var(--krds-fg-1);
 }
 
 .popupHeader {
@@ -17,14 +17,14 @@
 }
 
 .popupHeader strong {
-  color: #0f172a;
+  color: var(--krds-fg-1);
   font-size: 0.96rem;
   font-weight: 850;
   line-height: 1.25;
 }
 
 .popupHeader span {
-  color: #334155;
+  color: var(--krds-fg-2);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
@@ -38,17 +38,17 @@
 .popupSafety {
   display: grid;
   gap: 7px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--krds-border-default);
   padding-top: 8px;
 }
 
 .popupSafety strong {
-  color: #0f172a;
+  color: var(--krds-fg-1);
   font-size: 0.82rem;
 }
 
 .popupSafety p {
-  color: #475569;
+  color: var(--krds-fg-2);
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -62,13 +62,13 @@
 }
 
 .popupRow dt {
-  color: #475569;
+  color: var(--krds-fg-2);
   font-weight: 800;
 }
 
 .popupRow dd {
   min-width: 0;
-  color: #111827;
+  color: var(--krds-fg-1);
   font-weight: 700;
   overflow-wrap: anywhere;
 }
@@ -85,7 +85,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  background: #225ea8;
+  background: var(--krds-fg-link);
   color: #ffffff;
   font-size: 0.78rem;
   font-weight: 700;
