@@ -72,7 +72,7 @@
 .field input,
 .field select,
 .field textarea {
-  background: #ffffff;
+  background: var(--krds-surface);
   border: 1px solid var(--krds-border);
   border-radius: 6px;
   color: var(--krds-text);
@@ -83,7 +83,7 @@
 }
 
 .field input[readonly] {
-  background: #f0f1f2;
+  background: var(--krds-gray-20);
   color: var(--krds-text-muted);
 }
 
@@ -161,7 +161,7 @@
 }
 
 .danger {
-  background: #ffffff;
+  background: var(--krds-surface);
   border-color: var(--krds-danger);
   color: var(--krds-danger);
 }
@@ -303,7 +303,7 @@
 }
 
 .tabbar {
-  background: #ffffff;
+  background: var(--krds-surface);
   border-top: 1px solid var(--krds-border-light);
   bottom: 0;
   display: grid;

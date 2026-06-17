@@ -1,15 +1,15 @@
 .page {
-  --background: var(--krds-gray-10);
-  --foreground: var(--krds-gray-100);
-  --border: var(--krds-gray-30);
-  --control-border: var(--krds-gray-30);
-  --control-surface: #ffffff;
-  --control-selected: var(--krds-primary-10);
-  --focus-ring: var(--krds-primary-50);
-  --text-muted: var(--krds-gray-60);
-  --text-strong: var(--krds-gray-100);
-  --nav-bg: #ffffff;
-  --dropdown-surface: #ffffff;
+  --background: var(--krds-background);
+  --foreground: var(--krds-text);
+  --border: var(--krds-border-light);
+  --control-border: var(--krds-border);
+  --control-surface: var(--krds-surface);
+  --control-selected: var(--krds-gray-20);
+  --focus-ring: var(--krds-focus);
+  --text-muted: var(--krds-text-muted);
+  --text-strong: var(--krds-text);
+  --nav-bg: var(--krds-surface);
+  --dropdown-surface: var(--krds-surface);
   --dropdown-shadow:
     0 6px 16px oklch(0.16 0.003 264 / 0.1),
     0 2px 4px oklch(0.16 0.003 264 / 0.05);
