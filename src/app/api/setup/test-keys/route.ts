@@ -205,7 +205,11 @@ async function checkKakaoMobility(payload: Record<string, unknown>) {
 
     return response.ok
       ? passed("kakao-mobility", title)
-      : failed("kakao-mobility", title, `Provider returned HTTP ${response.status}.`);
+      : failed(
+          "kakao-mobility",
+          title,
+          `Provider returned HTTP ${response.status}.`,
+        );
   } catch (error) {
     return failed(
       "kakao-mobility",
@@ -221,7 +225,9 @@ async function checkPublicData(payload: Record<string, unknown>) {
 
   if (!apiKey) return skipped("public-data", title);
 
-  const url = new URL("http://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg");
+  const url = new URL(
+    "http://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg",
+  );
   url.searchParams.set("serviceKey", apiKey);
   url.searchParams.set("numOfRows", "1");
   url.searchParams.set("pageNo", "1");
@@ -234,7 +240,11 @@ async function checkPublicData(payload: Record<string, unknown>) {
 
     return response.ok
       ? passed("public-data", title)
-      : failed("public-data", title, `Provider returned HTTP ${response.status}.`);
+      : failed(
+          "public-data",
+          title,
+          `Provider returned HTTP ${response.status}.`,
+        );
   } catch (error) {
     return failed(
       "public-data",
@@ -251,7 +261,7 @@ async function checkSeoulOpen(payload: Record<string, unknown>) {
   if (!apiKey) return skipped("seoul", title);
 
   const url = new URL(
-    `https://openapi.seoul.go.kr:8088/${encodeURIComponent(apiKey)}/json/citydata_ppltn/1/5/광화문·덕수궁`
+    `https://openapi.seoul.go.kr:8088/${encodeURIComponent(apiKey)}/json/citydata_ppltn/1/5/광화문·덕수궁`,
   );
 
   try {
