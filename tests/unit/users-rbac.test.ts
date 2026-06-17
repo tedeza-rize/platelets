@@ -79,7 +79,7 @@ test("setup creates sudo and admin user accounts", async () => {
 
 test("staff username login creates a role-aware session", async () => {
   await ensureSetup();
-  const [field, error] = await users.createUser({
+  const [field, _error] = await users.createUser({
     department: "Jongno",
     email: "field@example.com",
     name: "Field Worker",
@@ -238,7 +238,7 @@ test("account deletion protects the current and sudo accounts", async () => {
 
 test("role and password updates revoke the target user's sessions", async () => {
   await ensureSetup();
-  const [target, error] = await users.createUser({
+  const [target, _error] = await users.createUser({
     department: "Mapo",
     email: "session-target@example.com",
     name: "Session Target",
