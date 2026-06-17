@@ -118,6 +118,16 @@
   );
   --text-muted: #a7b5ac;
   --text-strong: #f3f8f4;
+
+  --krds-background: var(--krds-gray-100);
+  --krds-surface: var(--krds-gray-95);
+  --krds-text: var(--krds-gray-10);
+  --krds-text-muted: var(--krds-gray-40);
+  --krds-border: var(--krds-gray-70);
+  --krds-border-light: var(--krds-gray-80);
+  --krds-primary: var(--krds-primary-40);
+  --krds-primary-strong: var(--krds-primary-50);
+  --krds-focus: var(--krds-primary-40);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -164,9 +174,7 @@
     );
     --text-muted: #a7b5ac;
     --text-strong: #f3f8f4;
-  }
 
-  :root {
     --krds-background: var(--krds-gray-100);
     --krds-surface: var(--krds-gray-95);
     --krds-text: var(--krds-gray-10);
