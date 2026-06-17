@@ -213,11 +213,14 @@ export async function getUserById(id: string) {
   return row ? mapUser(row) : null;
 }
 
-export async function authenticateUser(username: string, password: string) {
+export async function authenticateUser(identifier: string, password: string) {
   const db = await getDatabase();
-  const row = await get<UserRow>(db, "SELECT * FROM users WHERE username = ?", [
-    cleanUsername(username),
-  ]);
+
+  const row = await get<UserRow>(
+    db,
+    "SELECT * FROM users WHERE username = ? OR email = ?",
+    [cleanUsername(identifier), cleanText(identifier, 200).toLowerCase()],
+  );
 
   return row && verifyPassword(password, row) ? mapUser(row) : null;
 }
