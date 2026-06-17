@@ -185,6 +185,100 @@ async function checkVworld(payload: Record<string, unknown>) {
   }
 }
 
+async function checkKakaoMobility(payload: Record<string, unknown>) {
+  const title = "Kakao Mobility API";
+  const apiKey = stringValue(payload.kakaoMobilityRestApiKey);
+
+  if (!apiKey) return skipped("kakao-mobility", title);
+
+  const url = new URL("https://apis-navi.kakaomobility.com/v1/directions");
+  url.searchParams.set("origin", "126.9786,37.5665");
+  url.searchParams.set("destination", "126.9768,37.5728");
+  url.searchParams.set("priority", "TIME");
+
+  try {
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        Authorization: `KakaoAK ${apiKey}`,
+      },
+    });
+
+    return response.ok
+      ? passed("kakao-mobility", title)
+      : failed(
+          "kakao-mobility",
+          title,
+          `Provider returned HTTP ${response.status}.`,
+        );
+  } catch (error) {
+    return failed(
+      "kakao-mobility",
+      title,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+async function checkPublicData(payload: Record<string, unknown>) {
+  const title = "Public Data Portal API";
+  const apiKey = stringValue(payload.publicDataApiKey);
+
+  if (!apiKey) return skipped("public-data", title);
+
+  const url = new URL(
+    "http://apis.data.go.kr/1360000/EqkInfoService/getEqkMsg",
+  );
+  url.searchParams.set("serviceKey", apiKey);
+  url.searchParams.set("numOfRows", "1");
+  url.searchParams.set("pageNo", "1");
+  url.searchParams.set("dataType", "JSON");
+  url.searchParams.set("fromTmFc", "20260610");
+  url.searchParams.set("toTmFc", "20260617");
+
+  try {
+    const response = await fetchWithTimeout(url);
+
+    return response.ok
+      ? passed("public-data", title)
+      : failed(
+          "public-data",
+          title,
+          `Provider returned HTTP ${response.status}.`,
+        );
+  } catch (error) {
+    return failed(
+      "public-data",
+      title,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+async function checkSeoulOpen(payload: Record<string, unknown>) {
+  const title = "Seoul Open API";
+  const apiKey = stringValue(payload.seoulOpenApiKey);
+
+  if (!apiKey) return skipped("seoul", title);
+
+  const url = new URL(
+    `https://openapi.seoul.go.kr:8088/${encodeURIComponent(apiKey)}/json/citydata_ppltn/1/5/광화문·덕수궁`,
+  );
+
+  try {
+    const response = await fetchWithTimeout(url);
+
+    return response.ok
+      ? passed("seoul", title)
+      : failed("seoul", title, `Provider returned HTTP ${response.status}.`);
+  } catch (error) {
+    return failed(
+      "seoul",
+      title,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as Record<
     string,
@@ -198,10 +292,10 @@ export async function POST(request: Request) {
   const checks = [
     await checkOpenAi(payload),
     await checkKakaoLocal(payload),
+    await checkKakaoMobility(payload),
     await checkVworld(payload),
-    skipped("public-data", "Public data service key"),
-    skipped("kakao-mobility", "Kakao Mobility API"),
-    skipped("seoul", "Seoul Open API"),
+    await checkPublicData(payload),
+    await checkSeoulOpen(payload),
   ];
 
   return noStoreJson({
