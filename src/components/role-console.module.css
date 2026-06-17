@@ -45,8 +45,7 @@
   max-width: 64ch;
 }
 
-.card,
-.tableCard {
+.card {
   background: var(--krds-surface);
   border: 1px solid var(--krds-border-light);
   border-radius: 8px;
@@ -54,7 +53,12 @@
 }
 
 .tableCard {
+  background: var(--krds-surface);
+  border: 1px solid var(--krds-border-light);
+  border-radius: 8px;
   margin-top: 24px;
+  overflow: auto;
+  padding: 24px;
 }
 
 .grid {
@@ -231,26 +235,34 @@
 }
 
 .table {
-  border-collapse: collapse;
   width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  background: var(--control-surface);
+  border-top: 1px solid var(--border);
 }
 
 .table th,
 .table td {
-  border-bottom: 1px solid var(--krds-border-light);
-  padding: 14px 12px;
+  border-bottom: 1px solid var(--krds-gray-20);
+  padding: 12px 14px;
   text-align: left;
   vertical-align: middle;
 }
 
 .table th {
-  color: var(--krds-text-muted);
-  font-size: 0.9rem;
+  background: var(--background);
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--krds-secondary-70);
+  height: 48px;
 }
 
 .stateCell {
   color: var(--krds-text-muted);
   text-align: center;
+  height: 40px;
 }
 
 .stateCell svg {
@@ -385,6 +397,7 @@
   .table td {
     display: block;
     width: 100%;
+    min-width: 0;
   }
 
   .table tr {

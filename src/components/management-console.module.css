@@ -414,19 +414,30 @@ textarea.textInput {
   height: 40px;
 }
 
-.statusSuccess {
-  color: var(--krds-success);
+.statusSuccess,
+.statusFailure,
+.statusSkipped {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1;
+  color: #fff;
+}
+
+.statusSuccess {
+  background: var(--krds-success);
 }
 
 .statusFailure {
-  color: var(--krds-danger);
-  font-weight: 700;
+  background: var(--krds-danger);
 }
 
 .statusSkipped {
-  color: var(--krds-warning);
-  font-weight: 700;
+  background: var(--krds-warning);
 }
 
 .logMessage {
