@@ -139,25 +139,25 @@
 }
 
 .primary:active {
-  background: #083891;
+  background: var(--krds-focus);
 }
 
 .secondary {
-  background: #ecf2fe;
+  background: transparent;
   border-color: var(--krds-primary);
-  color: var(--krds-primary-strong);
+  color: var(--krds-primary);
 }
 
 .secondary:hover {
-  background: #dbe7fd;
+  background: var(--krds-border-light);
   border-color: var(--krds-primary-strong);
   color: var(--krds-primary-strong);
 }
 
 .secondary:active {
-  background: #b1cefb;
-  border-color: #083891;
-  color: #083891;
+  background: var(--krds-border);
+  border-color: var(--krds-focus);
+  color: var(--krds-focus);
 }
 
 .danger {
@@ -167,16 +167,16 @@
 }
 
 .danger:hover {
-  background: #fff2f0;
+  background: var(--krds-border-light);
 }
 
 .primary:disabled,
 .secondary:disabled,
 .danger:disabled,
 .tabbar button:disabled {
-  background: #cdd1d5;
-  border-color: #b1b8be;
-  color: #6d7882;
+  background: var(--krds-border-light);
+  border-color: var(--krds-border);
+  color: var(--krds-text-muted);
   cursor: not-allowed;
 }
 

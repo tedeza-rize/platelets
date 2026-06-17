@@ -125,13 +125,13 @@
 
 .tabButton[aria-selected="true"] {
   background: transparent;
-  color: var(--krds-primary-60);
+  color: var(--krds-primary-strong);
   font-weight: 700;
 }
 
 .tabButton:hover,
 .tabButton:focus-visible {
-  color: var(--krds-primary-60);
+  color: var(--krds-primary-strong);
   outline: none;
 }
 
@@ -218,7 +218,7 @@
   gap: 8px;
   border: none;
   border-radius: 6px;
-  background: var(--krds-primary-50);
+  background: var(--krds-primary);
   color: #ffffff;
   cursor: pointer;
   font-size: 17px;
@@ -229,12 +229,12 @@
 }
 
 .actionButton:hover:not(:disabled) {
-  background: var(--krds-primary-60);
+  background: var(--krds-primary-strong);
   outline: 0;
 }
 
 .actionButton:active:not(:disabled) {
-  background: var(--krds-primary-70);
+  background: var(--krds-focus);
 }
 
 .actionButton:focus-visible {
@@ -242,8 +242,8 @@
 }
 
 .actionButton:disabled {
-  background: var(--krds-gray-10);
-  color: var(--krds-gray-50);
+  background: var(--krds-border-light);
+  color: var(--krds-text-muted);
   cursor: not-allowed;
 }
 
