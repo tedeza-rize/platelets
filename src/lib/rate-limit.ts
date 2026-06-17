@@ -33,7 +33,10 @@ export function enforceRateLimit(
   request: Request,
   options: { bucket: string; limit: number; windowMs: number },
 ) {
-  if (process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT_TEST === "true") {
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.PLAYWRIGHT_TEST === "true"
+  ) {
     return null;
   }
   const now = Date.now();
@@ -67,7 +70,10 @@ export async function enforceSharedRateLimit(
   request: Request,
   options: { bucket: string; limit: number; windowMs: number },
 ) {
-  if (process.env.NODE_ENV === "test" || process.env.PLAYWRIGHT_TEST === "true") {
+  if (
+    process.env.NODE_ENV === "test" ||
+    process.env.PLAYWRIGHT_TEST === "true"
+  ) {
     return null;
   }
   const now = Date.now();
