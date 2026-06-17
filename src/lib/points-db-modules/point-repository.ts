@@ -390,6 +390,14 @@ function distanceMeters(
   return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function nearestResultLimit(value: number | undefined, fallback: number) {
+  return Math.min(Math.max(Math.trunc(value ?? fallback), 1), 100);
+}
+
+function nearestCandidateLimit(resultLimit: number, maximum: number) {
+  return Math.min(Math.max(resultLimit * 20, 200), maximum);
+}
+
 export async function findNearestPoints(options: {
   latitude: number;
   limit?: number;
@@ -405,6 +413,7 @@ export async function findNearestPoints(options: {
   const longitudeDelta =
     radiusMeters /
     (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
+  const limit = nearestResultLimit(options.limit, 10);
   const candidates = await listPointSummaries({
     bounds: {
       maxLatitude: options.latitude + latitudeDelta,
@@ -412,7 +421,8 @@ export async function findNearestPoints(options: {
       minLatitude: options.latitude - latitudeDelta,
       minLongitude: options.longitude - longitudeDelta,
     },
-    limit: 20_000,
+    center: { latitude: options.latitude, longitude: options.longitude },
+    limit: nearestCandidateLimit(limit, 2_000),
     source: options.source,
   });
 
@@ -431,7 +441,7 @@ export async function findNearestPoints(options: {
     }))
     .filter((point) => point.distanceMeters <= radiusMeters)
     .sort((left, right) => left.distanceMeters - right.distanceMeters)
-    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 10), 1), 100));
+    .slice(0, limit);
 }
 
 export async function findNearestEmergencyInstitutions(options: {
@@ -448,6 +458,7 @@ export async function findNearestEmergencyInstitutions(options: {
   const longitudeDelta =
     radiusMeters /
     (111_320 * Math.max(Math.cos(toRadians(options.latitude)), 0.1));
+  const limit = nearestResultLimit(options.limit, 30);
   const candidates = await listPoints({
     bounds: {
       maxLatitude: options.latitude + latitudeDelta,
@@ -455,7 +466,8 @@ export async function findNearestEmergencyInstitutions(options: {
       minLatitude: options.latitude - latitudeDelta,
       minLongitude: options.longitude - longitudeDelta,
     },
-    limit: 5_000,
+    center: { latitude: options.latitude, longitude: options.longitude },
+    limit: nearestCandidateLimit(limit, 5_000),
     source: "emergency-medical-institutions",
   });
 
@@ -474,5 +486,5 @@ export async function findNearestEmergencyInstitutions(options: {
     }))
     .filter((point) => point.distanceMeters <= radiusMeters)
     .sort((left, right) => left.distanceMeters - right.distanceMeters)
-    .slice(0, Math.min(Math.max(Math.trunc(options.limit ?? 30), 1), 100));
+    .slice(0, limit);
 }
