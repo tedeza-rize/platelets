@@ -27,7 +27,7 @@
   height: 42px;
   place-items: center;
   border-radius: 12px;
-  background: linear-gradient(145deg, #8f72ff, #6554df);
+  background: var(--krds-primary);
   color: #ffffff;
 }
 
@@ -44,7 +44,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6554df;
+  color: var(--krds-primary-strong);
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -54,7 +54,7 @@
   display: grid;
   gap: 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--krds-radius-xlarge);
   background: var(--dropdown-surface);
   padding: clamp(16px, 3vw, 24px);
   box-shadow: 0 12px 30px rgb(24 32 28 / 7%);
@@ -110,14 +110,14 @@
 
 .primaryButton {
   border: 0;
-  background: #6554df;
+  background: var(--krds-primary-strong);
   color: #ffffff;
 }
 
 .secondaryButton {
-  border: 1px solid #8f7ff1;
+  border: 1px solid var(--krds-primary);
   background: var(--background);
-  color: #6554df;
+  color: var(--krds-primary-strong);
 }
 
 .answerMeta {
@@ -149,13 +149,13 @@
 }
 
 .error {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--krds-bg-subtle);
+  color: var(--krds-danger);
 }
 
 .notice {
-  background: #ecfdf5;
-  color: #047857;
+  background: var(--krds-bg-subtle);
+  color: var(--krds-success);
 }
 
 .spinner {
