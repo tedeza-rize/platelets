@@ -6,6 +6,7 @@ import {
   API_KEY_FIELDS,
   type ApiKeyField,
   INTEGRATION_FIELDS,
+  type IntegrationField,
   type SecretField,
   SecretInput,
 } from "@/components/secret-input";
