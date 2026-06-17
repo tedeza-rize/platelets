@@ -387,8 +387,8 @@ textarea.textInput {
   width: 100%;
   min-width: 720px;
   border-collapse: collapse;
-  background: var(--control-surface);
-  border-top: 1px solid var(--border);
+  background: var(--krds-surface);
+  border-top: 1px solid var(--krds-gray-30);
 }
 
 .table th,
@@ -400,8 +400,8 @@ textarea.textInput {
 }
 
 .table th {
-  background: var(--background);
-  color: var(--text-strong);
+  background: var(--krds-gray-10);
+  color: var(--krds-text);
   font-size: 15px;
   font-weight: 700;
   border-bottom: 1px solid var(--krds-secondary-70);
@@ -409,7 +409,7 @@ textarea.textInput {
 }
 
 .table td {
-  color: var(--foreground);
+  color: var(--krds-text);
   font-size: 15px;
   height: 40px;
 }
