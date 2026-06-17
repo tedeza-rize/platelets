@@ -271,16 +271,26 @@ export function SetupWizard({
         method: "POST",
       });
       const payload = await readJsonResponse<{
-        checks?: { id: string; ok: boolean; title: string; message: string; skipped: boolean }[];
+        checks?: {
+          id: string;
+          ok: boolean;
+          title: string;
+          message: string;
+          skipped: boolean;
+        }[];
         errorKey?: string;
         ok?: boolean;
       }>(response, copy["json.failed"]);
 
       if (!(response.ok && payload.ok)) {
         if (payload.checks) {
-          const failedChecks = payload.checks.filter((c) => !c.ok && !c.skipped);
+          const failedChecks = payload.checks.filter(
+            (c) => !(c.ok || c.skipped),
+          );
           if (failedChecks.length > 0) {
-            throw new Error(failedChecks.map((c) => `${c.title}: ${c.message}`).join("\n"));
+            throw new Error(
+              failedChecks.map((c) => `${c.title}: ${c.message}`).join("\n"),
+            );
           }
         }
         throw new Error(setupErrorMessage(payload, copy, "api.failed"));
