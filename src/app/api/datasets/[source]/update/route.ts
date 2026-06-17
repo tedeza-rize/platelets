@@ -24,10 +24,12 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ source: string }> },
 ) {
-  const forbidden = await requireAccessRole(request, "sudo");
-
-  if (forbidden) {
-    return forbidden;
+  const [, accessError] = await requireAccessRole(request, "sudo");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const { source } = await context.params;

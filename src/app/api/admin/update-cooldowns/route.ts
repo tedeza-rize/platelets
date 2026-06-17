@@ -10,10 +10,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const forbidden = await requireAccessRole(request, "sudo");
-
-  if (forbidden) {
-    return forbidden;
+  const [, accessError] = await requireAccessRole(request, "sudo");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const url = new URL(request.url);

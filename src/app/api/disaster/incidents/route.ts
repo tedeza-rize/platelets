@@ -34,11 +34,16 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const [session, forbidden] = await requireAccessSession(
+  const [session, accessError] = await requireAccessSession(
     request,
     "field_worker",
   );
-  if (forbidden) return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const limited = await enforceSharedRateLimit(request, {
     bucket: "disaster-incidents",

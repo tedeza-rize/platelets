@@ -19,10 +19,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const forbidden = await requireAccessRole(request, "sudo");
+  const [, accessError] = await requireAccessRole(request, "sudo");
 
-  if (forbidden) {
-    return forbidden;
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
   }
 
   const actions = Object.keys(DATASET_SOURCES).map(
@@ -31,7 +34,16 @@ export async function POST(request: Request) {
 
   try {
     for (const action of actions) {
-      await assertAdminUpdateAvailable(action);
+      const [, error] = await assertAdminUpdateAvailable(action);
+      if (error !== null) {
+        return noStoreJson(
+          {
+            cooldown: error.cooldown,
+            error: "Update cooldown is active.",
+          },
+          { status: 429 },
+        );
+      }
     }
 
     const datasets = await updateAllDatasets();
@@ -42,16 +54,6 @@ export async function POST(request: Request) {
 
     return noStoreJson({ datasets });
   } catch (error) {
-    if (error instanceof AdminUpdateCooldownError) {
-      return noStoreJson(
-        {
-          cooldown: error.cooldown,
-          error: "Update cooldown is active.",
-        },
-        { status: 429 },
-      );
-    }
-
     throw error;
   }
 }

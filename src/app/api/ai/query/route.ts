@@ -21,8 +21,13 @@ export async function POST(request: Request) {
   });
   if (limited) return limited;
 
-  const forbidden = await requireAccessRole(request, "admin");
-  if (forbidden) return forbidden;
+  const [, accessError] = await requireAccessRole(request, "admin");
+  if (accessError !== null) {
+    return noStoreJson(
+      { error: accessError.message },
+      { status: accessError.code === "unauthorized" ? 401 : 403 },
+    );
+  }
 
   const payload = (await request.json().catch(() => null)) as {
     latitude?: unknown;

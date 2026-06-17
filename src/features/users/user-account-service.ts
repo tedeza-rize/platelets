@@ -95,11 +95,11 @@ export async function createManagedUser(
     return fail({ code: "sudo_required" });
   }
 
-  try {
-    return ok(await createUser(input));
-  } catch {
+  const [user, error] = await createUser(input);
+  if (error !== null) {
     return fail({ code: "invalid_input" });
   }
+  return ok(user);
 }
 
 export async function updateManagedUser(
@@ -143,19 +143,15 @@ export async function updateManagedUser(
     return fail({ code: "last_admin" });
   }
 
-  try {
-    const user = await updateUser(id, input);
-    if (!user) return fail({ code: "not_found" });
+  const [user, error] = await updateUser(id, input);
+  if (error !== null || !user) return fail({ code: "invalid_input" });
 
-    const sessionRevoked = changesSessionIdentity(input);
-    if (sessionRevoked) {
-      await revokeUserAccessSessions(id);
-    }
-
-    return ok({ sessionRevoked, user });
-  } catch {
-    return fail({ code: "invalid_input" });
+  const sessionRevoked = changesSessionIdentity(input);
+  if (sessionRevoked) {
+    await revokeUserAccessSessions(id);
   }
+
+  return ok({ sessionRevoked, user });
 }
 
 export async function deleteManagedUser(
