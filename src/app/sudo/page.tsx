@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { ManagementConsole } from "@/components/management-console";
 import { getDatabaseConfig } from "@/lib/database/config";
 import { getDictionary } from "@/lib/i18n";
@@ -12,14 +13,21 @@ export default async function SudoPage() {
 
   const dictionary = getDictionary(await getRequestLocale());
   const session = await getCurrentAccessSession();
-  const hasSudoSession = session?.role === "sudo";
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (session.role !== "sudo") {
+    redirect("/forbidden");
+  }
 
   return (
     <ManagementConsole
       currentDatabaseEngine={getDatabaseConfig().engine}
       dictionary={dictionary}
       mode="sudo"
-      hasSudoSession={hasSudoSession}
+      hasSudoSession={true}
     />
   );
 }
