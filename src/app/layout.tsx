@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "pretendard/dist/web/static/pretendard-dynamic-subset.css";
 import "./globals.css";
 import { NotificationControl } from "@/components/notification-control";
 import { PreferenceControl } from "@/components/preference-control";
