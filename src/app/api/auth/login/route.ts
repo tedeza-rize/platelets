@@ -31,24 +31,29 @@ export async function POST(request: Request) {
   });
   if (accountLimit) return accountLimit;
 
-  const session = await createAccessSession(password, username);
+  try {
+    const session = await createAccessSession(password, username);
 
-  if (!session) {
-    return noStoreJson({ error: "Invalid password." }, { status: 401 });
-  }
+    if (!session) {
+      return noStoreJson({ error: "Invalid password." }, { status: 401 });
+    }
 
-  return noStoreJson(
-    {
-      expiresAt: session.expiresAt,
-      homePath: homePathForRole(session.role),
-      name: session.name,
-      role: session.role,
-      username: session.username,
-    },
-    {
-      headers: {
-        "Set-Cookie": sessionCookieHeader(request, session.token),
+    return noStoreJson(
+      {
+        expiresAt: session.expiresAt,
+        homePath: homePathForRole(session.role),
+        name: session.name,
+        role: session.role,
+        username: session.username,
       },
-    },
-  );
+      {
+        headers: {
+          "Set-Cookie": sessionCookieHeader(request, session.token),
+        },
+      },
+    );
+  } catch (error) {
+    console.error("Login failure:", error);
+    return noStoreJson({ error: String(error) }, { status: 500 });
+  }
 }
