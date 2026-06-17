@@ -1,16 +1,18 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { setDataDirectoryPathForTests } from "@/lib/data-paths";
+import {
+  getSqliteDatabasePath,
+  setDataDirectoryPathForTests,
+} from "@/lib/data-paths";
 
 setDataDirectoryPathForTests(
   mkdtempSync(path.join(tmpdir(), "platelets-setup-database-")),
 );
 
 const { POST } = await import("@/app/api/setup/test-database/route");
-const pointsDb = await import("@/lib/points-db");
 
 function setupDatabaseRequest(body: unknown) {
   return new Request("http://platelets.local/api/setup/test-database", {
@@ -30,8 +32,7 @@ test("setup database validation accepts SQLite", async () => {
 
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
-
-  await pointsDb.closeDatabase();
+  assert.equal(existsSync(getSqliteDatabasePath()), false);
 });
 
 test("setup database validation rejects invalid external URLs without leaking credentials", async () => {
