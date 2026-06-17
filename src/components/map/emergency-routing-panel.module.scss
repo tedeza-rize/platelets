@@ -9,7 +9,7 @@
   gap: 12px;
   overflow: auto;
   border: 1px solid var(--dropdown-border);
-  border-radius: 14px;
+  border-radius: var(--krds-radius-xlarge);
   background: var(--dropdown-surface);
   color: var(--text-strong);
   padding: 15px;
@@ -30,7 +30,7 @@
 }
 
 .emergencyPanelHeader span {
-  color: #dc2626;
+  color: var(--krds-danger);
   font-size: 0.72rem;
   font-weight: 850;
 }
@@ -72,9 +72,9 @@
 }
 
 .emergencyTypeButtons button[aria-pressed="true"] {
-  border-color: #ef4444;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: var(--krds-danger);
+  background: var(--krds-bg-subtle);
+  color: var(--krds-danger);
 }
 
 .emergencyFields {
@@ -121,19 +121,19 @@
 }
 
 .dispatchStation {
-  background: #fff7ed;
-  color: #9a3412;
+  background: var(--krds-bg-subtle);
+  color: var(--krds-warning);
   font-weight: 750;
 }
 
 .emergencyError {
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--krds-bg-subtle);
+  color: var(--krds-danger);
 }
 
 .emergencyRouteSummary {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: var(--krds-primary-10);
+  color: var(--krds-primary-strong);
   font-weight: 800;
 }
 
@@ -145,7 +145,7 @@
   gap: 8px;
   border: 0;
   border-radius: 9px;
-  background: #dc2626;
+  background: var(--krds-danger);
   color: #ffffff;
   cursor: pointer;
   font-weight: 850;
@@ -178,7 +178,7 @@
 
 .hospitalResultHeader b {
   flex: 0 0 auto;
-  color: #dc2626;
+  color: var(--krds-danger);
   font-size: 0.8rem;
 }
 
@@ -191,10 +191,10 @@
 
 .hospitalResults button {
   min-height: 32px;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--krds-danger);
   border-radius: 7px;
   background: #ffffff;
-  color: #b91c1c;
+  color: var(--krds-danger);
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 800;

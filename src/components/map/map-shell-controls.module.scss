@@ -17,7 +17,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  color: #7258e8;
+  color: var(--krds-primary-strong);
   font-size: 1.08rem;
   font-weight: 850;
   letter-spacing: -0.025em;
@@ -29,7 +29,7 @@
   height: 34px;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(145deg, #8f72ff, #6554df);
+  background: var(--krds-primary);
   color: #ffffff;
   box-shadow: 0 8px 18px rgb(101 84 223 / 28%);
 }
@@ -87,7 +87,7 @@
 
 .navSearchButton:hover,
 .navSearchButton:focus-visible {
-  border-color: #8b7cf6;
+  border-color: var(--krds-primary);
   color: var(--text-strong);
   outline: 0;
 }
@@ -118,8 +118,8 @@
 
 .providerButton:hover,
 .providerButton:focus-visible {
-  border-color: #8b7cf6;
-  color: #7258e8;
+  border-color: var(--krds-primary);
+  color: var(--krds-primary-strong);
   outline: 0;
 }
 
@@ -139,8 +139,8 @@
 
 .navIconLink:hover,
 .navIconLink:focus-visible {
-  border-color: #8b7cf6;
-  color: #7258e8;
+  border-color: var(--krds-primary);
+  color: var(--krds-primary-strong);
   outline: 0;
 }
 
@@ -315,7 +315,7 @@
 .sourceItem input {
   width: 15px;
   height: 15px;
-  accent-color: #225ea8;
+  accent-color: var(--krds-fg-link);
 }
 
 .sourceItem span {
@@ -356,7 +356,7 @@
 .settingItem input {
   width: 15px;
   height: 15px;
-  accent-color: #225ea8;
+  accent-color: var(--krds-fg-link);
 }
 
 @media (max-width: 720px) {
@@ -395,8 +395,8 @@
   .mobileNav > button:hover,
   .mobileNav > button:focus-visible,
   .mobileNavActive {
-    background: color-mix(in srgb, #7258e8 10%, transparent);
-    color: #7258e8;
+    background: color-mix(in srgb, var(--krds-primary-strong) 10%, transparent);
+    color: var(--krds-primary-strong);
     outline: 0;
   }
 
@@ -425,7 +425,7 @@
   .mobileToolButton:hover,
   .mobileToolButton:focus-visible {
     border-color: var(--focus-ring);
-    color: #7258e8;
+    color: var(--krds-primary-strong);
     outline: 0;
   }
 
