@@ -1,4 +1,4 @@
-import { ErrorState } from "@/components/error-state";
+import { ErrorState } from "@/components/feedback/error-state";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";
 

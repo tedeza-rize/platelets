@@ -5,7 +5,7 @@ import type {
   PropertyValueSpecification,
   StyleSpecification,
 } from "maplibre-gl";
-import type { EmergencyRouteResult } from "@/components/emergency-routing-panel";
+import type { EmergencyRouteResult } from "@/components/map/emergency-routing-panel";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import {

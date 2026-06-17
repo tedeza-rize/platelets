@@ -1,4 +1,4 @@
-import { LicenseBrowser } from "@/components/license-browser";
+import { LicenseBrowser } from "@/components/licenses/license-browser";
 import { DATA_LICENSE_ENTRIES } from "@/lib/data-licenses";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/request-preferences";

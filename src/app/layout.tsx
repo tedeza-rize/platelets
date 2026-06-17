@@ -3,11 +3,11 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "pretendard/dist/web/static/pretendard-dynamic-subset.css";
-import "./globals.css";
-import { NotificationControl } from "@/components/notification-control";
-import { PreferenceControl } from "@/components/preference-control";
-import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
-import { TimeSkewGuard } from "@/components/time-skew-guard";
+import "./globals.scss";
+import { NotificationControl } from "@/components/settings/notification-control";
+import { PreferenceControl } from "@/components/settings/preference-control";
+import { ServiceWorkerRegistration } from "@/components/system/service-worker-registration";
+import { TimeSkewGuard } from "@/components/system/time-skew-guard";
 import { getDictionary } from "@/lib/i18n";
 import { getRequestLocale, getRequestTheme } from "@/lib/request-preferences";
 
