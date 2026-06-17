@@ -281,10 +281,10 @@ summary:focus-visible,
 }
 
 .maplibregl-popup-content {
-  border: 1px solid #d7dee8;
+  border: 1px solid var(--krds-border-default);
   border-radius: 8px;
   background: #ffffff;
-  color: #18201c;
+  color: var(--krds-fg-1);
   padding: 12px;
   box-shadow: 0 12px 28px rgb(24 32 28 / 24%);
 }
@@ -292,12 +292,12 @@ summary:focus-visible,
 .maplibregl-popup-close-button {
   width: 28px;
   height: 28px;
-  color: #64748b;
+  color: var(--krds-fg-3);
   font-size: 18px;
 }
 
 .maplibregl-popup-close-button:hover {
-  color: #0f172a;
+  color: var(--krds-fg-1);
 }
 
 .maplibregl-popup-anchor-top .maplibregl-popup-tip,
@@ -408,7 +408,7 @@ summary:focus-visible,
 }
 
 .licenseCard dd a {
-  color: #225ea8;
+  color: var(--krds-fg-link);
   font-weight: 700;
 }
 
