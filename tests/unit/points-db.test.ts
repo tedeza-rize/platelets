@@ -64,6 +64,43 @@ test("findNearestPoints sorts mapped points by haversine distance", async () => 
   assert.ok(results[0].distanceMeters < results[1].distanceMeters);
 });
 
+test("findNearestPoints orders candidates by proximity before limiting", async () => {
+  await replaceDataset({
+    failedCount: 0,
+    fetchedAt: "2026-06-12T00:00:00.000Z",
+    geocodedCount: 251,
+    points: [
+      ...Array.from({ length: 250 }, (_, index) =>
+        point({
+          name: `far-${String(index).padStart(3, "0")}`,
+          latitude: 37.62 + index * 0.00001,
+          longitude: 126.99,
+        }),
+      ),
+      point({
+        name: "zz-near",
+        latitude: 37.56651,
+        longitude: 126.97801,
+      }),
+    ],
+    skippedCount: 0,
+    source: "hospitals",
+  });
+
+  const results = await findNearestPoints({
+    latitude: 37.5665,
+    limit: 1,
+    longitude: 126.978,
+    radiusMeters: 10_000,
+    source: "hospitals",
+  });
+
+  assert.deepEqual(
+    results.map((result) => result.name),
+    ["zz-near"],
+  );
+});
+
 test("findNearestPoints clamps very large radiuses to 100km", async () => {
   await replaceDataset({
     failedCount: 0,
