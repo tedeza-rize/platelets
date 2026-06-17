@@ -124,6 +124,14 @@ type ManagementConsoleProps = {
   mode: "admin" | "sudo";
 };
 
+type ManagementTab =
+  | "integrations"
+  | "logs"
+  | "overview"
+  | "settings"
+  | "status"
+  | "updates";
+
 type ProgressState = {
   currentStep: string;
   percent: number;
@@ -274,6 +282,7 @@ export function ManagementConsole({
   const [savingNtpServers, setSavingNtpServers] = useState(false);
   const [clockTick, setClockTick] = useState(0);
   const [sudoPassword, setSudoPassword] = useState("");
+  const [activeTab, setActiveTab] = useState<ManagementTab>("overview");
 
   const title =
     mode === "sudo" ? t("개발자 총 권한 페이지") : t("관리자 페이지");
@@ -752,6 +761,32 @@ export function ManagementConsole({
   const pausedDatasets = datasets.filter(
     (dataset) => dataset.importProgress?.status === "paused",
   );
+  const managementTabs = useMemo(
+    () =>
+      [
+        { id: "overview", label: t("adminTabs.overview") },
+        mode === "sudo"
+          ? { id: "integrations", label: t("adminTabs.integrations") }
+          : null,
+        mode === "sudo"
+          ? { id: "settings", label: t("adminTabs.settings") }
+          : null,
+        mode === "sudo"
+          ? { id: "updates", label: t("adminTabs.updates") }
+          : null,
+        { id: "status", label: t("adminTabs.status") },
+        mode === "sudo" ? { id: "logs", label: t("adminTabs.logs") } : null,
+      ].filter((tab): tab is { id: ManagementTab; label: string } =>
+        Boolean(tab),
+      ),
+    [mode, t],
+  );
+
+  useEffect(() => {
+    if (!managementTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(managementTabs[0]?.id ?? "overview");
+    }
+  }, [activeTab, managementTabs]);
 
   return (
     <div className={styles.page}>
@@ -778,107 +813,130 @@ export function ManagementConsole({
       </header>
 
       <main className={styles.content}>
-        <section className={styles.summaryGrid}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>
-                <Database aria-hidden="true" size={18} strokeWidth={2.4} />
-                {t("데이터셋")}
-              </span>
+        <div
+          aria-label={t("adminTabs.label")}
+          className={styles.tabList}
+          role="tablist"
+        >
+          {managementTabs.map((tab) => (
+            <button
+              aria-selected={activeTab === tab.id}
+              className={styles.tabButton}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {notice ? <output className={styles.notice}>{notice}</output> : null}
+
+        {activeTab === "overview" ? (
+          <section className={styles.summaryGrid}>
+            <div className={styles.card}>
+              <div className={styles.cardHeader}>
+                <span className={styles.cardTitle}>
+                  <Database aria-hidden="true" size={18} strokeWidth={2.4} />
+                  {t("데이터셋")}
+                </span>
+              </div>
+              <strong className={styles.metric}>
+                {datasets
+                  .reduce((total, dataset) => total + dataset.recordCount, 0)
+                  .toLocaleString(dictionary.formatLocale)}
+              </strong>
+              <span className={styles.muted}>{t("저장된 전체 기록")}</span>
             </div>
-            <strong className={styles.metric}>
-              {datasets
-                .reduce((total, dataset) => total + dataset.recordCount, 0)
-                .toLocaleString(dictionary.formatLocale)}
-            </strong>
-            <span className={styles.muted}>{t("저장된 전체 기록")}</span>
-          </div>
 
-          {mode === "sudo" ? (
-            <>
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>
-                    <TerminalSquare
-                      aria-hidden="true"
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                    {t("카카오 로컬 API")}
+            {mode === "sudo" ? (
+              <>
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <TerminalSquare
+                        aria-hidden="true"
+                        size={18}
+                        strokeWidth={2.4}
+                      />
+                      {t("카카오 로컬 API")}
+                    </span>
+                  </div>
+                  <strong className={styles.metric}>
+                    {uiText(dictionary, "format.quota", {
+                      limit: (quota?.monthlyLimit ?? 100000).toLocaleString(
+                        dictionary.formatLocale,
+                      ),
+                      used: (quota?.usedCount ?? 0).toLocaleString(
+                        dictionary.formatLocale,
+                      ),
+                    })}
+                  </strong>
+                  <span className={styles.muted}>
+                    {quotaPercent}
+                    {t("% 사용, 리셋")}{" "}
+                    {formatDateTime(
+                      quota?.windowEndsAt ?? null,
+                      dictionary.formatLocale,
+                    )}
                   </span>
                 </div>
-                <strong className={styles.metric}>
-                  {uiText(dictionary, "format.quota", {
-                    limit: (quota?.monthlyLimit ?? 100000).toLocaleString(
-                      dictionary.formatLocale,
-                    ),
-                    used: (quota?.usedCount ?? 0).toLocaleString(
-                      dictionary.formatLocale,
-                    ),
-                  })}
-                </strong>
-                <span className={styles.muted}>
-                  {quotaPercent}
-                  {t("% 사용, 리셋")}{" "}
-                  {formatDateTime(
-                    quota?.windowEndsAt ?? null,
-                    dictionary.formatLocale,
-                  )}
-                </span>
-              </div>
 
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>
-                    <AlertTriangle
-                      aria-hidden="true"
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                    {t("기상청 지진 API")}
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <AlertTriangle
+                        aria-hidden="true"
+                        size={18}
+                        strokeWidth={2.4}
+                      />
+                      {t("기상청 지진 API")}
+                    </span>
+                  </div>
+                  <strong className={styles.metric}>
+                    {uiText(dictionary, "format.quota", {
+                      limit: (kmaQuota?.monthlyLimit ?? 5000).toLocaleString(
+                        dictionary.formatLocale,
+                      ),
+                      used: (kmaQuota?.usedCount ?? 0).toLocaleString(
+                        dictionary.formatLocale,
+                      ),
+                    })}
+                  </strong>
+                  <span className={styles.muted}>
+                    {kmaQuotaPercent}
+                    {t("% 사용, 리셋")}{" "}
+                    {formatDateTime(
+                      kmaQuota?.windowEndsAt ?? null,
+                      dictionary.formatLocale,
+                    )}
                   </span>
                 </div>
-                <strong className={styles.metric}>
-                  {uiText(dictionary, "format.quota", {
-                    limit: (kmaQuota?.monthlyLimit ?? 5000).toLocaleString(
-                      dictionary.formatLocale,
-                    ),
-                    used: (kmaQuota?.usedCount ?? 0).toLocaleString(
-                      dictionary.formatLocale,
-                    ),
-                  })}
-                </strong>
-                <span className={styles.muted}>
-                  {kmaQuotaPercent}
-                  {t("% 사용, 리셋")}{" "}
-                  {formatDateTime(
-                    kmaQuota?.windowEndsAt ?? null,
-                    dictionary.formatLocale,
-                  )}
-                </span>
-              </div>
 
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <span className={styles.cardTitle}>
-                    <ClipboardList
-                      aria-hidden="true"
-                      size={18}
-                      strokeWidth={2.4}
-                    />
-                    {t("최근 로그")}
-                  </span>
+                <div className={styles.card}>
+                  <div className={styles.cardHeader}>
+                    <span className={styles.cardTitle}>
+                      <ClipboardList
+                        aria-hidden="true"
+                        size={18}
+                        strokeWidth={2.4}
+                      />
+                      {t("최근 로그")}
+                    </span>
+                  </div>
+                  <strong className={styles.metric}>
+                    {logs.length.toLocaleString(dictionary.formatLocale)}
+                  </strong>
+                  <span className={styles.muted}>{t("최근 12건")}</span>
                 </div>
-                <strong className={styles.metric}>
-                  {logs.length.toLocaleString(dictionary.formatLocale)}
-                </strong>
-                <span className={styles.muted}>{t("최근 12건")}</span>
-              </div>
-            </>
-          ) : null}
-        </section>
+              </>
+            ) : null}
+          </section>
+        ) : null}
 
-        {mode === "sudo" ? (
+        {mode === "sudo" && activeTab === "overview" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>{t("개발자 권한")}</span>
@@ -899,7 +957,9 @@ export function ManagementConsole({
           </section>
         ) : null}
 
-        {mode === "sudo" && currentDatabaseEngine ? (
+        {mode === "sudo" &&
+        activeTab === "integrations" &&
+        currentDatabaseEngine ? (
           <DatabaseMigrationPanel
             currentEngine={currentDatabaseEngine}
             dictionary={dictionary}
@@ -907,14 +967,14 @@ export function ManagementConsole({
           />
         ) : null}
 
-        {mode === "sudo" ? (
+        {mode === "sudo" && activeTab === "integrations" ? (
           <IntegrationSettingsPanel
             dictionary={dictionary}
             ensureSudoSession={loginIfNeeded}
           />
         ) : null}
 
-        {mode === "sudo" && operationalSettings ? (
+        {mode === "sudo" && activeTab === "settings" && operationalSettings ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>{t("운영 설정")}</span>
@@ -1066,7 +1126,7 @@ export function ManagementConsole({
           </section>
         ) : null}
 
-        {mode === "sudo" && schedules ? (
+        {mode === "sudo" && activeTab === "updates" && schedules ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>
@@ -1139,7 +1199,7 @@ export function ManagementConsole({
           </section>
         ) : null}
 
-        {mode === "sudo" ? (
+        {mode === "sudo" && activeTab === "updates" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>{t("데이터 갱신")}</span>
@@ -1261,11 +1321,10 @@ export function ManagementConsole({
                 ) : null}
               </button>
             </div>
-            <output className={styles.notice}>{notice}</output>
           </section>
         ) : null}
 
-        {mode === "sudo" ? (
+        {mode === "sudo" && activeTab === "settings" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>
@@ -1333,60 +1392,65 @@ export function ManagementConsole({
           </section>
         ) : null}
 
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <span className={styles.cardTitle}>{t("데이터셋 상태")}</span>
-          </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>{t("데이터셋")}</th>
-                  <th>{t("기록")}</th>
-                  <th>{t("좌표")}</th>
-                  <th>{t("실패")}</th>
-                  <th>{t("진행")}</th>
-                  <th>{t("가져온 시각")}</th>
-                  {mode === "sudo" ? <th>{t("오류")}</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {datasets.map((dataset) => (
-                  <tr key={dataset.id}>
-                    <td>{dataset.label}</td>
-                    <td>
-                      {dataset.recordCount.toLocaleString(
-                        dictionary.formatLocale,
-                      )}
-                    </td>
-                    <td>
-                      {dataset.geocodedCount.toLocaleString(
-                        dictionary.formatLocale,
-                      )}
-                    </td>
-                    <td>
-                      {dataset.failedCount.toLocaleString(
-                        dictionary.formatLocale,
-                      )}
-                    </td>
-                    <td>
-                      {formatImportProgress(dataset.importProgress, dictionary)}
-                    </td>
-                    <td>
-                      {formatDateTime(
-                        dataset.fetchedAt,
-                        dictionary.formatLocale,
-                      )}
-                    </td>
-                    {mode === "sudo" ? <td>{dataset.error ?? "-"}</td> : null}
+        {activeTab === "status" ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <span className={styles.cardTitle}>{t("데이터셋 상태")}</span>
+            </div>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>{t("데이터셋")}</th>
+                    <th>{t("기록")}</th>
+                    <th>{t("좌표")}</th>
+                    <th>{t("실패")}</th>
+                    <th>{t("진행")}</th>
+                    <th>{t("가져온 시각")}</th>
+                    {mode === "sudo" ? <th>{t("오류")}</th> : null}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody>
+                  {datasets.map((dataset) => (
+                    <tr key={dataset.id}>
+                      <td>{dataset.label}</td>
+                      <td>
+                        {dataset.recordCount.toLocaleString(
+                          dictionary.formatLocale,
+                        )}
+                      </td>
+                      <td>
+                        {dataset.geocodedCount.toLocaleString(
+                          dictionary.formatLocale,
+                        )}
+                      </td>
+                      <td>
+                        {dataset.failedCount.toLocaleString(
+                          dictionary.formatLocale,
+                        )}
+                      </td>
+                      <td>
+                        {formatImportProgress(
+                          dataset.importProgress,
+                          dictionary,
+                        )}
+                      </td>
+                      <td>
+                        {formatDateTime(
+                          dataset.fetchedAt,
+                          dictionary.formatLocale,
+                        )}
+                      </td>
+                      {mode === "sudo" ? <td>{dataset.error ?? "-"}</td> : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
 
-        {mode === "sudo" ? (
+        {mode === "sudo" && activeTab === "logs" ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <span className={styles.cardTitle}>{t("최근 로그")}</span>

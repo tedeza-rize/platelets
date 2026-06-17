@@ -175,6 +175,13 @@ export const koUiOperations = {
   "databaseMigration.testFailed": "대상 데이터베이스에 연결하지 못했습니다.",
   "databaseMigration.testReady": "대상 데이터베이스 연결을 확인했습니다.",
   "databaseMigration.title": "데이터베이스 이전",
+  "adminTabs.integrations": "API와 웹훅",
+  "adminTabs.label": "관리 영역",
+  "adminTabs.logs": "로그",
+  "adminTabs.overview": "대시보드",
+  "adminTabs.settings": "시스템 설정",
+  "adminTabs.status": "데이터셋 상태",
+  "adminTabs.updates": "데이터 갱신",
   "integrationSettings.clear": "저장된 값 삭제",
   "integrationSettings.configured": "등록됨 - 새 값 입력 시 교체",
   "integrationSettings.description":

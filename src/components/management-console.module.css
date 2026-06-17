@@ -63,6 +63,43 @@
   gap: 12px;
 }
 
+.tabList {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.tabButton {
+  min-height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--control-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 0 12px;
+}
+
+.tabButton[aria-selected="true"] {
+  border-color: var(--focus-ring);
+  background: var(--control-selected);
+  color: var(--text-strong);
+}
+
+.tabButton:hover,
+.tabButton:focus-visible {
+  border-color: var(--focus-ring);
+  color: var(--text-strong);
+  outline: 0;
+}
+
 .card {
   display: grid;
   gap: 10px;

@@ -180,6 +180,13 @@ export const enUiOperations = {
   "databaseMigration.testFailed": "Could not connect to the target database.",
   "databaseMigration.testReady": "Target database connection is ready.",
   "databaseMigration.title": "Database migration",
+  "adminTabs.integrations": "API and webhooks",
+  "adminTabs.label": "Management sections",
+  "adminTabs.logs": "Logs",
+  "adminTabs.overview": "Dashboard",
+  "adminTabs.settings": "System settings",
+  "adminTabs.status": "Dataset status",
+  "adminTabs.updates": "Data updates",
   "integrationSettings.clear": "Delete stored value",
   "integrationSettings.configured":
     "Configured - enter a new value to replace it",
