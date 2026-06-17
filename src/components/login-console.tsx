@@ -48,7 +48,7 @@ export function LoginConsole({
       setError(
         response.status === 429
           ? t("Too many sign-in attempts. Try again shortly.")
-          : t("Login failed."),
+          : payload?.error || t("Login failed."),
       );
       setIsSubmitting(false);
       return;
@@ -58,59 +58,61 @@ export function LoginConsole({
   }
 
   return (
-    <main className={styles.pageCentered}>
-      <section className={styles.narrowShell} style={{ width: "100%" }}>
-        <header className={styles.header}>
-          <div>
-            <h1>{t("Staff login")}</h1>
-            <p>{t("Sign in with an assigned account.")}</p>
-          </div>
-        </header>
-        <form
-          aria-busy={isSubmitting}
-          className={styles.card}
-          onSubmit={submit}
-        >
-          <label className={styles.field}>
-            {t("Username")}
-            <input
-              autoComplete="username"
-              name="username"
-              onChange={(event) => setUsername(event.target.value)}
-              required
-              value={username}
-            />
-          </label>
-          <label className={styles.field}>
-            {t("Password")}
-            <input
-              autoComplete="current-password"
-              aria-describedby={error ? errorId : undefined}
-              aria-invalid={Boolean(error)}
-              name="password"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </label>
-          <div className={styles.actions}>
-            <button
-              className={styles.primary}
-              disabled={!isReady || isSubmitting}
-              type="submit"
-            >
-              <LogIn aria-hidden="true" size={18} />
-              {t(isSubmitting ? "Signing in..." : "Sign in")}
-            </button>
-          </div>
-          {error ? (
-            <p className={styles.error} id={errorId} role="alert">
-              {error}
-            </p>
-          ) : null}
-        </form>
-      </section>
-    </main>
+    <div className={styles.pageCentered} style={{ padding: 0 }}>
+      <main className={styles.pageCentered} style={{ flex: 1, width: "100%" }}>
+        <section className={styles.narrowShell} style={{ width: "100%" }}>
+          <header className={styles.header}>
+            <div>
+              <h1>{t("Staff login")}</h1>
+              <p>{t("Sign in with an assigned account.")}</p>
+            </div>
+          </header>
+          <form
+            aria-busy={isSubmitting}
+            className={styles.card}
+            onSubmit={submit}
+          >
+            <label className={styles.field}>
+              {t("Username")}
+              <input
+                autoComplete="username"
+                name="username"
+                onChange={(event) => setUsername(event.target.value)}
+                required
+                value={username}
+              />
+            </label>
+            <label className={styles.field}>
+              {t("Password")}
+              <input
+                autoComplete="current-password"
+                aria-describedby={error ? errorId : undefined}
+                aria-invalid={Boolean(error)}
+                name="password"
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                type="password"
+                value={password}
+              />
+            </label>
+            <div className={styles.actions}>
+              <button
+                className={styles.primary}
+                disabled={!isReady || isSubmitting}
+                type="submit"
+              >
+                <LogIn aria-hidden="true" size={18} />
+                {t(isSubmitting ? "Signing in..." : "Sign in")}
+              </button>
+            </div>
+            {error ? (
+              <p className={styles.error} id={errorId} role="alert">
+                {error}
+              </p>
+            ) : null}
+          </form>
+        </section>
+      </main>
+    </div>
   );
 }

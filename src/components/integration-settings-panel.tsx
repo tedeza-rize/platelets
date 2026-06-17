@@ -15,17 +15,31 @@ import styles from "./management-console.module.css";
 type SettingsSummary = {
   apiKeys: {
     configured: Record<ApiKeyField, boolean>;
+    raw?: Record<ApiKeyField, string>;
   };
   integrations: {
     incidentWebhookCount: number;
     itsOpenApiKeyConfigured: boolean;
     webPushConfigured: boolean;
+    raw?: Record<IntegrationField, string>;
   };
 };
 
 function emptyDraft() {
   return Object.fromEntries(
     [...API_KEY_FIELDS, ...INTEGRATION_FIELDS].map((field) => [field, ""]),
+  ) as Record<SecretField, string>;
+}
+
+function initDraft(summary: SettingsSummary | null) {
+  if (!summary) return emptyDraft();
+  return Object.fromEntries(
+    [...API_KEY_FIELDS, ...INTEGRATION_FIELDS].map((field) => [
+      field,
+      (summary.apiKeys.raw?.[field as ApiKeyField] ??
+        summary.integrations.raw?.[field as IntegrationField]) ||
+        "",
+    ]),
   ) as Record<SecretField, string>;
 }
 
@@ -211,7 +225,7 @@ export function IntegrationSettingsPanel({
       }
 
       setSummary(payload);
-      setDraft(emptyDraft());
+      setDraft(initDraft(payload));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -269,7 +283,7 @@ export function IntegrationSettingsPanel({
       }
 
       setSummary(payload);
-      setDraft(emptyDraft());
+      setDraft(initDraft(payload));
       setNotice(t("integrationSettings.saved"));
     } catch (requestError) {
       setError(
