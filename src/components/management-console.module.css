@@ -388,23 +388,23 @@ textarea.textInput {
   min-width: 720px;
   border-collapse: collapse;
   background: var(--krds-surface);
-  border-top: 1px solid var(--krds-gray-30);
+  border-top: 1px solid var(--krds-border-default);
 }
 
 .table th,
 .table td {
-  border-bottom: 1px solid var(--krds-gray-20);
+  border-bottom: 1px solid var(--krds-divider);
   padding: 12px 14px;
   text-align: left;
   vertical-align: middle;
 }
 
 .table th {
-  background: var(--krds-gray-10);
+  background: var(--krds-bg-subtle);
   color: var(--krds-text);
   font-size: 15px;
   font-weight: 700;
-  border-bottom: 1px solid var(--krds-secondary-70);
+  border-bottom: 1px solid var(--krds-table-head-rule);
   height: 48px;
 }
 
