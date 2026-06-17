@@ -4,7 +4,6 @@ import {
   E2E_VAPID_KEYS,
   ensureSetupComplete,
   SEOUL_COORDINATES,
-  signInAsStaff,
   showEnglishSetup,
 } from "./home-helpers";
 
