@@ -1,0 +1,72 @@
+.tableWrap {
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  border-top: 1px solid var(--krds-border-default);
+  background: var(--krds-surface);
+}
+
+.table th,
+.table td {
+  height: 40px;
+  border-bottom: 1px solid var(--krds-divider);
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  height: 48px;
+  border-bottom-color: var(--krds-table-head-rule);
+  color: var(--krds-fg-2);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.table td {
+  color: var(--krds-text);
+  font-size: 15px;
+}
+
+.statusSuccess,
+.statusFailure,
+.statusSkipped {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  border-radius: var(--krds-radius-xsmall);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.statusSuccess {
+  color: var(--krds-success);
+}
+
+.statusFailure {
+  color: var(--krds-danger);
+}
+
+.statusSkipped {
+  color: var(--krds-warning);
+}
+
+.metadata {
+  max-width: 520px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--krds-surface);
+  color: var(--krds-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 8px;
+  white-space: pre-wrap;
+}

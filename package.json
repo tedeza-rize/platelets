@@ -9,8 +9,8 @@
     "download:bigdata119": "node scripts/download-bigdata119-samples.ts",
     "start": "next start",
     "mcp:points": "node scripts/points-mcp.ts",
-    "lint": "biome check --error-on-warnings && node scripts/check-encoding.ts",
-    "format": "biome format --write",
+    "lint": "biome check --error-on-warnings && stylelint \"**/*.scss\" && node scripts/check-encoding.ts",
+    "format": "biome format --write && prettier --write \"**/*.scss\"",
     "typecheck": "tsc --noEmit",
     "test": "npm run typecheck && npm run test:unit",
     "test:unit": "node --import ./tests/register-alias.mjs --test tests/unit/*.test.ts",
@@ -47,7 +47,10 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "babel-plugin-react-compiler": "1.0.0",
+    "prettier": "^3.8.4",
     "sass": "^1.101.0",
+    "stylelint": "^17.13.0",
+    "stylelint-config-standard-scss": "^17.0.0",
     "typescript": "^5"
   },
   "overrides": {

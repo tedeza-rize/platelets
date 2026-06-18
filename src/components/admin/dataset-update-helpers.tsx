@@ -5,6 +5,7 @@ import { useCallback } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.scss";
+import progressStyles from "./management-progress.module.scss";
 
 export type DatasetStatus = {
   error: string | null;
@@ -246,14 +247,14 @@ export function UpdateProgressModal({
   titleId,
 }: UpdateProgressModalProps) {
   return (
-    <div className={styles.progressBackdrop} role="presentation">
+    <div className={progressStyles.progressBackdrop} role="presentation">
       <section
         aria-labelledby={titleId}
         aria-modal="true"
-        className={styles.progressModal}
+        className={progressStyles.progressModal}
         role="dialog"
       >
-        <div className={styles.progressHeader}>
+        <div className={progressStyles.progressHeader}>
           <h2>{progress.title}</h2>
           <span>
             {uiText(dictionary, "format.percent", {
@@ -266,7 +267,7 @@ export function UpdateProgressModal({
           aria-valuemax={100}
           aria-valuemin={0}
           aria-valuenow={progress.percent}
-          className={styles.progressTrack}
+          className={progressStyles.progressTrack}
           role="progressbar"
         >
           <span style={{ width: `${progress.percent}%` }} />

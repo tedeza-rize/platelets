@@ -131,6 +131,19 @@ function withImportProgress(
   status: DatasetStatus,
   progress: DatasetImportProgress | null,
 ): DatasetStatus {
+  if (progress && status.recordCount === 0 && progress.importedCount > 0) {
+    return {
+      ...status,
+      failedCount: progress.failedCount,
+      fetchedAt: progress.fetchedAt,
+      geocodedCount: progress.geocodedCount,
+      importProgress: progress,
+      recordCount: progress.importedCount,
+      skippedCount: progress.skippedCount,
+      updatedAt: progress.updatedAt,
+    };
+  }
+
   return {
     ...status,
     importProgress: progress,

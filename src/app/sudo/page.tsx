@@ -15,6 +15,8 @@ export default async function SudoPage(props: { searchParams: SearchParams }) {
   const searchParams = await props.searchParams;
   const tab =
     typeof searchParams.tab === "string" ? searchParams.tab : undefined;
+  const section =
+    typeof searchParams.section === "string" ? searchParams.section : undefined;
 
   const dictionary = getDictionary(await getRequestLocale());
   const session = await getCurrentAccessSession();
@@ -28,6 +30,7 @@ export default async function SudoPage(props: { searchParams: SearchParams }) {
       dictionary={dictionary}
       mode="sudo"
       hasSudoSession={true}
+      section={section}
       tab={tab}
     />
   );

@@ -10,6 +10,7 @@ import {
   vworldReverseCoordinate,
   vworldSearchLocations,
 } from "./geocoding.ts";
+import { registerLiveApiTools } from "./live-api-tools.ts";
 import {
   datasetStatuses,
   listAssemblyProtestsForMcp,
@@ -31,6 +32,7 @@ export function registerPointsMcpTools(server: McpServer) {
   registerDatasetTools(server);
   registerGeocodingTools(server);
   registerAssemblyTools(server);
+  registerLiveApiTools(server);
   registerPointTools(server);
   registerResponseRankingTool(server);
   registerHospitalRecommendationTool(server);

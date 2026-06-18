@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
 
   if (!apiKey) {
     return noStoreJson(
-      { error: "The Seoul Open Data API key is not configured." },
+      { errorKey: "seoul.population.error.apiKeyMissing" },
       { status: 503 },
     );
   }

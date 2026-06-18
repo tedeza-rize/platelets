@@ -67,6 +67,7 @@ import {
 } from "@/lib/map-settings";
 import {
   createVworldStyle,
+  LAST_LOCATION_KEY,
   VWORLD_3D_BUILDINGS_SOURCE_ID,
 } from "@/lib/map-shell-core";
 import { safeLinkHref } from "@/lib/safe-link";
@@ -200,6 +201,10 @@ type UserLocation = {
   locatedAt: string;
   longitude: number;
 };
+type StoredLocation = {
+  latitude: number;
+  longitude: number;
+};
 type ReportLocation = {
   address: string;
   latitude: number;
@@ -228,8 +233,8 @@ type DashboardMapCreateOptions = {
   vworldApiKey: string;
 };
 
-const MAP_CENTER: [number, number] = [127.85, 36.45];
-const DEFAULT_ZOOM = 6.35;
+const MAP_CENTER: [number, number] = [126.978, 37.5665];
+const DEFAULT_ZOOM = 17;
 const OPENFREEMAP_SOURCE_ID = "dashboard-openmaptiles";
 const OSM_OFFICIAL_SOURCE_ID = "dashboard-osm-shortbread";
 const BUILDING_FOOTPRINT_LAYER_ID = "dashboard-building-footprint";
@@ -1308,6 +1313,42 @@ function createReportLocation(
   };
 }
 
+function readStoredLocation(): StoredLocation | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_LOCATION_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<StoredLocation>;
+    const latitude = Number(parsed.latitude);
+    const longitude = Number(parsed.longitude);
+
+    if (!(Number.isFinite(latitude) && Number.isFinite(longitude))) {
+      return null;
+    }
+
+    return { latitude, longitude };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLocation(location: StoredLocation) {
+  try {
+    const storedLocation: StoredLocation = {
+      latitude: Number(location.latitude.toFixed(2)),
+      longitude: Number(location.longitude.toFixed(2)),
+    };
+    window.localStorage.setItem(
+      LAST_LOCATION_KEY,
+      JSON.stringify(storedLocation),
+    );
+  } catch {
+    // Storage can be unavailable in private or locked-down browser profiles.
+  }
+}
+
 function buildBuildingReportAddress(
   buildingProperties: BuildingFeatureProperties | null,
   poiProperties: BuildingFeatureProperties | null,
@@ -1601,8 +1642,16 @@ function buildReportLocationPopupHtml(
   const coordinateLabel = `${location.latitude.toFixed(
     5,
   )}, ${location.longitude.toFixed(5)}`;
+  const isCoordinateFallback = location.address.includes(coordinateLabel);
   const rows = [
-    [text("dashboard.sheet.address"), location.address],
+    [
+      text(
+        isCoordinateFallback
+          ? "dashboard.sheet.selectedLocation"
+          : "dashboard.sheet.address",
+      ),
+      location.address,
+    ],
     [text("dashboard.sheet.coordinates"), coordinateLabel],
     [text("dashboard.sheet.status"), text("dashboard.sheet.reportStatus")],
   ];
@@ -1619,6 +1668,58 @@ function buildReportLocationPopupHtml(
     <div class="${styles.popupHeader}">
       <strong>${escapeHtml(text("dashboard.sheet.reportLocationTitle"))}</strong>
       <span>${escapeHtml(text("dashboard.sheet.reportLocationSubtitle"))}</span>
+    </div>
+    <dl class="${styles.popupDetails}">${rowsHtml}</dl>
+  </article>`;
+}
+
+function buildFacilityPopupHtml(
+  facility: FireStation | HospitalModel,
+  kind: "fire-station" | "hospital",
+  text: DashboardText,
+) {
+  const coordinateLabel = `${facility.latitude.toFixed(
+    5,
+  )}, ${facility.longitude.toFixed(5)}`;
+  const rows =
+    kind === "fire-station"
+      ? [
+          [text("dashboard.sheet.address"), facility.address],
+          [text("dashboard.sheet.coordinates"), coordinateLabel],
+          [
+            text("dashboard.context.station"),
+            (facility as FireStation).jurisdiction,
+          ],
+        ]
+      : [
+          [text("dashboard.sheet.address"), facility.address],
+          [text("dashboard.sheet.coordinates"), coordinateLabel],
+          [text("dashboard.sheet.phone"), (facility as HospitalModel).phone],
+          [
+            text("dashboard.sheet.status"),
+            (facility as HospitalModel).emergencyRoom
+              ? text("dashboard.sheet.emergencyRoom")
+              : text("dashboard.context.none"),
+          ],
+        ];
+  const rowsHtml = rows
+    .filter(([, value]) => Boolean(value))
+    .map(
+      ([label, value]) =>
+        `<div class="${styles.popupRow}"><dt>${escapeHtml(
+          label,
+        )}</dt><dd>${escapeHtml(value)}</dd></div>`,
+    )
+    .join("");
+  const subtitle =
+    kind === "fire-station"
+      ? text("dashboard.sheet.fireStation")
+      : text("dashboard.sheet.hospital");
+
+  return `<article class="${styles.popup}">
+    <div class="${styles.popupHeader}">
+      <strong>${escapeHtml(facility.name)}</strong>
+      <span>${escapeHtml(subtitle)}</span>
     </div>
     <dl class="${styles.popupDetails}">${rowsHtml}</dl>
   </article>`;
@@ -2264,39 +2365,6 @@ function featureId(feature: MapGeoJSONFeature | undefined) {
   return typeof id === "string" ? id : null;
 }
 
-function fitMapToSnapshot(map: MapLibreMap, snapshot: DashboardSnapshot) {
-  const coordinates = [
-    ...snapshot.incidents,
-    ...snapshot.fireStations,
-    ...snapshot.hospitals,
-    ...snapshot.riskAreas,
-    ...snapshot.bigData119Points,
-  ]
-    .map((item) => [item.longitude, item.latitude] as [number, number])
-    .filter(([longitude, latitude]) =>
-      [longitude, latitude].every(Number.isFinite),
-    );
-
-  if (coordinates.length === 0) {
-    return;
-  }
-
-  const longitudes = coordinates.map(([longitude]) => longitude);
-  const latitudes = coordinates.map(([, latitude]) => latitude);
-
-  map.fitBounds(
-    [
-      [Math.min(...longitudes), Math.min(...latitudes)],
-      [Math.max(...longitudes), Math.max(...latitudes)],
-    ],
-    {
-      duration: 0,
-      maxZoom: 11.8,
-      padding: 70,
-    },
-  );
-}
-
 export function DisasterDashboard({
   dictionary,
   initialView = "dashboard",
@@ -2307,6 +2375,7 @@ export function DisasterDashboard({
   const maplibreRef = useRef<MapLibreModule | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<MapLibrePopup | null>(null);
+  const snapshotRef = useRef<DashboardSnapshot | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const isThreeDimensionalRef = useRef(false);
@@ -2387,7 +2456,6 @@ export function DisasterDashboard({
   const bigData119PointsRef = useRef<BigData119MapPoint[]>([]);
   const userLocationRef = useRef<UserLocation | null>(null);
   const reportLocationRef = useRef<ReportLocation | null>(null);
-  const didFitInitialSnapshotRef = useRef(false);
   const mobileSheetDragStartRef = useRef<number | null>(null);
   const dashboardText = useCallback(
     (key: string, values: Record<string, string | number> = {}) => {
@@ -2624,6 +2692,7 @@ export function DisasterDashboard({
         };
 
         userLocationRef.current = location;
+        writeStoredLocation(location);
         setUserLocation(location);
         reportLocationRef.current = report;
         setReportLocation(report);
@@ -2648,7 +2717,7 @@ export function DisasterDashboard({
             center: [location.longitude, location.latitude],
             essential: true,
             pitch: isThreeDimensionalRef.current ? THREE_DIMENSIONAL_PITCH : 0,
-            zoom: Math.max(map.getZoom(), 15),
+            zoom: Math.max(map.getZoom(), DEFAULT_ZOOM),
           });
 
           popupRef.current?.remove();
@@ -2861,6 +2930,15 @@ export function DisasterDashboard({
       }
 
       mapRef.current = map;
+      const storedLocation = readStoredLocation();
+
+      if (storedLocation) {
+        map.jumpTo({
+          center: [storedLocation.longitude, storedLocation.latitude],
+          zoom: DEFAULT_ZOOM,
+        });
+      }
+
       map.addControl(
         new maplibre.NavigationControl({ showCompass: true }),
         "top-right",
@@ -3104,6 +3182,55 @@ export function DisasterDashboard({
         suppressPopupContextMenu(popupRef.current);
       }
 
+      async function lookupReportLocationAddress(location: ReportLocation) {
+        try {
+          const response = await fetch(
+            `/api/geocoding/reverse?latitude=${encodeURIComponent(
+              String(location.latitude),
+            )}&longitude=${encodeURIComponent(String(location.longitude))}`,
+            { cache: "no-store" },
+          );
+          const payload = (await response.json()) as ReverseGeocodingResponse;
+          const address = payload.addresses?.[0] ?? null;
+
+          if (!address) {
+            return;
+          }
+
+          const updated = { ...location, address };
+
+          reportLocationRef.current = updated;
+          setReportLocation(updated);
+          setForm((current) => ({
+            ...current,
+            address,
+            latitude: updated.latitude.toFixed(6),
+            longitude: updated.longitude.toFixed(6),
+          }));
+          showReportLocationPopup(updated);
+        } catch {
+          setNotice(dashboardText("dashboard.context.addressUnavailable"));
+        }
+      }
+
+      function showFacilityPopup(
+        facility: FireStation | HospitalModel,
+        kind: "fire-station" | "hospital",
+      ) {
+        popupRef.current?.remove();
+        setMobileSheet(null);
+        setMobileSheetDragOffset(0);
+        popupRef.current = new maplibre.Popup({
+          closeButton: true,
+          maxWidth: "320px",
+          offset: 12,
+        })
+          .setLngLat([facility.longitude, facility.latitude])
+          .setHTML(buildFacilityPopupHtml(facility, kind, dashboardText))
+          .addTo(map);
+        suppressPopupContextMenu(popupRef.current);
+      }
+
       function showBigData119Popup(point: BigData119MapPoint) {
         popupRef.current?.remove();
         setMobileSheet(bigData119Sheet(point, dashboardText));
@@ -3178,6 +3305,8 @@ export function DisasterDashboard({
             REPORT_LOCATION_HALO_LAYER_ID,
             INCIDENT_LAYER_ID,
             RISK_AREA_LAYER_ID,
+            FIRE_STATION_LAYER_ID,
+            HOSPITAL_LAYER_ID,
             BIGDATA119_TARGET_LAYER_ID,
             BIGDATA119_WATER_LAYER_ID,
             BIGDATA119_LABEL_LAYER_ID,
@@ -3223,6 +3352,32 @@ export function DisasterDashboard({
             ) &&
             feature.layer.id === INCIDENT_LAYER_ID
           ) {
+            return;
+          }
+
+          if (feature.layer.id === FIRE_STATION_LAYER_ID) {
+            const id = featureId(feature);
+            const station = snapshotRef.current?.fireStations.find(
+              (item) => item.id === id,
+            );
+
+            if (station) {
+              showFacilityPopup(station, "fire-station");
+            }
+
+            return;
+          }
+
+          if (feature.layer.id === HOSPITAL_LAYER_ID) {
+            const id = featureId(feature);
+            const hospital = snapshotRef.current?.hospitals.find(
+              (item) => item.id === id,
+            );
+
+            if (hospital) {
+              showFacilityPopup(hospital, "hospital");
+            }
+
             return;
           }
 
@@ -3318,6 +3473,7 @@ export function DisasterDashboard({
           dashboardText("dashboard.notice.mapSelected"),
         );
         showReportLocationPopup(report);
+        void lookupReportLocationAddress(report);
       });
       map.on("contextmenu", (event) => {
         event.preventDefault();
@@ -3334,6 +3490,8 @@ export function DisasterDashboard({
         REPORT_LOCATION_HALO_LAYER_ID,
         INCIDENT_LAYER_ID,
         RISK_AREA_LAYER_ID,
+        FIRE_STATION_LAYER_ID,
+        HOSPITAL_LAYER_ID,
         BIGDATA119_TARGET_LAYER_ID,
         BIGDATA119_WATER_LAYER_ID,
         BIGDATA119_LABEL_LAYER_ID,
@@ -3386,6 +3544,7 @@ export function DisasterDashboard({
       return;
     }
 
+    snapshotRef.current = snapshot;
     incidentsRef.current = snapshot.incidents;
     riskAreasRef.current = snapshot.riskAreas;
     bigData119PointsRef.current = snapshot.bigData119Points;
@@ -3415,11 +3574,6 @@ export function DisasterDashboard({
       ROUTE_SOURCE_ID,
       routeData(activeIncident, dispatchRecommendation, dispatchRoute),
     );
-
-    if (!didFitInitialSnapshotRef.current) {
-      didFitInitialSnapshotRef.current = true;
-      fitMapToSnapshot(map, snapshot);
-    }
   }, [
     activeIncident,
     dashboardText,

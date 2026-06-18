@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  MapGeoJSONFeature,
   MapLayerMouseEvent,
   Map as MapLibreMap,
   Popup,
@@ -10,9 +9,10 @@ import type {
 import type { Dispatch, SetStateAction } from "react";
 import { useEffect } from "react";
 import type { DatasetSourceId } from "@/lib/dataset-sources";
-import { type AppDictionary, uiText } from "@/lib/i18n";
+import type { AppDictionary } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
 import type { EmergencyRouteResult } from "./emergency-routing-panel";
+import { handleMapClick } from "./map-shell-clicks";
 
 type MutableRef<T> = {
   current: T;
@@ -89,9 +89,11 @@ function createMap(
         },
     center: mapCore.MAP_CENTER,
     container,
+    minZoom: 6,
     pitch: options.isThreeDimensionalRef.current
       ? mapCore.THREE_DIMENSIONAL_PITCH
       : 0,
+    renderWorldCopies: false,
     style: options.initialStyleRef.current,
     zoom: mapCore.DEFAULT_ZOOM,
   });
@@ -100,170 +102,6 @@ function createMap(
 function resetMapContainer(container: HTMLDivElement) {
   container.replaceChildren();
   container.classList.remove("maplibregl-map");
-}
-
-async function showPointPopup(
-  maplibre: MapLibreModule,
-  map: MapLibreMap,
-  feature: MapGeoJSONFeature,
-  options: InitializeMapOptions,
-) {
-  if (!feature?.properties) {
-    return;
-  }
-
-  const point = feature.properties as mapCore.PointFeatureProperties;
-  const coordinates: [number, number] = [
-    Number(point.longitude),
-    Number(point.latitude),
-  ];
-
-  if (!(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))) {
-    return;
-  }
-
-  const response = await fetch(`/api/points/${point.id}`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return;
-  }
-
-  const payload = (await response.json()) as mapCore.PointDetailResponse;
-  options.popupRef.current?.remove();
-  options.popupRef.current = new maplibre.Popup({
-    closeButton: true,
-    maxWidth: "320px",
-    offset: 16,
-  })
-    .setLngLat(coordinates)
-    .setHTML(
-      mapCore.buildPopupHtml(
-        payload.point,
-        options.dictionary,
-        options.sourceLabelsRef.current.get(payload.point.source) ??
-          payload.point.source,
-        options.popupClassNames,
-      ),
-    )
-    .addTo(map);
-}
-
-async function showSeoulPopulationPopup(
-  maplibre: MapLibreModule,
-  map: MapLibreMap,
-  feature: MapGeoJSONFeature,
-  options: InitializeMapOptions,
-) {
-  if (!feature?.properties) {
-    return;
-  }
-
-  const area = feature.properties as mapCore.SeoulAreaProperties;
-  const point = feature.properties as mapCore.SeoulAreaPointProperties;
-  const coordinates: [number, number] = [
-    Number(point.longitude),
-    Number(point.latitude),
-  ];
-
-  if (!(Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1]))) {
-    return;
-  }
-
-  const response = await fetch(
-    `/api/seoul/population?areaCode=${encodeURIComponent(area.areaCode)}`,
-    { cache: "no-store" },
-  );
-  const payload = (await response
-    .json()
-    .catch(() => ({}))) as mapCore.SeoulPopulationResponse;
-  const population = response.ok ? (payload.population ?? null) : null;
-
-  if (population) {
-    options.setSeoulAreas((current) =>
-      current
-        ? mapCore.updateSeoulAreaPopulation(current, population)
-        : current,
-    );
-  }
-
-  options.popupRef.current?.remove();
-  options.popupRef.current = new maplibre.Popup({
-    closeButton: true,
-    maxWidth: "340px",
-    offset: 12,
-  })
-    .setLngLat(coordinates)
-    .setHTML(
-      mapCore.buildSeoulPopulationPopupHtml(
-        area,
-        population,
-        population
-          ? null
-          : (payload.error ??
-              uiText(options.dictionary, "실시간 인구 조회 실패")),
-        options.dictionary,
-        options.popupClassNames,
-      ),
-    )
-    .addTo(map);
-}
-
-async function handleMapClick(
-  maplibre: MapLibreModule,
-  map: MapLibreMap,
-  event: MapLayerMouseEvent,
-  options: InitializeMapOptions,
-) {
-  const layers = [
-    mapCore.POINTS_SYMBOL_LAYER_ID,
-    mapCore.POINTS_LAYER_ID,
-    mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID,
-    mapCore.SEOUL_AREAS_LAYER_ID,
-    mapCore.SEOUL_AREAS_HALO_LAYER_ID,
-    mapCore.HAZARDS_LAYER_ID,
-  ].filter((layerId) => map.getLayer(layerId));
-
-  if (layers.length === 0) {
-    return;
-  }
-
-  const feature = map.queryRenderedFeatures(event.point, { layers })[0] as
-    | MapGeoJSONFeature
-    | undefined;
-
-  if (!feature?.properties) {
-    return;
-  }
-
-  if (
-    feature.layer.id === mapCore.POINTS_LAYER_ID ||
-    feature.layer.id === mapCore.POINTS_SYMBOL_LAYER_ID
-  ) {
-    await showPointPopup(maplibre, map, feature, options);
-    return;
-  }
-
-  if (
-    feature.layer.id === mapCore.SEOUL_AREAS_HALO_LAYER_ID ||
-    feature.layer.id === mapCore.SEOUL_AREAS_LAYER_ID ||
-    feature.layer.id === mapCore.SEOUL_AREAS_SYMBOL_LAYER_ID
-  ) {
-    await showSeoulPopulationPopup(maplibre, map, feature, options);
-    return;
-  }
-
-  const eventId = String(
-    (feature.properties as mapCore.HazardFeatureProperties).eventId,
-  );
-  const hazard = options.hazardsRef.current.find(
-    (current) => current.eventId === eventId,
-  );
-
-  if (hazard) {
-    options.focusHazard(hazard);
-  }
 }
 
 function bindPointerCursors(map: MapLibreMap) {

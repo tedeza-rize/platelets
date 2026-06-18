@@ -11,13 +11,13 @@ import {
 } from "./emergency-routing-panel";
 import styles from "./map-shell.module.scss";
 import {
-  DatasetPanel,
   HazardModal,
   MapNavbar,
   MobileMapTools,
   MobileNav,
   SourceMenu,
 } from "./map-shell-controls";
+import { DatasetPanel } from "./map-shell-status-panel";
 
 type MapShellViewProps = {
   activeHazard: mapCore.HazardEvent | null;
@@ -31,6 +31,7 @@ type MapShellViewProps = {
   hazardsCount: number;
   isEmergencyPanelOpen: boolean;
   isLoadingData: boolean;
+  isLowPerformance: boolean;
   isMenuOpen: boolean;
   isSourceMenuOpen: boolean;
   isThreeDimensional: boolean;
@@ -76,6 +77,7 @@ export function MapShellView({
   hazardsCount,
   isEmergencyPanelOpen,
   isLoadingData,
+  isLowPerformance,
   isMenuOpen,
   isSourceMenuOpen,
   isThreeDimensional,
@@ -190,6 +192,7 @@ export function MapShellView({
           dictionary={dictionary}
           hazardsCount={hazardsCount}
           isLoadingData={isLoadingData}
+          isLowPerformance={isLowPerformance}
           latestFetchedAt={latestFetchedAt}
           mappedPointCount={mappedPointCount}
         />
