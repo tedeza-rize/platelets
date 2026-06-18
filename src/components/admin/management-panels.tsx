@@ -6,6 +6,7 @@ import type {
 import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.scss";
+import tableStyles from "./management-table.module.scss";
 
 export type ApiLogEntry = {
   action: string;
@@ -40,14 +41,14 @@ export function formatDateTime(value: string | null, locale: string) {
 
 export function statusClassName(status: ApiLogEntry["status"]) {
   if (status === "success") {
-    return styles.statusSuccess;
+    return tableStyles.statusSuccess;
   }
 
   if (status === "failure") {
-    return styles.statusFailure;
+    return tableStyles.statusFailure;
   }
 
-  return styles.statusSkipped;
+  return tableStyles.statusSkipped;
 }
 
 export function formatImportProgress(
@@ -88,8 +89,8 @@ export function DatasetStatusPanel({
       <div className={styles.cardHeader}>
         <span className={styles.cardTitle}>{t("데이터셋 상태")}</span>
       </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      <div className={tableStyles.tableWrap}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>{t("데이터셋")}</th>
@@ -149,8 +150,8 @@ export function LogsPanel({ dictionary, logs, mode }: LogsPanelProps) {
           {t("전체 보기")}
         </Link>
       </div>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      <div className={tableStyles.tableWrap}>
+        <table className={tableStyles.table}>
           <thead>
             <tr>
               <th>{t("시각")}</th>
@@ -171,7 +172,7 @@ export function LogsPanel({ dictionary, logs, mode }: LogsPanelProps) {
                 <td>{log.message}</td>
                 {mode === "sudo" ? (
                   <td>
-                    <pre className={styles.metadata}>
+                    <pre className={tableStyles.metadata}>
                       {JSON.stringify(log.metadata, null, 2)}
                     </pre>
                   </td>

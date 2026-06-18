@@ -144,6 +144,15 @@
   },
   "overrides": [
     {
+      "includes": ["**/*.scss"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": [
         "scripts/points-mcp.ts",
         "src/app/api/points/route.ts",

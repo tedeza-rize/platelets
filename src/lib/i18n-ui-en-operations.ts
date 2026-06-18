@@ -203,6 +203,7 @@ export const enUiOperations = {
     "External service connection values are encrypted in the database. Blank inputs keep their current values.",
   "integrationSettings.field.incidentWebhookUrls":
     "Incident webhook URLs (one per line)",
+  "integrationSettings.field.fireSafetyApiKey": "Fire Safety API key",
   "integrationSettings.field.itsOpenApiKey": "National traffic API key",
   "integrationSettings.field.kakaoMobilityRestApiKey": "Kakao Mobility API key",
   "integrationSettings.field.kakaoRestApiKey": "Kakao Local API key",
@@ -220,5 +221,30 @@ export const enUiOperations = {
   "integrationSettings.save": "Save external service settings",
   "integrationSettings.saveFailed": "Could not save external service settings.",
   "integrationSettings.saved": "External service settings saved.",
+  "admin.currentSection": "Current section",
+  "admin.description.admin":
+    "Review dataset readiness and protected operator tools.",
+  "admin.description.sudo":
+    "Manage provider connections, update schedules, system settings, and operational logs.",
+  "admin.eyebrow": "Operations console",
+  "admin.title.admin": "Operator administration",
+  "admin.title.sudo": "Administrator console",
+  "adminTabs.integrations.description":
+    "Encrypted API keys, traffic, AI, and webhook connections.",
+  "adminTabs.logs.description": "Recent protected system and provider events.",
+  "adminTabs.overview.description":
+    "Stored records, provider quotas, and recent activity at a glance.",
+  "adminTabs.settings.description":
+    "Database, map, clock, and deployment behavior.",
+  "adminTabs.status.description":
+    "Imported dataset counts, coordinates, failures, and freshness.",
+  "adminTabs.updates.description":
+    "Scheduled and manual public-safety data refreshes.",
+  "dashboard.ticker.live": "Incident board",
+  "integrationSettings.section.data": "Public data and traffic",
+  "integrationSettings.section.map": "Map and location APIs",
+  "integrationSettings.section.notification": "Alerts and webhooks",
   "integrationSettings.title": "External service connections",
+  "seoul.population.error.apiKeyMissing":
+    "Seoul Open Data API key is not configured, so real-time population was not requested.",
 } satisfies Record<string, string>;

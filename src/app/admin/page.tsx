@@ -13,6 +13,8 @@ export default async function AdminPage(props: { searchParams: SearchParams }) {
   const searchParams = await props.searchParams;
   const tab =
     typeof searchParams.tab === "string" ? searchParams.tab : undefined;
+  const section =
+    typeof searchParams.section === "string" ? searchParams.section : undefined;
 
   const dictionary = getDictionary(await getRequestLocale());
 
@@ -21,6 +23,7 @@ export default async function AdminPage(props: { searchParams: SearchParams }) {
       dictionary={dictionary}
       mode="admin"
       hasSudoSession={false}
+      section={section}
       tab={tab}
     />
   );

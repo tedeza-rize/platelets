@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DATASET_SOURCES } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.scss";
+import tableStyles from "./management-table.module.scss";
 
 type ApiLogEntry = {
   action: string;
@@ -36,14 +37,14 @@ function formatDateTime(value: string, locale: string) {
 
 function statusClassName(status: ApiLogEntry["status"]) {
   if (status === "success") {
-    return styles.statusSuccess;
+    return tableStyles.statusSuccess;
   }
 
   if (status === "failure") {
-    return styles.statusFailure;
+    return tableStyles.statusFailure;
   }
 
-  return styles.statusSkipped;
+  return tableStyles.statusSkipped;
 }
 
 export function LogConsole({ dictionary }: { dictionary: AppDictionary }) {
@@ -190,8 +191,8 @@ export function LogConsole({ dictionary }: { dictionary: AppDictionary }) {
               {t("건")}
             </span>
           </div>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
+          <div className={tableStyles.tableWrap}>
+            <table className={tableStyles.table}>
               <thead>
                 <tr>
                   <th>{t("ID")}</th>
@@ -225,7 +226,7 @@ export function LogConsole({ dictionary }: { dictionary: AppDictionary }) {
                     </td>
                     <td>{log.message}</td>
                     <td>
-                      <pre className={styles.metadata}>
+                      <pre className={tableStyles.metadata}>
                         {JSON.stringify(log.metadata, null, 2)}
                       </pre>
                     </td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { KeyRound, LoaderCircle, RefreshCw, Save } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   API_KEY_FIELDS,
@@ -13,12 +14,15 @@ import {
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import styles from "./management-console.module.scss";
 
+export type IntegrationSettingsSection = "ai" | "data" | "map" | "notification";
+
 type SettingsSummary = {
   apiKeys: {
     configured: Record<ApiKeyField, boolean>;
     raw?: Record<ApiKeyField, string>;
   };
   integrations: {
+    fireSafetyApiKeyConfigured: boolean;
     incidentWebhookCount: number;
     itsOpenApiKeyConfigured: boolean;
     webPushConfigured: boolean;
@@ -45,7 +49,7 @@ function initDraft(summary: SettingsSummary | null) {
 }
 
 type SettingsGridProps = {
-  panelTab: "map" | "data" | "ai" | "notification";
+  panelTab: IntegrationSettingsSection;
   configured: (field: SecretField) => boolean;
   dictionary: AppDictionary;
   draft: Record<SecretField, string>;
@@ -115,6 +119,13 @@ function SettingsGrid({
           onValue={(val) => setField("itsOpenApiKey", val)}
           value={draft.itsOpenApiKey}
         />
+        <SecretInput
+          configured={configured("fireSafetyApiKey")}
+          dictionary={dictionary}
+          field="fireSafetyApiKey"
+          onValue={(val) => setField("fireSafetyApiKey", val)}
+          value={draft.fireSafetyApiKey}
+        />
       </>
     );
   }
@@ -174,10 +185,12 @@ export function IntegrationSettingsPanel({
   dictionary,
   ensureSudoSession,
   isSudoActive,
+  section,
 }: {
   dictionary: AppDictionary;
   ensureSudoSession: () => Promise<void>;
   isSudoActive?: boolean;
+  section: IntegrationSettingsSection;
 }) {
   const t = useCallback((key: string) => uiText(dictionary, key), [dictionary]);
   const [summary, setSummary] = useState<SettingsSummary | null>(null);
@@ -185,15 +198,15 @@ export function IntegrationSettingsPanel({
   const [busy, setBusy] = useState<"load" | "save" | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [panelTab, setPanelTab] = useState<
-    "map" | "data" | "ai" | "notification"
-  >("map");
 
   const configured = useCallback(
     (field: SecretField) => {
       if (!summary) return false;
       if (field === "itsOpenApiKey") {
         return summary.integrations.itsOpenApiKeyConfigured;
+      }
+      if (field === "fireSafetyApiKey") {
+        return summary.integrations.fireSafetyApiKeyConfigured;
       }
       if (field === "incidentWebhookUrls") {
         return summary.integrations.incidentWebhookCount > 0;
@@ -304,10 +317,13 @@ export function IntegrationSettingsPanel({
   }, [isSudoActive, loadSettings]);
 
   const panelTabs = [
-    { id: "map", label: t("지도 & 위치 API") },
-    { id: "data", label: t("공공 데이터 & 교통") },
+    { id: "map", label: t("integrationSettings.section.map") },
+    { id: "data", label: t("integrationSettings.section.data") },
     { id: "ai", label: t("AI 설정") },
-    { id: "notification", label: t("알림 & 웹훅") },
+    {
+      id: "notification",
+      label: t("integrationSettings.section.notification"),
+    },
   ] as const;
 
   return (
@@ -337,31 +353,23 @@ export function IntegrationSettingsPanel({
 
       {summary ? (
         <>
-          <div
-            className={styles.tabList}
-            role="tablist"
-            style={{ marginBottom: "16px", marginTop: "8px" }}
-          >
+          <div className={styles.tabList} role="tablist">
             {panelTabs.map((tab) => (
-              <button
-                aria-selected={panelTab === tab.id}
+              <Link
+                aria-selected={section === tab.id}
                 className={styles.tabButton}
+                href={`/sudo?tab=integrations&section=${tab.id}`}
                 key={tab.id}
-                onClick={() => setPanelTab(tab.id)}
                 role="tab"
-                type="button"
               >
                 {tab.label}
-              </button>
+              </Link>
             ))}
           </div>
 
-          <div
-            className={styles.settingsGrid}
-            style={{ gridTemplateColumns: "1fr" }}
-          >
+          <div className={styles.settingsGridSingle}>
             <SettingsGrid
-              panelTab={panelTab}
+              panelTab={section}
               configured={configured}
               dictionary={dictionary}
               draft={draft}

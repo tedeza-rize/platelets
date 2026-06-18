@@ -6,11 +6,20 @@ export function ServiceWorkerRegistration() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
-    function reportNetworkStatus() {
-      navigator.serviceWorker.controller?.postMessage({
+    function postNetworkStatus(target: ServiceWorker | null | undefined) {
+      target?.postMessage({
         online: navigator.onLine,
         type: "network-status",
       });
+    }
+
+    function reportNetworkStatus() {
+      postNetworkStatus(navigator.serviceWorker.controller);
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          postNetworkStatus(registration.active);
+        })
+        .catch(() => undefined);
     }
 
     async function registerServiceWorker() {
@@ -22,10 +31,7 @@ export function ServiceWorkerRegistration() {
         },
       );
       await navigator.serviceWorker.ready;
-      registration.active?.postMessage({
-        online: navigator.onLine,
-        type: "network-status",
-      });
+      postNetworkStatus(registration.active);
     }
 
     window.addEventListener("offline", reportNetworkStatus);

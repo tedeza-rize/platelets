@@ -1,0 +1,134 @@
+.page {
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--krds-bg-subtle);
+}
+
+.shell {
+  display: grid;
+  gap: 20px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.header,
+.tabs,
+.intro,
+.card,
+.wideCard {
+  border: 1px solid var(--krds-border-default);
+  border-radius: 8px;
+  background: var(--krds-surface);
+  box-shadow: var(--krds-shadow-1);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 24px;
+  padding: 28px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.intro {
+  padding: 24px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card,
+.wideCard {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.wideCard {
+  grid-column: 1 / -1;
+}
+
+.line,
+.shortLine,
+.pill,
+.tab,
+.metric,
+.row {
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--krds-gray-20) 0%,
+    var(--krds-gray-5) 45%,
+    var(--krds-gray-20) 90%
+  );
+  background-size: 220% 100%;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.line {
+  width: 72%;
+  height: 16px;
+}
+
+.shortLine {
+  width: 42%;
+  height: 16px;
+}
+
+.pill {
+  width: 108px;
+  height: 24px;
+}
+
+.tab {
+  width: 100%;
+  height: 54px;
+  border-radius: 6px;
+}
+
+.metric {
+  width: 150px;
+  height: 34px;
+  border-radius: 6px;
+}
+
+.row {
+  width: 100%;
+  height: 44px;
+  border-radius: 6px;
+}
+
+@keyframes pulse {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: -220% 50%;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 14px;
+  }
+
+  .header,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    grid-template-columns: 1fr;
+  }
+}

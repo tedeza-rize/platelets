@@ -197,6 +197,7 @@ export const koUiOperations = {
     "외부 서비스 연결값은 암호화해 DB에 저장합니다. 빈 입력은 기존 값을 유지합니다.",
   "integrationSettings.field.incidentWebhookUrls":
     "사고 알림 웹훅 주소 (줄마다 하나)",
+  "integrationSettings.field.fireSafetyApiKey": "소방안전 API 키",
   "integrationSettings.field.itsOpenApiKey": "국가교통정보 API 키",
   "integrationSettings.field.kakaoMobilityRestApiKey": "카카오모빌리티 API 키",
   "integrationSettings.field.kakaoRestApiKey": "카카오 로컬 API 키",
@@ -215,4 +216,29 @@ export const koUiOperations = {
   "integrationSettings.saveFailed": "외부 서비스 설정을 저장하지 못했습니다.",
   "integrationSettings.saved": "외부 서비스 설정을 저장했습니다.",
   "integrationSettings.title": "외부 서비스 연결",
+  "admin.currentSection": "현재 섹션",
+  "admin.description.admin":
+    "데이터 준비 상태와 보호된 운영자 도구를 확인합니다.",
+  "admin.description.sudo":
+    "제공자 연결, 갱신 일정, 시스템 설정, 운영 로그를 관리합니다.",
+  "admin.eyebrow": "운영 콘솔",
+  "admin.title.admin": "운영자 관리",
+  "admin.title.sudo": "관리자 콘솔",
+  "adminTabs.integrations.description":
+    "암호화된 API 키, 교통, AI, 웹훅 연결을 관리합니다.",
+  "adminTabs.logs.description": "보호된 시스템과 제공자 이벤트를 확인합니다.",
+  "adminTabs.overview.description":
+    "저장된 기록, 제공자 사용량, 최근 활동을 한눈에 봅니다.",
+  "adminTabs.settings.description":
+    "데이터베이스, 지도, 시간, 배포 동작을 조정합니다.",
+  "adminTabs.status.description":
+    "가져온 데이터 수, 좌표, 실패, 최신 상태를 확인합니다.",
+  "adminTabs.updates.description":
+    "공공안전 데이터 자동·수동 갱신을 관리합니다.",
+  "dashboard.ticker.live": "진행 상황",
+  "integrationSettings.section.data": "공공데이터와 교통",
+  "integrationSettings.section.map": "지도와 위치 API",
+  "integrationSettings.section.notification": "알림과 웹훅",
+  "seoul.population.error.apiKeyMissing":
+    "서울 열린데이터 API 키가 등록되지 않아 실시간 인구를 조회하지 않았습니다.",
 } satisfies Record<string, string>;

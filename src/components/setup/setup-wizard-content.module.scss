@@ -9,8 +9,7 @@
   padding: 20px;
   color: var(--setup-muted);
   background: var(--setup-accent-soft);
-  border: 1px solid
-    color-mix(in srgb, var(--setup-accent) 22%, var(--setup-border));
+  border: 1px solid color-mix(in srgb, var(--setup-accent) 22%, var(--setup-border));
   border-radius: var(--krds-radius-xlarge);
   line-height: 1.65;
 }

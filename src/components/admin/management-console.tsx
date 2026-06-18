@@ -15,7 +15,10 @@ import Link from "next/link";
 import { DatabaseMigrationPanel } from "@/components/admin/database-migration-panel";
 import { DatasetUpdateConsole } from "@/components/admin/dataset-update-console";
 import type { DatasetStatus } from "@/components/admin/dataset-update-helpers";
-import { IntegrationSettingsPanel } from "@/components/admin/integration-settings-panel";
+import {
+  IntegrationSettingsPanel,
+  type IntegrationSettingsSection,
+} from "@/components/admin/integration-settings-panel";
 import { SudoLoginForm } from "@/components/auth/sudo-login-form";
 import { NtpSettingsForm } from "@/components/settings/ntp-settings-form";
 import { OperationalSettingsForm } from "@/components/settings/operational-settings-form";
@@ -45,6 +48,7 @@ type ManagementConsoleProps = {
   dictionary: AppDictionary;
   mode: "admin" | "sudo";
   hasSudoSession: boolean;
+  section?: string;
   tab?: string;
 };
 
@@ -103,10 +107,28 @@ function _datasetIcon(source: DatasetSourceId) {
   return <HeartPulse aria-hidden="true" size={16} strokeWidth={2.4} />;
 }
 
+const INTEGRATION_SECTIONS = new Set<IntegrationSettingsSection>([
+  "ai",
+  "data",
+  "map",
+  "notification",
+]);
+
+function normalizeIntegrationSection(
+  value: string | undefined,
+): IntegrationSettingsSection {
+  if (INTEGRATION_SECTIONS.has(value as IntegrationSettingsSection)) {
+    return value as IntegrationSettingsSection;
+  }
+
+  return "map";
+}
+
 export async function ManagementConsole({
   dictionary,
   mode,
   hasSudoSession,
+  section,
   tab = "overview",
 }: ManagementConsoleProps) {
   const t = (key: string, values?: Record<string, string | number>) =>
@@ -116,27 +138,59 @@ export async function ManagementConsole({
   const datasets = (await listDatasetStatuses()) as DatasetStatus[];
 
   const managementTabs = [
-    { id: "overview", label: t("adminTabs.overview") },
+    {
+      description: t("adminTabs.overview.description"),
+      id: "overview",
+      label: t("adminTabs.overview"),
+    },
     mode === "sudo" && hasSudoSession
-      ? { id: "integrations", label: t("adminTabs.integrations") }
+      ? {
+          description: t("adminTabs.integrations.description"),
+          id: "integrations",
+          label: t("adminTabs.integrations"),
+        }
       : null,
     mode === "sudo" && hasSudoSession
-      ? { id: "settings", label: t("adminTabs.settings") }
+      ? {
+          description: t("adminTabs.settings.description"),
+          id: "settings",
+          label: t("adminTabs.settings"),
+        }
       : null,
     mode === "sudo" && hasSudoSession
-      ? { id: "updates", label: t("adminTabs.updates") }
+      ? {
+          description: t("adminTabs.updates.description"),
+          id: "updates",
+          label: t("adminTabs.updates"),
+        }
       : null,
-    { id: "status", label: t("adminTabs.status") },
+    {
+      description: t("adminTabs.status.description"),
+      id: "status",
+      label: t("adminTabs.status"),
+    },
     mode === "sudo" && hasSudoSession
-      ? { id: "logs", label: t("adminTabs.logs") }
+      ? {
+          description: t("adminTabs.logs.description"),
+          id: "logs",
+          label: t("adminTabs.logs"),
+        }
       : null,
-  ].filter((tabItem): tabItem is { id: ManagementTab; label: string } =>
-    Boolean(tabItem),
+  ].filter(
+    (
+      tabItem,
+    ): tabItem is {
+      description: string;
+      id: ManagementTab;
+      label: string;
+    } => Boolean(tabItem),
   );
 
   const validTab = managementTabs.some((tabItem) => tabItem.id === activeTab)
     ? activeTab
     : (managementTabs[0]?.id ?? "overview");
+  const integrationSection = normalizeIntegrationSection(section);
+  const currentTab = managementTabs.find((tabItem) => tabItem.id === validTab);
 
   let quota: Awaited<ReturnType<typeof getKakaoLocalUsage>> | null = null;
   let kmaQuota: Awaited<ReturnType<typeof getKmaEarthquakeUsage>> | null = null;
@@ -183,7 +237,11 @@ export async function ManagementConsole({
       : 0;
 
   const title =
-    mode === "sudo" ? t("개발자 총 권한 페이지") : t("관리자 페이지");
+    mode === "sudo" ? t("admin.title.sudo") : t("admin.title.admin");
+  const description =
+    mode === "sudo"
+      ? t("admin.description.sudo")
+      : t("admin.description.admin");
   const currentDatabaseEngine = getDatabaseConfig().engine;
   const noopEnsureSession = async () => {
     "use server";
@@ -192,7 +250,11 @@ export async function ManagementConsole({
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>{title}</h1>
+        <div className={styles.brandBlock}>
+          <span className={styles.eyebrow}>{t("admin.eyebrow")}</span>
+          <h1 className={styles.title}>{title}</h1>
+          <p className={styles.headerDescription}>{description}</p>
+        </div>
         <nav className={styles.navLinks} aria-label={t("관리 메뉴")}>
           <Link className={styles.navLink} href="/">
             {t("지도")}
@@ -227,10 +289,19 @@ export async function ManagementConsole({
               href={`/${mode}?tab=${tabItem.id}`}
               role="tab"
             >
-              {tabItem.label}
+              {tabItem.label}{" "}
+              <span className={styles.tabMeta}>{tabItem.description}</span>
             </Link>
           ))}
         </div>
+
+        {currentTab ? (
+          <section className={styles.sectionIntro}>
+            <span className={styles.eyebrow}>{t("admin.currentSection")}</span>
+            <h2>{currentTab.label}</h2>
+            <p>{currentTab.description}</p>
+          </section>
+        ) : null}
 
         {validTab === "overview" && (
           <>
@@ -345,6 +416,7 @@ export async function ManagementConsole({
             dictionary={dictionary}
             ensureSudoSession={noopEnsureSession}
             isSudoActive={hasSudoSession}
+            section={integrationSection}
           />
         )}
 

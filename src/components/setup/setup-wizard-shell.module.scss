@@ -3,11 +3,7 @@
   flex-direction: column;
   gap: 32px;
   padding: 34px;
-  background: color-mix(
-    in srgb,
-    var(--setup-card) 72%,
-    var(--setup-background)
-  );
+  background: color-mix(in srgb, var(--setup-card) 72%, var(--setup-background));
   border-right: 1px solid var(--setup-border);
 }
 
@@ -44,8 +40,7 @@
   color: #ffffff;
   background: var(--setup-accent);
   border-radius: var(--krds-radius-xlarge);
-  box-shadow: 0 8px 18px
-    color-mix(in srgb, var(--setup-accent) 35%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--setup-accent) 35%, transparent);
 }
 
 .controls {
