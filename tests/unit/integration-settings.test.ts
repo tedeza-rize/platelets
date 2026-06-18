@@ -50,6 +50,7 @@ test("runtime API keys come only from encrypted setup settings", async () => {
 
 test("integration secrets are encrypted and support explicit clearing", async () => {
   await integrationSettings.saveIntegrationSettings({
+    fireSafetyApiKey: "stored-fire-safety-key",
     incidentWebhookUrls: "https://hooks.example.com/secret-token",
     itsOpenApiKey: "stored-its-key",
     webPushContact: "mailto:operations@example.com",
@@ -63,17 +64,47 @@ test("integration secrets are encrypted and support explicit clearing", async ()
     null,
   );
 
+  assert.equal(configured.fireSafetyApiKey, "stored-fire-safety-key");
   assert.equal(configured.itsOpenApiKey, "stored-its-key");
   assert.equal(configured.incidentWebhookUrls.length, 1);
+  assert.equal(
+    JSON.stringify(stored).includes("stored-fire-safety-key"),
+    false,
+  );
   assert.equal(JSON.stringify(stored).includes("stored-its-key"), false);
   assert.equal(JSON.stringify(stored).includes("secret-token"), false);
 
   const summary = await integrationSettings.saveIntegrationSettings({
-    clear: ["incidentWebhookUrls", "itsOpenApiKey"],
+    clear: ["fireSafetyApiKey", "incidentWebhookUrls", "itsOpenApiKey"],
   });
 
+  assert.equal(summary.fireSafetyApiKeyConfigured, false);
   assert.equal(summary.incidentWebhookCount, 0);
   assert.equal(summary.itsOpenApiKeyConfigured, false);
+});
+
+test("integration secrets can be seeded from temporary environment aliases", async () => {
+  process.env["FIRE-SAFTY-API-KEY"] = "env-fire-key";
+  process.env["ITS-API-KEY"] = "env-its-key";
+
+  try {
+    const settings = await integrationSettings.getIntegrationSettings();
+    const stored = await pointsDb.getAppSetting<unknown>(
+      "integration-settings",
+      null,
+    );
+
+    assert.equal(settings.fireSafetyApiKey, "env-fire-key");
+    assert.equal(settings.itsOpenApiKey, "env-its-key");
+    assert.equal(JSON.stringify(stored).includes("env-fire-key"), false);
+    assert.equal(JSON.stringify(stored).includes("env-its-key"), false);
+  } finally {
+    process.env["FIRE-SAFTY-API-KEY"] = undefined;
+    process.env["ITS-API-KEY"] = undefined;
+    await integrationSettings.saveIntegrationSettings({
+      clear: ["fireSafetyApiKey", "itsOpenApiKey"],
+    });
+  }
 });
 
 test.after(async () => {

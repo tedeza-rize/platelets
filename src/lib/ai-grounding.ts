@@ -1,9 +1,11 @@
+import { getFireSafetyApiSummary } from "@/lib/fire-safety-api";
 import {
   findNearestPoints,
   listDatasetStatuses,
   listHazardEvents,
   searchPointSummaries,
 } from "@/lib/points-db";
+import { fetchItsTrafficAreaSummary } from "@/lib/traffic/realtime-traffic-service";
 
 function compactPoint(point: {
   address: string;
@@ -59,25 +61,37 @@ export async function buildAiGrounding(params: {
         .slice(0, 6),
     ),
   );
-  const [datasets, hazards, termMatches, nearby] = await Promise.all([
-    listDatasetStatuses(),
-    listHazardEvents({ limit: 12 }),
-    Promise.all(searchTerms.map((term) => searchPointSummaries(term, 12))),
-    hasCoordinate
-      ? findNearestPoints({
-          latitude: params.latitude as number,
-          limit: 20,
-          longitude: params.longitude as number,
-          radiusMeters: 30_000,
-        })
-      : Promise.resolve([]),
-  ]);
+  const [datasets, fireSafetyApi, hazards, termMatches, nearby, traffic] =
+    await Promise.all([
+      listDatasetStatuses(),
+      getFireSafetyApiSummary(),
+      listHazardEvents({ limit: 12 }),
+      Promise.all(searchTerms.map((term) => searchPointSummaries(term, 12))),
+      hasCoordinate
+        ? findNearestPoints({
+            latitude: params.latitude as number,
+            limit: 20,
+            longitude: params.longitude as number,
+            radiusMeters: 30_000,
+          })
+        : Promise.resolve([]),
+      hasCoordinate
+        ? fetchItsTrafficAreaSummary({
+            latitude: params.latitude as number,
+            longitude: params.longitude as number,
+          })
+        : Promise.resolve(null),
+    ]);
   const matches = Array.from(
     new Map(termMatches.flat().map((point) => [point.id, point])).values(),
   ).slice(0, 20);
 
   return {
     generatedAt: new Date().toISOString(),
+    externalApis: {
+      fireSafetyApi,
+      itsTraffic: traffic,
+    },
     location: hasCoordinate
       ? { latitude: params.latitude, longitude: params.longitude }
       : null,

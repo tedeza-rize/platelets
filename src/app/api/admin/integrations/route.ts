@@ -36,6 +36,7 @@ export async function GET(request: Request) {
     integrations: {
       ...(await getIntegrationSettingsSummary()),
       raw: {
+        fireSafetyApiKey: rawIntegrations.fireSafetyApiKey,
         itsOpenApiKey: rawIntegrations.itsOpenApiKey,
         incidentWebhookUrls: rawIntegrations.incidentWebhookUrls.join("\n"),
         webPushPublicKey: rawIntegrations.webPushPublicKey,

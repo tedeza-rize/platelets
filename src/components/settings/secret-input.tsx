@@ -14,6 +14,7 @@ export const API_KEY_FIELDS = [
 
 export const INTEGRATION_FIELDS = [
   "itsOpenApiKey",
+  "fireSafetyApiKey",
   "incidentWebhookUrls",
   "webPushPublicKey",
   "webPushPrivateKey",
@@ -73,6 +74,7 @@ export function SecretInput({
   } | null>(null);
 
   const isTestable =
+    field !== "fireSafetyApiKey" &&
     field !== "incidentWebhookUrls" &&
     field !== "webPushPublicKey" &&
     field !== "webPushPrivateKey" &&
