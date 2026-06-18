@@ -1,15 +1,12 @@
 "use client";
 
 import {
-  AlertTriangle,
   Check,
   ChevronDown,
-  Database,
   HeartPulse,
   ListFilter,
   type LucideIcon,
   Map as MapIcon,
-  MapPin,
   Search,
   Settings,
   ShieldCheck,
@@ -28,7 +25,6 @@ import type { DatasetSourceId } from "@/lib/dataset-sources";
 import { type AppDictionary, uiText } from "@/lib/i18n";
 import * as mapCore from "@/lib/map-shell-core";
 import styles from "./map-shell-controls.module.scss";
-import datasetStyles from "./map-shell-dataset-panel.module.scss";
 import hazardStyles from "./map-shell-hazard-modal.module.scss";
 
 type ProviderControlProps = {
@@ -64,15 +60,6 @@ type SourceMenuProps = {
   sourceQuery: string;
   sourceSearchInputRef: RefObject<HTMLInputElement | null>;
   visibleSources: Partial<Record<DatasetSourceId, boolean>>;
-};
-
-type DatasetPanelProps = {
-  dataError: string | null;
-  dictionary: AppDictionary;
-  hazardsCount: number;
-  isLoadingData: boolean;
-  latestFetchedAt: string | null;
-  mappedPointCount: number;
 };
 
 type HazardModalProps = {
@@ -269,49 +256,6 @@ export function SourceMenu({
         </fieldset>
       ) : null}
     </div>
-  );
-}
-
-export function DatasetPanel({
-  dataError,
-  dictionary,
-  hazardsCount,
-  isLoadingData,
-  latestFetchedAt,
-  mappedPointCount,
-}: DatasetPanelProps) {
-  return (
-    <section
-      aria-label={dictionary.map.datasets.panelLabel}
-      className={datasetStyles.datasetPanel}
-    >
-      <div className={datasetStyles.datasetStats}>
-        <span className={datasetStyles.datasetMetric}>
-          <MapPin aria-hidden="true" size={16} strokeWidth={2.4} />
-          <span>{mappedPointCount.toLocaleString("ko-KR")}</span>
-          <span>{dictionary.map.datasets.points}</span>
-        </span>
-        <span className={datasetStyles.datasetMetric}>
-          <Database aria-hidden="true" size={16} strokeWidth={2.4} />
-          <span>{dictionary.map.datasets.lastUpdated}</span>
-          <span>
-            {mapCore.formatDateTime(latestFetchedAt) ??
-              dictionary.map.datasets.neverUpdated}
-          </span>
-        </span>
-        <span className={datasetStyles.datasetMetric}>
-          <AlertTriangle aria-hidden="true" size={16} strokeWidth={2.4} />
-          <span>{hazardsCount.toLocaleString("ko-KR")}</span>
-          <span>{uiText(dictionary, "최근 이벤트")}</span>
-        </span>
-      </div>
-
-      {isLoadingData || dataError ? (
-        <output className={datasetStyles.dataNotice}>
-          {dataError ?? dictionary.map.datasets.loading}
-        </output>
-      ) : null}
-    </section>
   );
 }
 

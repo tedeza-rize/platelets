@@ -1,4 +1,9 @@
-import { type APIRequestContext, expect, type Page } from "@playwright/test";
+import {
+  type APIRequestContext,
+  type APIResponse,
+  expect,
+  type Page,
+} from "@playwright/test";
 import webPush from "web-push";
 
 export const SEOUL_COORDINATES = {
@@ -8,8 +13,26 @@ export const SEOUL_COORDINATES = {
 
 export const E2E_VAPID_KEYS = webPush.generateVAPIDKeys();
 
+async function getWithRetry(
+  request: APIRequestContext,
+  url: string,
+): Promise<APIResponse> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await request.get(url);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+    }
+  }
+
+  throw lastError;
+}
+
 export async function ensureSetupComplete(request: APIRequestContext) {
-  const status = await request.get("/api/setup/status");
+  const status = await getWithRetry(request, "/api/setup/status");
   const statusPayload = (await status.json()) as { installed?: boolean };
 
   if (statusPayload.installed) {

@@ -3,8 +3,8 @@
 import { LogIn } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
-import styles from "@/components/admin/role-console.module.scss";
 import { type AppDictionary, uiText } from "@/lib/i18n";
+import styles from "./login-console.module.scss";
 
 export function LoginConsole({
   dictionary,
@@ -58,18 +58,28 @@ export function LoginConsole({
   }
 
   return (
-    <div className={styles.pageCentered} style={{ padding: 0 }}>
-      <main className={styles.pageCentered} style={{ flex: 1, width: "100%" }}>
-        <section className={styles.narrowShell} style={{ width: "100%" }}>
-          <header className={styles.header}>
+    <main className={styles.page}>
+      <section className={styles.shell}>
+        <div className={styles.intro}>
+          <div>
+            <span className={styles.brand}>
+              <span aria-hidden="true" className={styles.brandMark} />
+              {dictionary.navigation.brand}
+            </span>
+          </div>
+          <header>
+            <p className={styles.eyebrow}>{t("login.eyebrow")}</p>
             <div>
               <h1>{t("Staff login")}</h1>
               <p>{t("Sign in with an assigned account.")}</p>
             </div>
           </header>
+          <p className={styles.securityNote}>{t("login.securityNote")}</p>
+        </div>
+        <div className={styles.panel}>
           <form
             aria-busy={isSubmitting}
-            className={styles.card}
+            className={styles.form}
             onSubmit={submit}
           >
             <label className={styles.field}>
@@ -111,8 +121,8 @@ export function LoginConsole({
               </p>
             ) : null}
           </form>
-        </section>
-      </main>
-    </div>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -84,7 +84,7 @@ export type DatasetsResponse = {
 
 export const SEOUL_CENTER: [number, number] = [37.5665, 126.978];
 export const MAP_CENTER: [number, number] = [SEOUL_CENTER[1], SEOUL_CENTER[0]];
-export const DEFAULT_ZOOM = 16;
+export const DEFAULT_ZOOM = 17;
 export const STYLE_LOAD_TIMEOUT_MS = 8000;
 export const THREE_DIMENSIONAL_PITCH = 55;
 export const THREE_DIMENSIONAL_BEARING = -18;
@@ -103,6 +103,11 @@ export const EMERGENCY_ROUTE_SOURCE_ID = "emergency-route";
 export const EMERGENCY_ROUTE_LAYER_ID = "emergency-route-line";
 export const HAZARD_POLL_INTERVAL_MS = 60_000;
 export const HAZARD_AUTO_FOCUS_KEY = "platelets:auto-focus-hazards";
+export const LAST_LOCATION_KEY = "platelets:last-map-location";
+export const DEFAULT_VISIBLE_SOURCES = new Set<DatasetSourceId>([
+  "fire-stations",
+  "police-stations",
+]);
 export const DEFAULT_VISIBLE_SOURCE: DatasetSourceId = "fire-stations";
 export const VIEWPORT_POINTS_PADDING_RATIO = 0.16;
 export const POINT_HALO_RADIUS: PropertyValueSpecification<number> = [
@@ -280,6 +285,7 @@ export type SeoulPopulationStatus = {
 
 export type SeoulPopulationResponse = {
   error?: string;
+  errorKey?: string;
   population?: SeoulPopulationStatus;
 };
 
@@ -1141,27 +1147,35 @@ export function isSourceVisible(
   visibleSources: Partial<Record<DatasetSourceId, boolean>>,
   source: DatasetSourceId,
 ) {
-  return visibleSources[source] ?? source === DEFAULT_VISIBLE_SOURCE;
+  return visibleSources[source] ?? DEFAULT_VISIBLE_SOURCES.has(source);
+}
+
+export function isDefaultVisibleSource(source: DatasetSourceId) {
+  return DEFAULT_VISIBLE_SOURCES.has(source);
 }
 
 export function getPointLimitForZoom(zoom: number) {
   if (zoom < 8) {
-    return 600;
+    return 300;
   }
 
   if (zoom < 10) {
-    return 1_200;
+    return 600;
   }
 
   if (zoom < 12) {
-    return 2_500;
+    return 1_000;
   }
 
   if (zoom < 14) {
-    return 6_000;
+    return 1_600;
   }
 
-  return 16_000;
+  if (zoom < 16) {
+    return 2_400;
+  }
+
+  return 3_200;
 }
 
 export function getViewportFromMap(map: MapLibreMap): PointViewport {
@@ -1185,6 +1199,21 @@ export function getViewportFromMap(map: MapLibreMap): PointViewport {
     minLatitude: Math.max(south - latitudePadding, -90),
     minLongitude: Math.max(west - longitudePadding, -180),
     zoom: map.getZoom(),
+  };
+}
+
+export function getViewportAroundCenter(
+  center: { latitude: number; longitude: number },
+  zoom: number,
+): PointViewport {
+  const radiusDegrees = Math.max(0.01, 180 / 2 ** Math.max(zoom, 1));
+
+  return {
+    maxLatitude: Math.min(center.latitude + radiusDegrees, 90),
+    maxLongitude: Math.min(center.longitude + radiusDegrees, 180),
+    minLatitude: Math.max(center.latitude - radiusDegrees, -90),
+    minLongitude: Math.max(center.longitude - radiusDegrees, -180),
+    zoom,
   };
 }
 
@@ -1541,6 +1570,57 @@ export function buildPopupHtml(
         dictionary.map.popup.naverMap,
       )}</a>
       <a href="${buildKakaoMapUrl(point)}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.kakaoMap,
+      )}</a>
+    </div>
+  </article>`;
+}
+
+export function buildLocationPopupHtml(
+  input: {
+    address: string | null;
+    latitude: number;
+    longitude: number;
+    status: "found" | "loading" | "unavailable";
+  },
+  dictionary: AppDictionary,
+  classNames: PopupClassNames,
+) {
+  const coordinateLabel = `${input.latitude.toFixed(6)}, ${input.longitude.toFixed(6)}`;
+  let statusLabel = uiText(dictionary, "map.popup.addressUnavailable");
+
+  if (input.status === "loading") {
+    statusLabel = uiText(dictionary, "map.popup.addressLoading");
+  }
+
+  if (input.status === "found") {
+    statusLabel = uiText(dictionary, "map.popup.addressFound");
+  }
+  const rows = [
+    [dictionary.map.popup.address, input.address ?? statusLabel],
+    [uiText(dictionary, "map.popup.coordinates"), coordinateLabel],
+  ];
+  const rowsHtml = rows
+    .map(
+      ([label, value]) =>
+        `<div class="${classNames.popupRow}"><dt>${escapeHtml(
+          label,
+        )}</dt><dd>${escapeHtml(value)}</dd></div>`,
+    )
+    .join("");
+  const query = encodeURIComponent(input.address ?? coordinateLabel);
+
+  return `<article class="${classNames.popup}">
+    <div class="${classNames.popupHeader}">
+      <strong>${escapeHtml(uiText(dictionary, "map.popup.selectedLocation"))}</strong>
+      <span>${escapeHtml(statusLabel)}</span>
+    </div>
+    <dl class="${classNames.popupDetails}">${rowsHtml}</dl>
+    <div class="${classNames.popupActions}">
+      <a href="https://map.naver.com/v5/search/${query}" target="_blank" rel="noreferrer">${escapeHtml(
+        dictionary.map.popup.naverMap,
+      )}</a>
+      <a href="https://map.kakao.com/link/search/${query}" target="_blank" rel="noreferrer">${escapeHtml(
         dictionary.map.popup.kakaoMap,
       )}</a>
     </div>

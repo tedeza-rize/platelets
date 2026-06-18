@@ -9,6 +9,7 @@ const SETTINGS_KEY = "integration-settings";
 const MAX_WEBHOOKS = 5;
 
 export type IntegrationSettings = {
+  fireSafetyApiKey: string;
   incidentWebhookUrls: string[];
   itsOpenApiKey: string;
   webPushContact: string;
@@ -17,14 +18,16 @@ export type IntegrationSettings = {
 };
 
 type StoredIntegrationSettings = {
-  incidentWebhookUrls: ProtectedSecret;
-  itsOpenApiKey: ProtectedSecret;
-  webPushContact: ProtectedSecret;
-  webPushPrivateKey: ProtectedSecret;
-  webPushPublicKey: ProtectedSecret;
+  fireSafetyApiKey?: ProtectedSecret;
+  incidentWebhookUrls?: ProtectedSecret;
+  itsOpenApiKey?: ProtectedSecret;
+  webPushContact?: ProtectedSecret;
+  webPushPrivateKey?: ProtectedSecret;
+  webPushPublicKey?: ProtectedSecret;
 };
 
 export type IntegrationSettingsSummary = {
+  fireSafetyApiKeyConfigured: boolean;
   incidentWebhookCount: number;
   itsOpenApiKeyConfigured: boolean;
   webPushConfigured: boolean;
@@ -37,12 +40,19 @@ export type IntegrationSettingsUpdate = Partial<
 };
 
 const EMPTY_SETTINGS: IntegrationSettings = {
+  fireSafetyApiKey: "",
   incidentWebhookUrls: [],
   itsOpenApiKey: "",
   webPushContact: "",
   webPushPrivateKey: "",
   webPushPublicKey: "",
 };
+const FIRE_SAFETY_ENV_KEYS = [
+  "FIRE-SAFTY-API-KEY",
+  "FIRE-SAFETY-API-KEY",
+  "FIRE_SAFETY_API_KEY",
+] as const;
+const ITS_ENV_KEYS = ["ITS-API-KEY", "ITS_API_KEY"] as const;
 
 function cleanText(value: unknown, maxLength: number) {
   return String(value ?? "")
@@ -85,10 +95,23 @@ function normalizeWebPushContact(value: unknown) {
   return url.toString();
 }
 
+function firstEnvironmentValue(names: readonly string[]) {
+  for (const name of names) {
+    const value = cleanText(process.env[name], 2_000);
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
 function protectSettings(
   input: IntegrationSettings,
 ): StoredIntegrationSettings {
   return {
+    fireSafetyApiKey: protectSecret(input.fireSafetyApiKey),
     incidentWebhookUrls: protectSecret(input.incidentWebhookUrls.join("\n")),
     itsOpenApiKey: protectSecret(input.itsOpenApiKey),
     webPushContact: protectSecret(input.webPushContact),
@@ -99,14 +122,36 @@ function protectSettings(
 
 function revealSettings(input: StoredIntegrationSettings): IntegrationSettings {
   return {
+    fireSafetyApiKey: revealSecret(input.fireSafetyApiKey ?? ""),
     incidentWebhookUrls: normalizeWebhookUrls(
-      revealSecret(input.incidentWebhookUrls),
+      revealSecret(input.incidentWebhookUrls ?? ""),
     ),
-    itsOpenApiKey: revealSecret(input.itsOpenApiKey),
-    webPushContact: revealSecret(input.webPushContact),
-    webPushPrivateKey: revealSecret(input.webPushPrivateKey),
-    webPushPublicKey: revealSecret(input.webPushPublicKey),
+    itsOpenApiKey: revealSecret(input.itsOpenApiKey ?? ""),
+    webPushContact: revealSecret(input.webPushContact ?? ""),
+    webPushPrivateKey: revealSecret(input.webPushPrivateKey ?? ""),
+    webPushPublicKey: revealSecret(input.webPushPublicKey ?? ""),
   };
+}
+
+async function seedSettingsFromEnvironment(settings: IntegrationSettings) {
+  const next = { ...settings };
+  let changed = false;
+
+  if (!next.fireSafetyApiKey) {
+    next.fireSafetyApiKey = firstEnvironmentValue(FIRE_SAFETY_ENV_KEYS);
+    changed = Boolean(next.fireSafetyApiKey);
+  }
+
+  if (!next.itsOpenApiKey) {
+    next.itsOpenApiKey = firstEnvironmentValue(ITS_ENV_KEYS);
+    changed = changed || Boolean(next.itsOpenApiKey);
+  }
+
+  if (changed) {
+    await setAppSetting(SETTINGS_KEY, protectSettings(next));
+  }
+
+  return next;
 }
 
 export async function getIntegrationSettings() {
@@ -115,13 +160,16 @@ export async function getIntegrationSettings() {
     null,
   );
 
-  return stored ? revealSettings(stored) : EMPTY_SETTINGS;
+  const settings = stored ? revealSettings(stored) : EMPTY_SETTINGS;
+
+  return seedSettingsFromEnvironment(settings);
 }
 
 export function summarizeIntegrationSettings(
   settings: IntegrationSettings,
 ): IntegrationSettingsSummary {
   return {
+    fireSafetyApiKeyConfigured: Boolean(settings.fireSafetyApiKey),
     incidentWebhookCount: settings.incidentWebhookUrls.length,
     itsOpenApiKeyConfigured: Boolean(settings.itsOpenApiKey),
     webPushConfigured: Boolean(
@@ -143,6 +191,7 @@ export async function saveIntegrationSettings(
   const clear = new Set(input.clear ?? []);
   const next = { ...current };
   const secretFields = [
+    "fireSafetyApiKey",
     "itsOpenApiKey",
     "webPushPrivateKey",
     "webPushPublicKey",

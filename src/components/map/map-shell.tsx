@@ -21,6 +21,44 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
+function readStoredLocation() {
+  const raw = window.localStorage.getItem(mapCore.LAST_LOCATION_KEY);
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      latitude?: unknown;
+      longitude?: unknown;
+    };
+    const latitude = Number(parsed.latitude);
+    const longitude = Number(parsed.longitude);
+
+    if (!(Number.isFinite(latitude) && Number.isFinite(longitude))) {
+      return null;
+    }
+
+    return { latitude, longitude };
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredLocation(location: {
+  latitude: number;
+  longitude: number;
+}) {
+  window.localStorage.setItem(
+    mapCore.LAST_LOCATION_KEY,
+    JSON.stringify({
+      ...location,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
 export function MapShell({
   dictionary,
   initialProvider,
@@ -43,6 +81,7 @@ export function MapShell({
     controller: AbortController;
     id: number;
   } | null>(null);
+  const initialPointViewportRef = useRef<mapCore.PointViewport | null>(null);
   const sourceLabelsRef = useRef<Map<DatasetSourceId, string>>(new Map());
   const knownHazardIdsRef = useRef<Set<string>>(new Set());
   const initialStyleRef = useRef<StyleSpecification>(
@@ -72,8 +111,12 @@ export function MapShell({
     useState<EmergencyRouteResult | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [initialLocationStatus, setInitialLocationStatus] = useState<
+    "pending" | "settled"
+  >("pending");
   const [isThreeDimensional, setIsThreeDimensional] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
+  const [isLowPerformance, setIsLowPerformance] = useState(false);
   const [autoFocusHazards, setAutoFocusHazards] = useState(true);
   const [sourceQuery, setSourceQuery] = useState("");
   const [visibleSources, setVisibleSources] = useState<
@@ -164,61 +207,66 @@ export function MapShell({
     setSeoulAreas(seoulPayload);
   }, []);
 
-  const refreshPointsForViewport = useCallback(async () => {
-    const map = mapRef.current;
+  const refreshPointsForViewport = useCallback(
+    async (viewportOverride?: mapCore.PointViewport | null) => {
+      const map = mapRef.current;
 
-    if (!map || datasets.length === 0) {
-      return;
-    }
+      if (!map || datasets.length === 0) {
+        return;
+      }
 
-    const selectedSources = datasets
-      .filter((dataset) => mapCore.isSourceVisible(visibleSources, dataset.id))
-      .map((dataset) => dataset.id);
+      const selectedSources = datasets
+        .filter((dataset) =>
+          mapCore.isSourceVisible(visibleSources, dataset.id),
+        )
+        .map((dataset) => dataset.id);
 
-    pointRequestRef.current?.controller.abort();
+      pointRequestRef.current?.controller.abort();
 
-    if (selectedSources.length === 0) {
-      pointRequestRef.current = null;
-      setPoints([]);
-      return;
-    }
+      if (selectedSources.length === 0) {
+        pointRequestRef.current = null;
+        setPoints([]);
+        return;
+      }
 
-    const controller = new AbortController();
-    const requestId = (pointRequestRef.current?.id ?? 0) + 1;
-    pointRequestRef.current = { controller, id: requestId };
+      const controller = new AbortController();
+      const requestId = (pointRequestRef.current?.id ?? 0) + 1;
+      pointRequestRef.current = { controller, id: requestId };
 
-    const viewport = mapCore.getViewportFromMap(map);
-    const response = await fetch(
-      mapCore.buildPointsUrl(selectedSources, viewport),
-      {
-        cache: "no-store",
-        signal: controller.signal,
-      },
-    );
+      const viewport = viewportOverride ?? mapCore.getViewportFromMap(map);
+      const response = await fetch(
+        mapCore.buildPointsUrl(selectedSources, viewport),
+        {
+          cache: "no-store",
+          signal: controller.signal,
+        },
+      );
 
-    if (
-      pointRequestRef.current?.id !== requestId ||
-      controller.signal.aborted
-    ) {
-      return;
-    }
+      if (
+        pointRequestRef.current?.id !== requestId ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
 
-    if (!response.ok) {
-      throw new Error("Failed to load viewport points");
-    }
+      if (!response.ok) {
+        throw new Error("Failed to load viewport points");
+      }
 
-    const payload = (await response.json()) as mapCore.PointsResponse;
+      const payload = (await response.json()) as mapCore.PointsResponse;
 
-    if (
-      pointRequestRef.current?.id !== requestId ||
-      controller.signal.aborted
-    ) {
-      return;
-    }
+      if (
+        pointRequestRef.current?.id !== requestId ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
 
-    setPoints(payload.points);
-    setDataError(null);
-  }, [datasets, visibleSources]);
+      setPoints(payload.points);
+      setDataError(null);
+    },
+    [datasets, visibleSources],
+  );
 
   const focusHazard = useCallback((event: mapCore.HazardEvent) => {
     setActiveHazard(event);
@@ -301,6 +349,36 @@ export function MapShell({
   }, [autoFocusHazards]);
 
   useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    let frameCount = 0;
+    let startedAt = performance.now();
+    let animationId = 0;
+
+    function measureFrame(now: number) {
+      frameCount += 1;
+      const elapsedSeconds = (now - startedAt) / 1000;
+
+      if (elapsedSeconds >= 3) {
+        const fps = frameCount / elapsedSeconds;
+        setIsLowPerformance(fps < 30);
+        frameCount = 0;
+        startedAt = now;
+      }
+
+      animationId = window.requestAnimationFrame(measureFrame);
+    }
+
+    animationId = window.requestAnimationFrame(measureFrame);
+
+    return () => {
+      window.cancelAnimationFrame(animationId);
+    };
+  }, [isMapReady]);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => {
       refreshHazards().catch(() => undefined);
     }, mapCore.HAZARD_POLL_INTERVAL_MS);
@@ -320,7 +398,7 @@ export function MapShell({
 
       for (const dataset of datasets) {
         next[dataset.id] =
-          current[dataset.id] ?? dataset.id === mapCore.DEFAULT_VISIBLE_SOURCE;
+          current[dataset.id] ?? mapCore.isDefaultVisibleSource(dataset.id);
       }
 
       return next;
@@ -328,7 +406,7 @@ export function MapShell({
   }, [datasets]);
 
   useEffect(() => {
-    if (!isMapReady) {
+    if (!isMapReady || initialLocationStatus === "pending") {
       return;
     }
 
@@ -341,7 +419,9 @@ export function MapShell({
       }
 
       timeoutId = window.setTimeout(() => {
-        refreshPointsForViewport().catch((error) => {
+        const viewport = initialPointViewportRef.current;
+        initialPointViewportRef.current = null;
+        refreshPointsForViewport(viewport).catch((error) => {
           if (isAbortError(error)) {
             return;
           }
@@ -372,7 +452,80 @@ export function MapShell({
       map.off("moveend", scheduleRefresh);
       map.off("zoomend", scheduleRefresh);
     };
-  }, [isMapReady, refreshPointsForViewport]);
+  }, [initialLocationStatus, isMapReady, refreshPointsForViewport]);
+
+  useEffect(() => {
+    if (!isMapReady) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    if (!map) {
+      setInitialLocationStatus("settled");
+      return;
+    }
+
+    const storedLocation = readStoredLocation();
+
+    if (storedLocation) {
+      initialPointViewportRef.current = mapCore.getViewportAroundCenter(
+        storedLocation,
+        mapCore.DEFAULT_ZOOM,
+      );
+      setEmergencyOrigin(storedLocation);
+      map.jumpTo({
+        center: [storedLocation.longitude, storedLocation.latitude],
+        zoom: Math.max(map.getZoom(), mapCore.DEFAULT_ZOOM),
+      });
+      setInitialLocationStatus("settled");
+    }
+
+    if (!navigator.geolocation) {
+      setInitialLocationStatus("settled");
+      return;
+    }
+
+    let disposed = false;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (disposed) {
+          return;
+        }
+
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        initialPointViewportRef.current = mapCore.getViewportAroundCenter(
+          { latitude, longitude },
+          mapCore.DEFAULT_ZOOM,
+        );
+        setEmergencyOrigin({ latitude, longitude });
+        writeStoredLocation({ latitude, longitude });
+        map.flyTo({
+          center: [longitude, latitude],
+          essential: true,
+          zoom: Math.max(map.getZoom(), mapCore.DEFAULT_ZOOM),
+        });
+        setInitialLocationStatus("settled");
+      },
+      () => {
+        if (!disposed) {
+          setInitialLocationStatus("settled");
+        }
+      },
+      {
+        enableHighAccuracy: false,
+        maximumAge: 60_000,
+        timeout: 3_000,
+      },
+    );
+
+    return () => {
+      disposed = true;
+    };
+  }, [isMapReady]);
 
   useEffect(() => {
     hazardsRef.current = hazards;
@@ -550,6 +703,7 @@ export function MapShell({
       hazardsCount={hazards.length}
       isEmergencyPanelOpen={isEmergencyPanelOpen}
       isLoadingData={isLoadingData}
+      isLowPerformance={isLowPerformance}
       isMenuOpen={isMenuOpen}
       isSourceMenuOpen={isSourceMenuOpen}
       isThreeDimensional={isThreeDimensional}
