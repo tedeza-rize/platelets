@@ -1336,7 +1336,14 @@ function readStoredLocation(): StoredLocation | null {
 
 function writeStoredLocation(location: StoredLocation) {
   try {
-    window.localStorage.setItem(LAST_LOCATION_KEY, JSON.stringify(location));
+    const storedLocation: StoredLocation = {
+      latitude: Number(location.latitude.toFixed(2)),
+      longitude: Number(location.longitude.toFixed(2)),
+    };
+    window.localStorage.setItem(
+      LAST_LOCATION_KEY,
+      JSON.stringify(storedLocation),
+    );
   } catch {
     // Storage can be unavailable in private or locked-down browser profiles.
   }
